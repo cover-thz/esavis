@@ -9,6 +9,7 @@
 # Copyright Cover.ai 2025
 #############################################################################
 
+import multiprocessing as mp
 from tlv import (
     TLV,
     TLVMessage,
@@ -79,6 +80,9 @@ new ones
 #############################################################################
 #############################################################################
 
+class ConfigObj:
+    
+
 
 
 # Main loop that is called by the multiprocessing core.  This contains all the
@@ -122,6 +126,7 @@ def main_loop(cfg_obj_pipe, flags_pipe, rsvd_pipe, frame_queue,
     #   multiprocessing concurrent.futures stuff as desired
 
     while True:
+        cfg_obj_pipe.poll()
         # check for configuration / pipe data
         # 
         # check for DAQ or file.  
