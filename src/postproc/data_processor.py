@@ -3,21 +3,19 @@
 # Date Created: 4/1/2025
 # Original Author: Max Bryk
 # Description
-#   This file contains the main body of code that grabs data from the radar 
-#   DAQ subsystem and processes it into formats usable by the GUI
+#   This file contains the main body of code that controls all the high level
+#   functions like updating the configuration set whenever the user updates 
+#   config parameters in the GUI, grabbing the DAQ values, sending those values
+#   to the processing substsytem, and grabbing processed frames and sending
+#   them back to the GUI through multiprocessing pipes
 #
 # Copyright Cover.ai 2025
 #############################################################################
 
 import multiprocessing as mp
-from tlv import (
-    TLV,
-    TLVMessage,
-    TLVPlotCmd,
-    TLVPlotTag,
-    TLVTracePCIeHTGZRF80002Tag,
-    TLVType,
-)
+import collections
+import daq_comms as dc
+import main_proc_fcns as mpf
 
 
 # simple method for moving the docstring above the function declaration
@@ -70,18 +68,27 @@ new ones
         a frame.  Note that "filled" means a rangeline assigned to that pixel
         not necessarily a valid pixel (as that rangeline may have no 
         valid peaks)
+       
+    daq_addr
+        the address used to connect to the DAQ.  Probably always will be 
+        "localhost"
 
-    
+    daq_num_rangelines
+        number of rangelines to grab from the DAQ at a time
 
+    daq_timeout       
+        total amount of time to wait while grabbing "daq_num_rangelines" before
+        returning whatever rangelines you found.  This is not related to the
+        python socket timout - that's a lower level timeout
+
+        
+        
 
 
 
 """
 #############################################################################
 #############################################################################
-
-class ConfigObj:
-    
 
 
 
@@ -93,7 +100,9 @@ additional objects
 
 cfg_obj_pipe
     this is a pipe that you send configuration objects through to reconfigure
-    the data processor.  Its a "pile" of data that changes infrequently, like
+    the data processor.  It consists of a dictionary with values in it that 
+    need to be updated
+
     the number of x and y pixels.  It even includes things that change more 
     frequently like threshold and contrast values.  
 
@@ -103,22 +112,22 @@ cfg_obj_pipe
     This config pipe actually should contain tagged data where only new values
     are sent, to minimize the overhead 
 
-flags_pipe 
-    a lightweight variable that contains flags indicating various things like
-    pause and resume.
-
 rsvd_pipe
     currently uncertain what's in here. But it feels like it should exist
 
 frame_queue
     a queue object that contains an object that contains all relelvent frame
     data
-
-
 """)
-def main_loop(cfg_obj_pipe, flags_pipe, rsvd_pipe, frame_queue, 
-              aux_data_queue):
-        
+def main_processing_loop(cfg_obj_pipe, error_pipe, frame_pipe, 
+                         aux_pipe, cfg_dict):
+
+
+    radar       = dc.SimpRadar()
+    daq_connected = False
+
+
+
     # setup everything 
     #   DAQ socket and sending that configuration
     #   xml thing.  Abstract away as much as possible
@@ -126,7 +135,92 @@ def main_loop(cfg_obj_pipe, flags_pipe, rsvd_pipe, frame_queue,
     #   multiprocessing concurrent.futures stuff as desired
 
     while True:
-        cfg_obj_pipe.poll()
+        # do a status check of everything, the DAQ connection in particular
+        # but anything that could periodically change asynchronously
+
+        #####################################################################
+        #                         SETUP CHANGES STEPS                       #
+        #####################################################################
+        if (cfg_obj_pipe.poll()):
+            new_cfg_vals = cfg_obj_pipe.recv()
+
+            # update the configuration
+            for keyval in new_cfg_vals.keys():
+                if keyval in cfg_dict.keys():
+                    cfg_dict[keyval] = new_cfg_vals[keyval]
+                if keyval in update_keys:
+                    cfg_update = True
+                else:
+                    cfg_update = False
+        
+            # all new cfg_obj_pipe values have a flags dict
+            # and we check the flags to see what we have to do 
+            cfg_flags = new_cfg_vals["flags"]
+            if ("setup_daq" in cfg_flags) or ("update_daq_ch" in cfg_flags):
+                ch0_en = cfg_dict["ch0_en"]
+                ch1_en = cfg_dict["ch1_en"]
+
+                if not radar.daq_connected:
+                    addr   = cfg_dict["daq_addr"]
+                    conn_success = radar.setup_comms(addr, ch0_en, ch1_en)
+                    if conn_success:
+                        daq_connected = True
+                    else:
+                        error_pipe.send(["DAQ_CONN_FAILED"])
+                else:
+                    radar.set_en_channels(ch0_en, ch1_en)
+
+        else: # no updated config values
+            cfg_flags = None
+
+
+
+        #####################################################################
+        #                      DATA GATHERING STEPS                         #
+        #####################################################################
+        if cfg_dict["data_src"] == "daq":
+            daq_num_rangelines = cfg_dict["daq_num_rangelines"]
+            daq_timeout         = cfg_dict["daq_timeout"]
+           
+           # this step actually grabs the rangelines from the DAQ
+           (rangelines_array, az_array, 
+            el_array, ch_array, num_rangelines, 
+            status_flag) = radar.get_daq_data(daq_num_rangelines, 
+                           radar_timeout)
+
+            # currently just trash everything that's not OK
+            if status_flag != "OK":
+                error_pipe.send(["DAQ STATUS FLAG NOT OK", status_flag])
+                continue 
+
+            if num_rangelines != daq_num_rangelines:
+                rangelines_array = rangelines_array[:num_rangelines]
+                az_array = az_array[:num_rangelines]
+                el_array = el_array[:num_rangelines]
+                ch_array = ch_array[:num_rangelines]
+
+            (frame_out, aux_data_out, 
+             new_frame_flag) = postproc_data(rangelines_array, az_array, 
+                                             el_array, ch_array, cfg_dict, 
+                                             cfg_flags)
+
+
+        elif cfg_dict["data_src"] == "video_file"
+
+
+        else: # cfg_dict["data_src"] == "still_file":
+            if cfg_update:
+                (frame_out, aux_data_out, new_frame_flag) = postproc_data(None, cfg_dict)
+
+
+        # send frame
+        if new_frame_flag
+            frame_pipe.send(frame_out)
+
+
+           
+
+
         # check for configuration / pipe data
         # 
         # check for DAQ or file.  
