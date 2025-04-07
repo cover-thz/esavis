@@ -233,7 +233,7 @@ class SimpRadar:
 
 
     # main workhorse function
-    def get_daq_data(s, num_rangelines, timeout=3):
+    def get_daq_data(s, num_rangelines, ret_on_turnaround, timeout=3):
         start_time = time.time()
 
         buffer_setup = False
@@ -242,8 +242,11 @@ class SimpRadar:
         az_array = None
         el_array = None
         ch_array = None
+        turnaround_inds = []
+        prev_az = None
+        az_diff_pos = None
 
-        # index of the rangeline.  Also dobules as number of rangelines 
+        # index of the rangeline.  Also doubles as number of rangelines 
         # captureed
         i = 0 
         while True:
@@ -294,6 +297,28 @@ class SimpRadar:
                         "big",
                         signed=False,)
 
+                    # setup turnaround detection
+                    if prev_az == None:
+                        prev_az = az_val
+                    else:
+                        diff = az_val - prev_az
+                        # is az_diff initialised yet?
+                        if az_diff_pos == None:
+                            if diff > 0:
+                                az_diff _pos = True
+                            elif diff < 0:
+                                az_diff_pos = False
+                            else: 
+                                # wait for an actual difference
+                                az_diff_pos = None
+                        else:
+                            diff_dir = bool(diff > 0)
+                            if diff_dir != az_diff_pos:
+                                turnaround_inds.append(i)
+                                if ret_on_turnaround:
+                                    status_flag = "TURNAROUND"
+                                    break
+
                     # setup the buffers now because you don't know the 
                     # length of the rangeline until now
                     if not buffer_setup:
@@ -320,6 +345,6 @@ class SimpRadar:
                     continue
 
         return (rangelines_array, az_array, el_array, ch_array, 
-                i, status_flag)
+                i, turnaround_inds, status_flag)
 
 

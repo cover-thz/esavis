@@ -406,6 +406,59 @@ def regrid_rangelines(rangelines_in, el_array_in, az_array_in, channels_in,
 
     return (coarse_rangelines_grid, coarse_valid_grid, 
             ideal_az_array, ideal_el_array, real_az_out, real_el_out)
+            
+###############################################################################
+###############################################################################
+
+
+def update_grid(rangelines_grid_a, valid_grid_a, grid_az_a, grid_el_a, 
+                rangelines_grid_b, valid_grid_b, grid_az_b, grid_el_b, 
+                ideal_az_grid, ideal_el_grid):
+                """
+                compares the two grids of rangelines, checks the distance
+                of each rangeline from the ideal and selects the better one
+                """
+                rangelines_grid_out = np.zeros(rangelines_grid_a.shape)
+                grid_el_out = np.zeros(grid_el_a.shape)
+                grid_az_out = np.zeros(grid_az_a.shape)
+                dist_arr_a  = np.square(grid_az_a-ideal_az_grid) + 
+                              np.square(grid_el_a-idea_el_grid)
+                max_a = np.max(dist_arr_a)
+                
+                dist_arr_b  = np.square(grid_az_b-ideal_az_grid) + 
+                              np.square(grid_el_b-idea_el_grid)
+                max_b = np.max(dist_arr_b)
+                max_val = np.max([max_a, max_b])
+
+                # now effectively get rid of the invalid indices
+                dist_arr_a[~valid_grid_a] = max_val + 1
+                dist_arr_b[~valid_grid_b] = max_val + 1
+
+                # this is inefficient, but there are speedups available 
+                # if it becomes necessary
+                for i in dist_arr_a.shape[0]
+                    for j in dist_arr_a.shape[1]:
+                        if dist_arr_a >= dist_arr_b:
+                            rangelines_grid_out[i][j] = rangelines_grid_a[i][j]
+                            grid_el_out[i][j] = grid_el_a[i][j]
+                            grid_az_out[i][j] = grid_az_a[i][j]
+                        else:
+                            rangelines_grid_out[i] = rangelines_grid_b[i]
+                            grid_el_out[i][j] = grid_el_b[i][j]
+                            grid_az_out[i][j] = grid_az_b[i][j]
+
+                valid_grid_out = valid_grid_a + valid_grid_b
+                return (rangelines_grid_out, valid_grid_out, grid_az_out, 
+                        grid_el_out)
+
+###############################################################################
+###############################################################################
+
+
+def check_col_percent(r_grid_valids):
+    """
+    To be written
+    """
 
             
 ###############################################################################
@@ -442,6 +495,36 @@ def spectra_conv(coarse_rangelines_grid, data_format_in, fft_len, fs_post_dec):
     freq_lut = np.fft.fftshift(freq_lut)
 
     return (coarse_power_grid, freq_lut)
+
+##############################################################################
+##############################################################################
+
+# extracts some data from a single rangeline calculation
+def extract_aux_vals(
+    """
+    what aux values do I want?
+        the power spectrum
+        time domain (if it exists)
+        FFT (if it exists)
+        adjusted linear threshold
+        adjusted linear contrast "threshold"
+        noise floor indices
+        noise floor value
+        weighted_sum indices
+        calc_weighted_sum flag
+
+
+    """
+
+
+#int extract_single_rangeline_peaks(double *rangeline_power, int rng_len,
+#    double *range_lut_cm, double threshold_lin,
+#    double contrast_lin, int half_peak_width, double min_range,
+#    double max_range, int num_noise_pts, double noise_start_frac,
+#    int *interm_peak_inds, bool calc_weighted_sum, double *peak_ranges,
+#    double *peak_powers_lin, double *noise_floor, int *num_peaks) {
+
+
 
 ##############################################################################
 ##############################################################################
@@ -544,4 +627,6 @@ def extract_peaks_c(coarse_power_grid_in, coarse_valid_grid_in, xlen_in,
                 pixel_ranges_grid[i][j] = dead_pix_val
 
     return (pixel_ranges_grid, valid_pixels_grid, noise_floor_grid)
+
+
 

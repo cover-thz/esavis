@@ -16,6 +16,7 @@ import multiprocessing as mp
 import collections
 import daq_comms as dc
 import main_proc_fcns as mpf
+import file_parser as fp
 
 
 # simple method for moving the docstring above the function declaration
@@ -80,11 +81,7 @@ new ones
         total amount of time to wait while grabbing "daq_num_rangelines" before
         returning whatever rangelines you found.  This is not related to the
         python socket timout - that's a lower level timeout
-
         
-        
-
-
 
 """
 #############################################################################
@@ -119,13 +116,27 @@ frame_queue
     a queue object that contains an object that contains all relelvent frame
     data
 """)
-def main_processing_loop(cfg_obj_pipe, error_pipe, frame_pipe, 
-                         aux_pipe, cfg_dict):
+def main_processing_loop(cfg_obj_pipe, error_pipe, data_out_pipe, 
+                         cfg_dict):
 
-
+    dbg_prof    = False
     radar       = dc.SimpRadar()
     daq_connected = False
 
+    # buffer containing data from most recent fileset
+
+    file_buf = collections.OrderedDict()
+    file_buf["initialized"] = False
+    file_buf["rangelines"]  = None
+    file_buf["elevation"]   = None
+    file_buf["azimuth"]     = None
+    file_buf["channels"]    = None
+    file_buf["fs_post_dec"] = None
+    file_buf["fft_flag"]    = None
+    file_buf["powcalc_flag"]    = None
+    file_buf["dec_val"]     =  None
+    file_buf["len_rangeline"]   = None
+    file_buf["data_good"]   = None
 
 
     # setup everything 
@@ -141,6 +152,7 @@ def main_processing_loop(cfg_obj_pipe, error_pipe, frame_pipe,
         #####################################################################
         #                         SETUP CHANGES STEPS                       #
         #####################################################################
+        # check for new confiugration data
         if (cfg_obj_pipe.poll()):
             new_cfg_vals = cfg_obj_pipe.recv()
 
@@ -171,8 +183,7 @@ def main_processing_loop(cfg_obj_pipe, error_pipe, frame_pipe,
                     radar.set_en_channels(ch0_en, ch1_en)
 
         else: # no updated config values
-            cfg_flags = None
-
+            cfg_flags = []
 
 
         #####################################################################
@@ -182,16 +193,34 @@ def main_processing_loop(cfg_obj_pipe, error_pipe, frame_pipe,
             daq_num_rangelines = cfg_dict["daq_num_rangelines"]
             daq_timeout         = cfg_dict["daq_timeout"]
            
+            # this directs get_daq_data() to stop looking for rangelines after
+            # a turnaround is detected and return immediately
+            if cfg_dict["frame_style"] == "azumuth_turnaround":
+                ret_on_turnaround = True
+            else:
+                ret_on_turnaround = False
+
            # this step actually grabs the rangelines from the DAQ
            (rangelines_array, az_array, 
-            el_array, ch_array, num_rangelines, 
+            el_array, ch_array, num_rangelines, turnaround_inds, 
             status_flag) = radar.get_daq_data(daq_num_rangelines, 
-                           radar_timeout)
+                                              ret_on_turnaround,
+                                              daq_timeout)
 
-            # currently just trash everything that's not OK
-            if status_flag != "OK":
+            # can gather a lot of metadata here
+
+            # turnaround_inds not used right now
+
+
+            # currently just trash everything that's not perfectly OK
+            if status_flag not in ["OK", "TURNAROUND"]:
                 error_pipe.send(["DAQ STATUS FLAG NOT OK", status_flag])
                 continue 
+
+            if status_flag == "TURNAROUND":
+                turnaround_flag = True
+            else:
+                turnaround_flag = False
 
             if num_rangelines != daq_num_rangelines:
                 rangelines_array = rangelines_array[:num_rangelines]
@@ -199,26 +228,74 @@ def main_processing_loop(cfg_obj_pipe, error_pipe, frame_pipe,
                 el_array = el_array[:num_rangelines]
                 ch_array = ch_array[:num_rangelines]
 
+
             (frame_out, aux_data_out, 
              new_frame_flag) = postproc_data(rangelines_array, az_array, 
-                                             el_array, ch_array, cfg_dict, 
-                                             cfg_flags)
+                                             el_array, ch_array, 
+                                             turnaround_flag, cfg_dict, 
+                                             cfg_flags, dbg_prof)
 
 
-        elif cfg_dict["data_src"] == "video_file"
+        # future work
+        #elif cfg_dict["data_src"] == "video_file"
 
 
-        else: # cfg_dict["data_src"] == "still_file":
+        else: # cfg_dict["data_src"] == "dat_file":
+            # for a dat_file the postproc_data handles that completely
             if cfg_update:
-                (frame_out, aux_data_out, new_frame_flag) = postproc_data(None, cfg_dict)
+                if ("fname_changed" in cfg_flags) or 
+                   (file_buf["initialized"] == False):
+
+                    fs_adc = cfg_dict["fs_adc"]
+                    fname_list = cfg_dict["fname_list"]
+
+                    (rangelines, elevation, azimuth, channels, 
+                     fs_post_dec, fft_flag, powcalc_flag, dec_val, 
+                     len_rangeline, 
+                     data_good) = fp.get_rangelines_from_file(fname_list, 
+                                                              fs_adc)
+            
+                    file_buf["initialized"] = True
+                    file_buf["rangelines"]  = rangelines
+                    file_buf["elevation"]   = elevation
+                    file_buf["azimuth"]     = azimuth
+                    file_buf["channels"]    = channels
+                    file_buf["fs_post_dec"] = fs_post_dec
+                    file_buf["fft_flag"]    = fft_flag
+                    file_buf["powcalc_flag"]    = powcalc_flag
+                    file_buf["dec_val"]     =  dec_val
+                    file_buf["len_rangeline"]   = len_rangeline
+                    file_buf["data_good"]   = data_good
+
+                else:
+                    # grab the stored data of the most recent file and 
+                    # re-process it
+                    rangelines_array    = file_buf["rangelines"]
+                    el_array            = file_buf["elevation"]
+                    az_array            = file_buf["azimuth"]
+                    ch_array            = file_buf["channels"]
+                    fs_post_dec         = file_buf["fs_post_dec"]
+                    fft_flag            = file_buf["fft_flag"]
+                    powcalc_flag        = file_buf["powcalc_flag"]
+                    dec_val             = file_buf["dec_val"]
+                    len_rangeline       = file_buf["len_rangeline"]
+                    data_good           = file_buf["data_good"]
+
+                    if not data_good:
+                        error_pipe.send("FILE_FRAME_DATA_BAD"]
+                        new_frame_flag = False
+                    else:
+                        (frame_out, aux_data_out, 
+                         new_frame_flag) = postproc_data(rangelines_array, 
+                                                az_array, el_array, ch_array, 
+                                                turnaround_flag, cfg_dict, 
+                                                cfg_flags, dbg_prof)
 
 
         # send frame
         if new_frame_flag
-            frame_pipe.send(frame_out)
+            data_out_pipe.send([frame_out, aux_data_out])
 
-
-           
 
 
         # check for configuration / pipe data
@@ -237,14 +314,8 @@ def main_processing_loop(cfg_obj_pipe, error_pipe, frame_pipe,
         #
 
 
+        if "close_process" in cfg_flags:
+            break
 
-
-
-
-
-
-
-
-def 
 
 
