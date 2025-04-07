@@ -506,6 +506,7 @@ def extract_aux_vals(
         the power spectrum
         time domain (if it exists)
         FFT (if it exists)
+
         adjusted linear threshold
         adjusted linear contrast "threshold"
         noise floor indices
