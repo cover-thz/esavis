@@ -16,8 +16,8 @@ import multiprocessing as mp
 import collections
 import daq_comms as dc
 import main_proc_fcns as mpf
-import file_parser as fp
-
+import dat_file_fcns as dff
+import time
 
 # simple method for moving the docstring above the function declaration
 # because having a big docstring underneath the arguments list is annoying
@@ -219,6 +219,7 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe,
                                               daq_timeout)
 
             if status_flag == "DAQ_NOT_CONNECTED":
+                time.sleep(0.01)
                 continue
 
             # can gather a lot of metadata here
@@ -265,8 +266,8 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe,
                     (rangelines, elevation, azimuth, channels, 
                      fs_post_dec, fft_flag, powcalc_flag, dec_val, 
                      len_rangeline, 
-                     data_good) = fp.get_rangelines_from_file(fname_list, 
-                                                              fs_adc)
+                     data_good) = dff.get_rangelines_from_file(fname_list, 
+                                                               fs_adc)
             
                     file_buf["initialized"] = True
                     file_buf["rangelines"]  = rangelines

@@ -88,3 +88,4 @@ src/config/*.json
 /docs
 
 src/sandbox
+/data

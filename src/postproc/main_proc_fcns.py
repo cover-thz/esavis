@@ -34,18 +34,11 @@ class CoverProc:
         s.r_grid_data   = None
         s.r_grid_valids = None
         s.last_az       = None
+        s.accum_rangelines = 0
 
-
-    # rangeline grid is the pre-processed "frame".  In the initial phase
-    # of acquisiton we accumulate rangelines until the regridded rangelines
-    # make a satisfactory frame (under certain conditions, such as azimuth
-    # turnaround, % pixels, % columns, or just time) 
-    # we accumulate those in the "rangeline_grid" variable
-    def reset_rangeline_grid(s, coarse_az_1d, coarse_el_1d, 
+    def reset_coarse_grids(s, coarse_az_1d, coarse_el_1d, 
                     ideal_az_array, ideal_el_array, xlen, ylen, 
                     data_format_in):
-        # TODO maybe reset accumulation-related variables as well
-
         s.coarse_az_1d = coarse_az_1d
         s.coarse_el_1d = coarse_el_1d
 
@@ -54,13 +47,21 @@ class CoverProc:
         s.xlen           = xlen
         s.ylen           = ylen
         s.data_format_in = data_format_in
+        s.uninitialized = False
+
+    # rangeline grid is the pre-processed "frame".  In the initial phase
+    # of acquisiton we accumulate rangelines until the regridded rangelines
+    # make a satisfactory frame (under certain conditions, such as azimuth
+    # turnaround, % pixels, % columns, or just time) 
+    # we accumulate those in the "rangeline_grid" variable
+    def clear_preproc_buffer(s):
+        s.accum_rangelines = 0
 
         s.r_grid_data   = np.zeros((s.xlen, s.ylen, s.rng_len), 
                                   dtype=np.float64)
         s.r_grid_valids = np.zeros((s.xlen, s.ylen), dtype=bool)
         s.r_grid_az     = np.zeros((s.xlen, s.ylen), dtype=np.float64)
         s.r_grid_el     = np.zeros((s.xlen, s.ylen), dtype=np.float64)
-        s.uninitialized = False
 
     #def reset_frame(s):
     #    s.curr_frame_data   = np.zeros((s.xlen, s.ylen), dtype=np.float64)
@@ -73,7 +74,9 @@ class CoverProc:
         len_rangeline = len(rangelines_array[-1])
                                                  
         num_rangelines = len(rangelines_array)
-        #print(f"num_rangelines: {num_rangelines}")
+        s.accum_rangelines += num_rangelines
+        #print(f"accumulated rangelines: {s.accum_rangelines}")
+
 
         reset_proc = False
         if ((s.uninitialized) or ("recalc_coarse_grid" in cfg_flags)):
@@ -119,9 +122,12 @@ class CoverProc:
                 data_format_in = cfg_dict["data_format_in"]
 
                 # have to reset the grid when making these adjustments
-                s.reset_rangeline_grid(coarse_az_1d, coarse_el_1d, 
+                s.reset_coarse_grids(coarse_az_1d, coarse_el_1d, 
                     ideal_az_array, ideal_el_array, xlen, ylen, 
                     data_format_in)
+                
+                # this 
+                s.clear_preproc_buffer()
 
             #################################################################
             #                        Regridding Steps                       #
@@ -154,7 +160,7 @@ class CoverProc:
                                 dbg_prof)
             
             num_valids = np.sum(new_valid_grid)
-            #print(f"number re-gridded successfully: {num_valids}")
+            #print(f"pre update_grid valids: {num_valids}")
 
             # this compares the passed rangelines grid azimuth and elvation
             # values and evaluates how "close" they are to the ideal when
@@ -198,7 +204,11 @@ class CoverProc:
                 if turnaround_flag:
                     process_frame = True
 
-            elif cfg_dict["frame_style"] == "dat_file":
+            elif cfg_dict["frame_style"] == "accum_rangelines":
+                if s.accum_rangelines >= cfg_dict["accum_rangelines_thresh"]:
+                    process_frame = True
+
+            elif cfg_dict["frame_style"] == "always":
                 process_frame = True
 
 
@@ -235,7 +245,7 @@ class CoverProc:
                 (pixel_ranges_grid, valid_pixels_grid, 
                  noise_floor_grid) = lpf.extract_peaks_c(coarse_power_grid, 
                                         s.r_grid_valids, s.xlen, s.ylen, 
-                                        s.rng_len, range_lut_cm, 
+                                        fft_len, range_lut_cm, 
                                         threshold_lin, contrast_lin, 
                                         half_peak_width, peak_selection, 
                                         num_noise_pts, noise_start_frac, 
@@ -275,6 +285,10 @@ class CoverProc:
                 aux_data_out["aux_weight_sum_end"]  = aux_weight_sum_end
 
                 new_frame_flag = True
+
+                # clear the preprocessed buffer now that we've processed the 
+                # frame
+                s.clear_preproc_buffer()
 
             else:
                 frame_out       = None

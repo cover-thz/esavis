@@ -23,7 +23,8 @@ def extract_rdat(rdat, fs_adc):
 
         elevation[j]        = np.float64(hdr.el_pos) 
         azimuth[j]          = np.float64(hdr.az_pos) 
-        rangelines_out[j]   = rdat.rangelines[i][::-1]
+        #rangelines_out[j]   = rdat.rangelines[i][::-1]
+        rangelines_out[j]   = rdat.rangelines[i]
         channels[j]         = hdr.channel_id
 
         # decimation values, FFT values, and power values  for each header 

@@ -163,6 +163,7 @@ class SimpRadar:
 
     def __init__(s):
         s.daq_sock = DAQSocket()
+        s.tot_rangelines = 0
         s.en_channels = []
 
     def setup_comms(s, addr, ch0_en, ch1_en):
@@ -283,6 +284,7 @@ class SimpRadar:
 
             else:
                 if radar_data.message_type == TLVPlotCmd.SEND_TRACE_DATA:
+                    s.tot_rangelines += 1
                     az_val = float(
                         from_14_bit(
                             radar_data.get_by_tag(

@@ -18,9 +18,12 @@ if __name__ == "__main__":
     cfg_dict["daq_addr"]    = "localhost"
     cfg_dict["data_src"]    = "daq"
 
-    cfg_dict["daq_num_rangelines"] = 1000
+    cfg_dict["daq_num_rangelines"] = 4000
     cfg_dict["daq_timeout"] = 3
-    cfg_dict["frame_style"] = "azimuth_turnaround"
+    #cfg_dict["frame_style"] = "azimuth_turnaround"
+    #cfg_dict["frame_style"] = "always"
+    cfg_dict["frame_style"] = "accum_rangelines"
+    cfg_dict["accum_rangelines_thresh"] = 96000
 
 
     fs_adc = 4e9
@@ -117,7 +120,6 @@ if __name__ == "__main__":
     daq_setup_flag = False
     while True:   
         if (main_data_pipe.poll()):
-            print("GOT HERE!")
             i = 0
             [frame_out, aux_data_out] = main_data_pipe.recv()
             if frame_out != None:
@@ -127,12 +129,12 @@ if __name__ == "__main__":
             else:
                 print("frame_out is None")
 
-            #color_min = min(pixel_ranges_grid[valid_pixels_grid])
-            #color_max = max(pixel_ranges_grid[valid_pixels_grid])
-            color_min = np.min(valid_pixels_grid)
-            color_max = np.max(valid_pixels_grid)
+            color_min = min(pixel_ranges_grid[valid_pixels_grid])
+            color_max = max(pixel_ranges_grid[valid_pixels_grid])
+            #color_min = np.min(valid_pixels_grid)
+            #color_max = np.max(valid_pixels_grid)
 
-            pf.plot_img_vals(valid_pixels_grid, coarse_az_array, coarse_el_array, 
+            pf.plot_img_vals(pixel_ranges_grid, coarse_az_array, coarse_el_array, 
                     color_min, color_max, "Test 1!")
         else:
             i += 1
