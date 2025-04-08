@@ -116,11 +116,12 @@ frame_queue
     a queue object that contains an object that contains all relelvent frame
     data
 """)
-def main_processing_loop(cfg_obj_pipe, error_pipe, data_out_pipe, 
+def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, 
                          cfg_dict):
 
     dbg_prof    = False
     radar       = dc.SimpRadar()
+    proc_obj    = mpf.CoverProc()
     daq_connected = False
 
     # buffer containing data from most recent fileset
@@ -138,7 +139,6 @@ def main_processing_loop(cfg_obj_pipe, error_pipe, data_out_pipe,
     file_buf["len_rangeline"]   = None
     file_buf["data_good"]   = None
 
-
     # setup everything 
     #   DAQ socket and sending that configuration
     #   xml thing.  Abstract away as much as possible
@@ -146,6 +146,7 @@ def main_processing_loop(cfg_obj_pipe, error_pipe, data_out_pipe,
     #   multiprocessing concurrent.futures stuff as desired
 
     while True:
+        new_frame_flag = False
         # do a status check of everything, the DAQ connection in particular
         # but anything that could periodically change asynchronously
 
@@ -160,14 +161,22 @@ def main_processing_loop(cfg_obj_pipe, error_pipe, data_out_pipe,
             for keyval in new_cfg_vals.keys():
                 if keyval in cfg_dict.keys():
                     cfg_dict[keyval] = new_cfg_vals[keyval]
-                if keyval in update_keys:
-                    cfg_update = True
-                else:
-                    cfg_update = False
+
+                cfg_update = True
+                # ultimately we'll want to not do an update on any change
+                # but for now just always update
+                #if keyval in update_keys:
+                #    cfg_update = True
+                #else:
+                #    cfg_update = False
         
             # all new cfg_obj_pipe values have a flags dict
             # and we check the flags to see what we have to do 
             cfg_flags = new_cfg_vals["flags"]
+            if "close_process" in cfg_flags:
+                radar.disconnect()
+                break
+
             if ("setup_daq" in cfg_flags) or ("update_daq_ch" in cfg_flags):
                 ch0_en = cfg_dict["ch0_en"]
                 ch1_en = cfg_dict["ch1_en"]
@@ -185,6 +194,8 @@ def main_processing_loop(cfg_obj_pipe, error_pipe, data_out_pipe,
         else: # no updated config values
             cfg_flags = []
 
+        # and finally perform some DAQ checks
+
 
         #####################################################################
         #                      DATA GATHERING STEPS                         #
@@ -195,17 +206,20 @@ def main_processing_loop(cfg_obj_pipe, error_pipe, data_out_pipe,
            
             # this directs get_daq_data() to stop looking for rangelines after
             # a turnaround is detected and return immediately
-            if cfg_dict["frame_style"] == "azumuth_turnaround":
+            if cfg_dict["frame_style"] == "azimuth_turnaround":
                 ret_on_turnaround = True
             else:
                 ret_on_turnaround = False
 
-           # this step actually grabs the rangelines from the DAQ
-           (rangelines_array, az_array, 
+            # this step actually grabs the rangelines from the DAQ
+            (rangelines_array, az_array, 
             el_array, ch_array, num_rangelines, turnaround_inds, 
             status_flag) = radar.get_daq_data(daq_num_rangelines, 
                                               ret_on_turnaround,
                                               daq_timeout)
+
+            if status_flag == "DAQ_NOT_CONNECTED":
+                continue
 
             # can gather a lot of metadata here
 
@@ -230,8 +244,8 @@ def main_processing_loop(cfg_obj_pipe, error_pipe, data_out_pipe,
 
 
             (frame_out, aux_data_out, 
-             new_frame_flag) = postproc_data(rangelines_array, az_array, 
-                                             el_array, ch_array, 
+             new_frame_flag) = proc_obj.postproc_data(rangelines_array, 
+                                             az_array, el_array, ch_array, 
                                              turnaround_flag, cfg_dict, 
                                              cfg_flags, dbg_prof)
 
@@ -241,10 +255,9 @@ def main_processing_loop(cfg_obj_pipe, error_pipe, data_out_pipe,
 
 
         else: # cfg_dict["data_src"] == "dat_file":
-            # for a dat_file the postproc_data handles that completely
             if cfg_update:
-                if ("fname_changed" in cfg_flags) or 
-                   (file_buf["initialized"] == False):
+                if (("fname_changed" in cfg_flags) or 
+                   (file_buf["initialized"] == False)):
 
                     fs_adc = cfg_dict["fs_adc"]
                     fname_list = cfg_dict["fname_list"]
@@ -282,40 +295,22 @@ def main_processing_loop(cfg_obj_pipe, error_pipe, data_out_pipe,
                     data_good           = file_buf["data_good"]
 
                     if not data_good:
-                        error_pipe.send("FILE_FRAME_DATA_BAD"]
+                        error_pipe.send("FILE_FRAME_DATA_BAD")
                         new_frame_flag = False
                     else:
                         (frame_out, aux_data_out, 
-                         new_frame_flag) = postproc_data(rangelines_array, 
-                                                az_array, el_array, ch_array, 
-                                                turnaround_flag, cfg_dict, 
-                                                cfg_flags, dbg_prof)
+                         new_frame_flag) = proc_obj.postproc_data(
+                                            rangelines_array, 
+                                            az_array, el_array, ch_array, 
+                                            turnaround_flag, cfg_dict, 
+                                            cfg_flags, dbg_prof)
 
 
         # send frame
-        if new_frame_flag
+        if new_frame_flag:
             data_out_pipe.send([frame_out, aux_data_out])
 
 
-
-        # check for configuration / pipe data
-        # 
-        # check for DAQ or file.  
-        # if file:
-        #   If there's new config data, then re-process 
-        #   the file, if not, then do nothing.
-        #
-        # if DAQ:
-        #   DAQ data and put it in a buffer based on the "frame_style"
-        #   parameters
-        #
-        #   if enough data has been gathered for a frame, process a frame 
-        #   and update the appropriate "processed" state variables
-        #
-
-
-        if "close_process" in cfg_flags:
-            break
-
-
-
+##############################################################################
+##############################################################################
+##############################################################################

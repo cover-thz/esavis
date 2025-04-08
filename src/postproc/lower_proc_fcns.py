@@ -16,6 +16,7 @@ import ipdb
 import time
 import os
 import subprocess
+import ipdb
 
 
 # C function imports 
@@ -28,6 +29,7 @@ result = subprocess.run(["make"], cwd=c_funcs_dir)
 c_peak_fcns_lib = ct.CDLL(CWD + "\\c_funcs\\peak_find_fcns.dll")
 extract_single_rangeline_peaks  = c_peak_fcns_lib.extract_single_rangeline_peaks
 extract_all_rangeline_peaks     = c_peak_fcns_lib.extract_all_rangeline_peaks
+extract_aux_data                = c_peak_fcns_lib.extract_aux_data
 
 extract_single_rangeline_peaks.argtypes = [ct.POINTER(ct.c_double), 
     ct.c_int, ct.POINTER(ct.c_double), ct.c_double, ct.c_double, ct.c_int, 
@@ -56,6 +58,16 @@ extract_all_rangeline_peaks.argtypes = [ct.POINTER(ct.c_double),
     ct.POINTER(ct.c_double), ct.POINTER(ct.c_double), ct.POINTER(ct.c_int), 
     ct.POINTER(ct.c_double)]
 extract_all_rangeline_peaks.restype = ct.c_int
+
+
+extract_aux_data.argtypes = [ct.POINTER(ct.c_double), 
+    ct.c_int, ct.POINTER(ct.c_double), ct.c_double, ct.c_double, ct.c_int, 
+    ct.c_double, ct.c_double, ct.c_int, ct.c_double,  
+    ct.c_bool, ct.POINTER(ct.c_double), ct.POINTER(ct.c_double), 
+    ct.POINTER(ct.c_double), ct.POINTER(ct.c_int), ct.POINTER(ct.c_double),
+    ct.POINTER(ct.c_double), ct.POINTER(ct.c_int), ct.POINTER(ct.c_int)]
+extract_aux_data.restype = ct.c_int
+
 
 
 ##############################################################################
@@ -88,7 +100,7 @@ def calc_coarse_rangelines_grid(coarse_az_array, coarse_el_array,
     # need to create large array of "nearby values"
     # assume it's 10 times the "average" oversampling rate
     # this shouldn't be a problem
-    max_loc_pts = int(len(rangelines_adj) / (npts_az * npts_el) * 10)
+    max_loc_pts = max(int(len(rangelines_adj) / (npts_az * npts_el) * 10), 100)
     local_rngln_inds = np.zeros((npts_az, npts_el, max_loc_pts), dtype=int)
     local_az_vals    = np.zeros((npts_az, npts_el, max_loc_pts), dtype=int)
     local_el_vals    = np.zeros((npts_az, npts_el, max_loc_pts), dtype=int)
@@ -110,7 +122,14 @@ def calc_coarse_rangelines_grid(coarse_az_array, coarse_el_array,
 
         # nearest indices
         n_az_ind = int(round(((azi- min_coarse_az) * az_ind_coeff)))
+
+        if n_az_ind > (npts_az-1):
+            continue
+
         n_el_ind = int(round(((elev - min_coarse_el) * el_ind_coeff)))
+
+        if n_el_ind > (npts_el-1):
+            continue
 
 
         # number of points also doubles as the next empty index
@@ -330,10 +349,13 @@ def adj_rangelines(rangelines_in, el_array_in, az_array_in, channels_in,
 """)
 def calc_coarse_grid(min_el, max_el, min_az, max_az, xlen, 
     ylen):
-    coarse_az_array = np.linspace(min_az, max_az, xlen)
-    coarse_el_array = np.linspace(min_el, max_el, ylen)
+    coarse_az_1d = np.linspace(min_az, max_az, xlen)
+    coarse_el_1d = np.linspace(min_el, max_el, ylen)
 
-    return (coarse_az_array, coarse_el_array)
+    ideal_az_array = np.tile(coarse_az_1d, ylen).reshape((xlen,ylen))
+    ideal_el_array = (np.tile(coarse_el_1d, xlen).reshape((ylen,xlen))).T
+
+    return (coarse_az_1d, coarse_el_1d, ideal_az_array, ideal_el_array)
    
 
 ##############################################################################
@@ -418,15 +440,16 @@ def update_grid(rangelines_grid_a, valid_grid_a, grid_az_a, grid_el_a,
                 compares the two grids of rangelines, checks the distance
                 of each rangeline from the ideal and selects the better one
                 """
-                rangelines_grid_out = np.zeros(rangelines_grid_a.shape)
+                rangelines_grid_out = np.zeros(rangelines_grid_a.shape, 
+                                        dtype=type(rangelines_grid_a[0][0]))
                 grid_el_out = np.zeros(grid_el_a.shape)
                 grid_az_out = np.zeros(grid_az_a.shape)
-                dist_arr_a  = np.square(grid_az_a-ideal_az_grid) + 
-                              np.square(grid_el_a-idea_el_grid)
+                dist_arr_a  = (np.square(grid_az_a-ideal_az_grid) + 
+                              np.square(grid_el_a-ideal_el_grid))
                 max_a = np.max(dist_arr_a)
                 
-                dist_arr_b  = np.square(grid_az_b-ideal_az_grid) + 
-                              np.square(grid_el_b-idea_el_grid)
+                dist_arr_b  = (np.square(grid_az_b-ideal_az_grid) + 
+                              np.square(grid_el_b-ideal_el_grid))
                 max_b = np.max(dist_arr_b)
                 max_val = np.max([max_a, max_b])
 
@@ -436,14 +459,14 @@ def update_grid(rangelines_grid_a, valid_grid_a, grid_az_a, grid_el_a,
 
                 # this is inefficient, but there are speedups available 
                 # if it becomes necessary
-                for i in dist_arr_a.shape[0]
-                    for j in dist_arr_a.shape[1]:
-                        if dist_arr_a >= dist_arr_b:
+                for i in range(dist_arr_a.shape[0]):
+                    for j in range(dist_arr_a.shape[1]):
+                        if dist_arr_a[i][j] <= dist_arr_b[i][j]:
                             rangelines_grid_out[i][j] = rangelines_grid_a[i][j]
                             grid_el_out[i][j] = grid_el_a[i][j]
                             grid_az_out[i][j] = grid_az_a[i][j]
                         else:
-                            rangelines_grid_out[i] = rangelines_grid_b[i]
+                            rangelines_grid_out[i][j] = rangelines_grid_b[i][j]
                             grid_el_out[i][j] = grid_el_b[i][j]
                             grid_az_out[i][j] = grid_az_b[i][j]
 
@@ -500,31 +523,94 @@ def spectra_conv(coarse_rangelines_grid, data_format_in, fft_len, fs_post_dec):
 ##############################################################################
 
 # extracts some data from a single rangeline calculation
-def extract_aux_vals(
+def extract_aux_vals(rangeline_power_in, range_lut_cm_in, threshold_lin_in, 
+    contrast_lin_in, half_peak_width_in, min_range_in, max_range_in, 
+    num_noise_pts_in, noise_start_frac_in, calc_weighted_sum_in):
     """
     what aux values do I want?
-        the power spectrum
-        time domain (if it exists)
-        FFT (if it exists)
+        stuff we can get without the C code
+            the power spectrum
+            time domain (if it exists)
+            FFT (if it exists)
+            calc_weighted_sum flag
+            noise floor value
+            noise floor indices
 
-        adjusted linear threshold
-        adjusted linear contrast "threshold"
-        noise floor indices
-        noise floor value
-        weighted_sum indices
-        calc_weighted_sum flag
+        stuff we need to get from the C dcode
+            adjusted linear threshold
+            adjusted linear contrast "threshold"
+            weighted_sum indices
 
 
     """
 
+    # convert the arguments to ctypes objects to pass to the C functions
+    #
+    rng_len_in = len(rangeline_power_in)
+    rangeline_power = rangeline_power_in.flatten()   
+    rangeline_power = rangeline_power.ctypes.data_as(ct.POINTER(ct.c_double))
+    
+    rng_len = ct.c_int(rng_len_in)
 
-#int extract_single_rangeline_peaks(double *rangeline_power, int rng_len,
-#    double *range_lut_cm, double threshold_lin,
-#    double contrast_lin, int half_peak_width, double min_range,
-#    double max_range, int num_noise_pts, double noise_start_frac,
-#    int *interm_peak_inds, bool calc_weighted_sum, double *peak_ranges,
-#    double *peak_powers_lin, double *noise_floor, int *num_peaks) {
+    #range_lut_cm_in = np.array(range_lut_cm_in, dtype=np.float64)
+    range_lut_cm = range_lut_cm_in.flatten()   
+    range_lut_cm = range_lut_cm.ctypes.data_as(ct.POINTER(ct.c_double))
 
+    threshold_lin   = ct.c_double(threshold_lin_in)
+    contrast_lin    = ct.c_double(contrast_lin_in)
+    half_peak_width = ct.c_int(half_peak_width_in)
+    min_range       = ct.c_double(min_range_in)
+    max_range       = ct.c_double(max_range_in)
+    num_noise_pts   = ct.c_int(num_noise_pts_in)
+    noise_start_frac    = ct.c_double(noise_start_frac_in)
+    calc_weighted_sum   = ct.c_bool(calc_weighted_sum_in)
+
+
+    # "return" values
+    #
+    peak_ranges   = np.empty(rng_len_in)
+    peak_ranges   = peak_ranges.ctypes.data_as(ct.POINTER(ct.c_double))
+
+    peak_powers_lin   = np.empty(rng_len_in)
+    peak_powers_lin   = peak_powers_lin.ctypes.data_as(ct.POINTER(ct.c_double))
+
+    noise_floor = np.empty(1).ctypes.data_as(ct.POINTER(ct.c_double))
+
+    num_peaks = np.empty(1).ctypes.data_as(ct.POINTER(ct.c_int))
+
+    adj_lin_thresh      = np.empty(1).ctypes.data_as(ct.POINTER(ct.c_double))
+    adj_lin_contr       = np.empty(1).ctypes.data_as(ct.POINTER(ct.c_double))
+    weight_sum_start    = np.empty(1).ctypes.data_as(ct.POINTER(ct.c_int))
+    weight_sum_end      = np.empty(1).ctypes.data_as(ct.POINTER(ct.c_int))
+    #ipdb.set_trace()
+
+
+    ##########################################################################
+    ##########################################################################
+    # call the actual C function
+    ret_val = extract_aux_data(rangeline_power, rng_len, range_lut_cm, 
+                threshold_lin, contrast_lin, half_peak_width, min_range, 
+                max_range, num_noise_pts, noise_start_frac, calc_weighted_sum,
+                peak_ranges, peak_powers_lin, noise_floor, num_peaks, 
+                adj_lin_thresh, adj_lin_contr, weight_sum_start, 
+                weight_sum_end)
+    ##########################################################################
+    ##########################################################################
+
+    # unpack the output variables
+    peak_ranges_py        = np.ctypeslib.as_array(peak_ranges, (rng_len_in,))
+    peak_powers_lin_py    = np.ctypeslib.as_array(peak_powers_lin, 
+                                (rng_len_in,))
+    noise_floor_py        = np.float64(noise_floor.contents)
+    num_peaks_py          = np.int32(num_peaks.contents)
+    adj_lin_thresh_py     = np.float64(adj_lin_thresh.contents)
+    adj_lin_contr_py      = np.float64(adj_lin_contr.contents)
+    weight_sum_start_py   = np.int32(weight_sum_start.contents)
+    weight_sum_end_py     = np.int32(weight_sum_end.contents)
+
+    return (peak_ranges_py, peak_powers_lin_py, noise_floor_py, num_peaks_py,
+            adj_lin_thresh_py, adj_lin_contr_py, weight_sum_start_py, 
+            weight_sum_end_py)
 
 
 ##############################################################################
@@ -592,7 +678,7 @@ def extract_peaks_c(coarse_power_grid_in, coarse_valid_grid_in, xlen_in,
     ###########################################################################
     if dbg_prof:
         cfunc_start = time.time()
-    # call the C function
+    # call the C functions
     ret_val = extract_all_rangeline_peaks(power_array, valid_array, arr_len, 
         rng_len, range_lut_cm, threshold_lin, contrast_lin, half_peak_width, 
         min_range, max_range, num_noise_pts, noise_start_frac, 
@@ -618,7 +704,7 @@ def extract_peaks_c(coarse_power_grid_in, coarse_valid_grid_in, xlen_in,
     pixel_ranges_grid           = np.ctypeslib.as_array(sel_ranges_array_out, 
         (xlen_in, ylen_in,))
 
-    # argument will have been changed
+    # this argument will have been changed too
     valid_pixels_grid           = np.ctypeslib.as_array(valid_array, 
         (xlen_in, ylen_in,))
 

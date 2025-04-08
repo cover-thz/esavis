@@ -1,5 +1,5 @@
 #############################################################################
-# File Name: data_proc_fcns.py
+# File Name: main_proc_fcns.py
 # Date Created: 4/1/2025
 # Original Author: Max Bryk
 # Description
@@ -11,11 +11,11 @@
 
 import ctypes as ct
 import numpy as np
-import ipdb
 import time
 import lower_proc_fcns as lpf
 import os
-
+import ipdb
+import collections
             
 def docstring(docstr):
     def assign_doc(f):
@@ -24,14 +24,12 @@ def docstring(docstr):
     return assign_doc
 
 
-
-
 class CoverProc:
     # coarse grids
-    uninitialized  = True
-    ideal_az_array = None
-    ideal_el_array = None
-    rng_len = None
+    uninitialized   = True
+    ideal_az_array  = None
+    ideal_el_array  = None
+    rng_len         = None
     def __init__(s):
         s.r_grid_data   = None
         s.r_grid_valids = None
@@ -43,13 +41,26 @@ class CoverProc:
     # make a satisfactory frame (under certain conditions, such as azimuth
     # turnaround, % pixels, % columns, or just time) 
     # we accumulate those in the "rangeline_grid" variable
-    def reset_rangeline_grid(s)
+    def reset_rangeline_grid(s, coarse_az_1d, coarse_el_1d, 
+                    ideal_az_array, ideal_el_array, xlen, ylen, 
+                    data_format_in):
         # TODO maybe reset accumulation-related variables as well
+
+        s.coarse_az_1d = coarse_az_1d
+        s.coarse_el_1d = coarse_el_1d
+
+        s.ideal_az_array = ideal_az_array
+        s.ideal_el_array = ideal_el_array
+        s.xlen           = xlen
+        s.ylen           = ylen
+        s.data_format_in = data_format_in
+
         s.r_grid_data   = np.zeros((s.xlen, s.ylen, s.rng_len), 
                                   dtype=np.float64)
         s.r_grid_valids = np.zeros((s.xlen, s.ylen), dtype=bool)
         s.r_grid_az     = np.zeros((s.xlen, s.ylen), dtype=np.float64)
         s.r_grid_el     = np.zeros((s.xlen, s.ylen), dtype=np.float64)
+        s.uninitialized = False
 
     #def reset_frame(s):
     #    s.curr_frame_data   = np.zeros((s.xlen, s.ylen), dtype=np.float64)
@@ -58,14 +69,17 @@ class CoverProc:
     # Main Workhorse Function
     def postproc_data(s, rangelines_array, az_array, el_array, 
                       ch_array, turnaround_flag, cfg_dict, cfg_flags, 
-                      dbg_prof=False)
+                      dbg_prof=False):
         len_rangeline = len(rangelines_array[-1])
                                                  
+        num_rangelines = len(rangelines_array)
+        #print(f"num_rangelines: {num_rangelines}")
+
         reset_proc = False
-        if (uninitialized) or ("recalc_coarse_grid" in cfg_flags)):
+        if ((s.uninitialized) or ("recalc_coarse_grid" in cfg_flags)):
             reset_proc = True
 
-        elif len_rangeline != s.rng_len:
+        if len_rangeline != s.rng_len:
             s.rng_len       = len_rangeline
             reset_proc   = True
 
@@ -97,19 +111,17 @@ class CoverProc:
                 xlen = cfg_dict["xlen"]
                 ylen = cfg_dict["ylen"]
 
-                (ideal_az_array, 
+                (coarse_az_1d, coarse_el_1d, ideal_az_array, 
                  ideal_el_array) = lpf.calc_coarse_grid(min_el, max_el, 
                                                     min_az, max_az, 
                                                     xlen, ylen)
 
-                s.ideal_az_array = ideal_az_array
-                s.ideal_el_array = ideal_el_array
-                s.xlen           = xlen
-                s.ylen           = ylen
-                s.data_format_in = cfg_dict["data_format_in"]
+                data_format_in = cfg_dict["data_format_in"]
 
                 # have to reset the grid when making these adjustments
-                s.reset_rangeline_grid()
+                s.reset_rangeline_grid(coarse_az_1d, coarse_el_1d, 
+                    ideal_az_array, ideal_el_array, xlen, ylen, 
+                    data_format_in)
 
             #################################################################
             #                        Regridding Steps                       #
@@ -137,10 +149,13 @@ class CoverProc:
                                 elev_side_0_end,  elev_side_1_start, 
                                 elev_side_1_end,  disable_el_side0, 
                                 disable_el_side1,  ch0_en, ch1_en, 
-                                ch0_offset, ch1_offset, s.ideal_az_array, 
-                                s.ideal_el_array,  s.xlen, s.ylen, 
+                                ch0_offset, ch1_offset, s.coarse_az_1d, 
+                                s.coarse_el_1d,  s.xlen, s.ylen, 
                                 dbg_prof)
             
+            num_valids = np.sum(new_valid_grid)
+            #print(f"number re-gridded successfully: {num_valids}")
+
             # this compares the passed rangelines grid azimuth and elvation
             # values and evaluates how "close" they are to the ideal when
             # compared with the current "rangeline_grid_data"
@@ -148,7 +163,11 @@ class CoverProc:
              grid_el_out) = lpf.update_grid(new_rangelines_grid, 
                                 new_valid_grid, new_az_out, new_el_out, 
                                 s.r_grid_data, s.r_grid_valids, s.r_grid_az, 
-                                s.r_grid_el)
+                                s.r_grid_el, s.ideal_az_array, 
+                                s.ideal_el_array)
+
+            num_valids = np.sum(valid_grid_out)
+            #print(f"post update_grid valids: {num_valids}")
 
             s.r_grid_data   = r_grid_out
             s.r_grid_valids = valid_grid_out
@@ -215,7 +234,7 @@ class CoverProc:
 
                 (pixel_ranges_grid, valid_pixels_grid, 
                  noise_floor_grid) = lpf.extract_peaks_c(coarse_power_grid, 
-                                        r.grid_valids, s.xlen, s.ylen, 
+                                        s.r_grid_valids, s.xlen, s.ylen, 
                                         s.rng_len, range_lut_cm, 
                                         threshold_lin, contrast_lin, 
                                         half_peak_width, peak_selection, 
@@ -223,11 +242,45 @@ class CoverProc:
                                         calc_weighted_sum, min_range, 
                                         max_range, dead_pix_val, dbg_prof)                   
 
+                # frame data
+                frame_out = collections.OrderedDict()
+                frame_out["pixel_ranges_grid"]  = pixel_ranges_grid
+                frame_out["valid_pixels_grid"]  = valid_pixels_grid
+                frame_out["noise_floor_grid"]   = noise_floor_grid
+
 
                 # aux data
+                aux_x_ind = cfg_dict["aux_x_ind"]
+                aux_y_ind = cfg_dict["aux_y_ind"]
+                aux_rngline = s.r_grid_data[aux_x_ind][aux_y_ind]
 
 
+                (aux_peak_ranges, aux_peak_powers_lin, aux_noise_floor, 
+                 aux_num_peaks, aux_adj_lin_thresh, aux_adj_lin_contr, 
+                 aux_weight_sum_start, 
+                 aux_weight_sum_end) = lpf.extract_aux_vals(aux_rngline, 
+                    range_lut_cm, threshold_lin, contrast_lin, 
+                    half_peak_width, min_range, max_range, 
+                    num_noise_pts, noise_start_frac, 
+                    calc_weighted_sum)
 
-                return (frame_out, aux_data_out, new_frame_flag) 
-                         
+                aux_data_out = collections.OrderedDict()
+                aux_data_out["aux_peak_ranges"] = aux_peak_ranges
+                aux_data_out["aux_peak_powers_lin"] = aux_peak_powers_lin
+                aux_data_out["aux_noise_floor"]     = aux_noise_floor
+                aux_data_out["aux_num_peaks"]       = aux_num_peaks
+                aux_data_out["aux_adj_lin_thresh"]  = aux_adj_lin_thresh
+                aux_data_out["aux_adj_lin_contr"]   = aux_adj_lin_contr
+                aux_data_out["aux_weight_sum_start"] = aux_weight_sum_start
+                aux_data_out["aux_weight_sum_end"]  = aux_weight_sum_end
+
+                new_frame_flag = True
+
+            else:
+                frame_out       = None
+                aux_data_out    = None
+                new_frame_flag  = False
+
+            return (frame_out, aux_data_out, new_frame_flag) 
+
 

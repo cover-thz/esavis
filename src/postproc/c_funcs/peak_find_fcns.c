@@ -175,6 +175,263 @@ double calc_noise_floor(double *rangeline_power, int num_noise_pts,
 }
 
 
+/*****************************************************************************
+Function: extract_aux_data()
+Description:
+    similar to extract_single_rangeline_peaks(), but extracts some additiona
+    auxiliary data
+
+Arguments:
+    (double*) rangeline_power
+        one dimensional array of length "rng_len" which
+        represents the rangeline's power spectrum
+
+    (int) rng_len
+        number of samples in "rangeline_power" and "range_lut_cm"
+
+    (double*) range_lut_cm
+        one dimensional array of length "rng_len" which
+        represents the ranges in centimeters of each "'rangeline_power"
+        power spectrum sample
+
+    (double) threshold_lin
+        used in combination with the calculated noise floor of the rangeline
+        to calculate "adj_thresh_lin" which is a linear power
+        level.  Peaks below "adj_thresh_lin" are ignored
+
+    (double) contrast_lin
+        used in combination with the maximum detected peak power in the
+        rangeline to exclude peaks that are below the value:
+            "max_peak_power" / "contrast_lin"
+
+    (int) half_peak_width
+        half the number of points to look around the peak to search for higher
+        "nearby" peaks.
+        e.g. if this is 2, that means the code will search 2 samples before the
+        peak and 2 samples after each peak to see if there's a sample with a
+        power value greater than the peak being examined.  If there is a power
+        value in those 4 samples around the peak that is greater than the
+        power value of the peak being examined, then the peak being examined
+        is excluded.  Otherwise, the peak being examined is included
+
+    (double) min_range
+        minimum range to search for peaks. Used to be index 0 of "rangecut"
+
+    (double) max_range
+        maximum range to search for peaks. Used to be index 1 of "rangecut"
+
+    (int) num_noise_pts
+        number of points at the start of the array to average and set as the
+        "noise floor"
+
+    (double) noise_start_frac
+        fraction of "rng_len" from the start of the "rangeline_power"
+        at which to begin sampling points for calculating the noise floor
+
+
+    (bool) calc_weighted_sum
+        a switch to turn on or off the weighted sum calculation as it adds
+        additional processing time
+
+
+Return Values (returned through pointers in arguments):
+    (double*) peak_ranges
+        an array of the peak ranges, in the order they were found by going
+        incrementally through "rangeline_power"
+
+    (double*) peak_powers_lin
+        an array of the peak powers in linear units, corresponding to the peak
+        ranges in "peak_ranges"
+
+    (double*) noise_floor
+        a single value that contains the calculated noise floor of this
+        rangeline in linear units
+
+    (int*) num_peaks
+        number of peaks found.  This also serves as the length of both the
+        "peak_ranges" and "peak_powers_lin" arrays
+
+
+Function Return Value
+    Returns 0 if successful
+*****************************************************************************/
+
+int extract_aux_data(double *rangeline_power, int rng_len,
+    double *range_lut_cm, double threshold_lin,
+    double contrast_lin, int half_peak_width, double min_range,
+    double max_range, int num_noise_pts, double noise_start_frac,
+    bool calc_weighted_sum, double *peak_ranges,
+    double *peak_powers_lin, double *noise_floor, int *num_peaks, 
+    double *adj_lin_thresh, double *adj_lin_contr, int *weight_sum_start,  
+    int *weight_sum_end) {
+
+    //////////////////////////////// VARIABLES ///////////////////////////////
+    int start_ind;
+    int stop_ind;
+    double power_val, power_val_next, power_val_prev;
+    double adj_thresh_lin;
+
+    // interm_ind points to the address after the last filled address in
+    int interm_ind;
+    double max_peak_power;
+    int peak_ind;
+    double peak_power;
+    double contr_thresh;
+    double interm_peak_power;
+
+    // pointer to the indices of the final peak ranges and powers output values
+    int peak_ind_out;
+    bool keep_peak;
+
+    int *interm_peak_inds   = malloc(rng_len*sizeof(int));
+
+    ////////////////////////////// END VARIABLES /////////////////////////////
+
+
+    // do weighted sum to trim limits
+    if (calc_weighted_sum) {
+        get_weighted_sum_limits(rangeline_power, rng_len, &start_ind,
+                                &stop_ind);
+    } else {
+        start_ind = 0;
+        stop_ind = rng_len;
+    }
+
+    *weight_sum_start = start_ind;
+    *weight_sum_end   = stop_ind;
+
+
+    // calculate the noise floor
+    *noise_floor = calc_noise_floor(rangeline_power, num_noise_pts,
+                                   noise_start_frac, rng_len);
+
+
+    // calc adjusted linear power threshold
+    adj_thresh_lin  = *(noise_floor) * (threshold_lin);
+    *adj_lin_thresh = adj_thresh_lin;
+
+
+    // adjust start and stop indices to account for half peak width edge
+    // conditions
+    if (half_peak_width > start_ind) {
+        start_ind = half_peak_width;
+    }
+
+    if ((rng_len-half_peak_width-2) < stop_ind) {
+        stop_ind = (rng_len-half_peak_width-2);
+    }
+
+
+    // main "for" loop that searches for peaks
+    //
+    max_peak_power = power_val;
+    interm_ind = 0;
+    // NOTE: because the number of true peaks is usually sparse, we're going 
+    // to make each loop a little more expensive to allow for an initial 
+    // check at the start to see if the power value is above the noise floor 
+    // or not so we can remove as many samples as possible as quickly as 
+    // possible
+    for (int i=1; i<(stop_ind-1); i++) {
+        power_val       = rangeline_power[i];
+        // A few checks to see if we're even in a state where we should be
+        // looking at things at all
+        //
+        // this first check should immediately eliminate most samples
+        if (power_val < adj_thresh_lin) {
+            continue;
+        }
+
+        // get rid of the start edge so we don't run into edge problems when
+        // searching around each peak later
+        if (i <= start_ind) {
+            continue;
+        }
+
+        if (range_lut_cm[i] < min_range) {
+            continue;
+        }
+
+        if (range_lut_cm[i] > max_range) {
+            break; // or continue?
+        }
+
+        // extract previous and next power values
+        power_val_next  = rangeline_power[i + 1];
+        power_val_prev  = rangeline_power[i - 1];
+
+        // conditions pointing to a peak at i
+        // will interpret a transition from "flat" to lower value as a peak
+        // but will not interpret a transition from lower region to a "flat" 
+        // value as a peak (to avoid many peaks from long flat regions)
+        // we may want to revisit this later, though it likely won't matter 
+        // much
+        if ((power_val >= power_val_prev) && (power_val > power_val_next)) {
+            // add the peak power and peak value to their respective arrays
+
+            // So you need to store peak index in an array.  Not the peak
+            // values, not yet.
+
+            // store the index
+            interm_peak_inds[interm_ind] = i;
+            interm_ind += 1;
+
+            // update the maximum power peak value
+            if (power_val > max_peak_power) {
+                max_peak_power = power_val;
+            }
+        }
+
+    }
+
+    // First for loop found all the peaks, but because we need the maximum
+    // value to apply the contrast parameter we need to go through the peaks
+    // a second time.  Also doing the peak width checks with this reduced
+    // set of peaks is more efficient than doing it on the raw
+    // "rangeline_power" array
+
+    // computes threshold for contrast exclusions
+    contr_thresh = max_peak_power / contrast_lin;
+    *adj_lin_contr = contr_thresh;
+
+
+    // "outer" peak loop.
+    peak_ind_out = 0;
+    for (int i=0; i<interm_ind; i++) {
+        peak_ind    = interm_peak_inds[i];
+        peak_power  = rangeline_power[peak_ind];
+
+        // first ignore any peaks that are below the contrast threshold
+        if (peak_power < contr_thresh) {
+            continue;
+        }
+
+        keep_peak = true;
+        for (int j=-half_peak_width; j<half_peak_width+1; j++) {
+            interm_peak_power = rangeline_power[peak_ind+j];
+
+            // indicates the peak should be removed
+            if (interm_peak_power > peak_power) {
+                keep_peak = false;
+                break;
+            }
+        }
+
+        if (keep_peak) {
+            // if we made it through without peaks getting removed, then
+            peak_ranges[peak_ind_out] = range_lut_cm[peak_ind];
+            peak_powers_lin[peak_ind_out] = rangeline_power[peak_ind];
+            peak_ind_out += 1;
+        }
+    }
+
+    *num_peaks = peak_ind_out;
+
+    free(interm_peak_inds);
+    return 0;
+}
+
+
+
 
 /*****************************************************************************
 Function: extract_single_rangeline_peaks()

@@ -14,10 +14,13 @@
 #############################################################################
 
 import multiprocessing as mp
+import numpy as np
 import copy
 import uuid
 import socket
 import time
+import os
+import ipdb
 from tlv import (
     TLV,
     TLVMessage,
@@ -59,7 +62,7 @@ class DAQSocket:
         data = bytearray()
         while len(data) < length:
             try:
-                if len(data_buffer > 0):
+                if len(self.data_buffer) > 0:
                     data = self.data_buffer[:length]
                     self.data_buffer = self.data_buffer[length:]
                 if len(data) == length:
@@ -164,28 +167,30 @@ class SimpRadar:
 
     def setup_comms(s, addr, ch0_en, ch1_en):
         s.addr = addr
-        s.set_en_channels(ch0_en, ch1_en)
+        s.set_en_channels(ch0_en, ch1_en, send_trace=False)
         status = s.init_connection()
         return status
 
 
-    def set_en_channels(s, ch0_en, ch1_en):
+    def set_en_channels(s, ch0_en, ch1_en, send_trace=True):
         en_channels = []
         if ch0_en:
             en_channels.append(0)
         if ch1_en:
             en_channels.append(1)
         s.en_channels = copy.copy(en_channels)
-        s.send_trace_config()
+        if send_trace:
+            s.send_trace_config()
 
 
     def init_connection(s):
         try:
-            s.daq_sock.connect(s.host)
+            s.daq_sock.connect(s.addr)
         except IOError as e:
             s.daq_connected = False
             s.daq_sock.close()
-            s.warning_made.emit(["Failed to connect to DAQ socket"])
+            print("Failed to connect to DAQ socket")
+            #s.warning_made.emit(["Failed to connect to DAQ socket"])
             print(e)
             return False
 
@@ -199,8 +204,9 @@ class SimpRadar:
 
 
     def disconnect(s):
-        s.daq_sock.close()
-        s.daq_connected = False
+        if s.daq_connected:
+            s.daq_sock.close()
+            s.daq_connected = False
 
 
     # need to call this at the beginning and whenever we change the number of 
@@ -250,6 +256,11 @@ class SimpRadar:
         # captureed
         i = 0 
         while True:
+
+            if not s.daq_connected:
+                status_flag = "DAQ_NOT_CONNECTED"
+                break
+
             if buffer_setup:
                 if i == num_rangelines:
                     break
@@ -305,7 +316,7 @@ class SimpRadar:
                         # is az_diff initialised yet?
                         if az_diff_pos == None:
                             if diff > 0:
-                                az_diff _pos = True
+                                az_diff_pos = True
                             elif diff < 0:
                                 az_diff_pos = False
                             else: 
@@ -314,6 +325,7 @@ class SimpRadar:
                         else:
                             diff_dir = bool(diff > 0)
                             if diff_dir != az_diff_pos:
+                                #ipdb.set_trace()
                                 turnaround_inds.append(i)
                                 if ret_on_turnaround:
                                     status_flag = "TURNAROUND"
@@ -323,17 +335,16 @@ class SimpRadar:
                     # length of the rangeline until now
                     if not buffer_setup:
                         len_rangeline = len(rangeline)
-                        rangelines_array = np.array((num_rangelines, 
-                            len_rangeline))
-                        az_array = np.array((num_rangelines))
-                        el_array = np.array((num_rangelines))
-                        ch_array = np.array((num_rangelines))
+                        rangelines_array = np.zeros((num_rangelines, 
+                            len_rangeline), dtype=np.complex128)
+                        az_array = np.zeros((num_rangelines))
+                        el_array = np.zeros((num_rangelines))
+                        ch_array = np.zeros((num_rangelines))
                         buffer_setup = True
 
                     if len(rangeline) != len_rangeline:
                         status_flag = "RANGELINE_LEN_CHANGE"
                         break
-
                     rangelines_array[i] = rangeline
                     az_array[i] = az_val
                     el_array[i] = el_val

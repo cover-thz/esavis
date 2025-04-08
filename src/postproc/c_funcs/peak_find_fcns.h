@@ -16,6 +16,16 @@ double calc_noise_floor(double *rangeline_power, int num_noise_pts,
                         double noise_start_frac, int rng_len);
                           
 
+int extract_aux_data(double *rangeline_power, int rng_len,
+    double *range_lut_cm, double threshold_lin,
+    double contrast_lin, int half_peak_width, double min_range,
+    double max_range, int num_noise_pts, double noise_start_frac,
+    int *interm_peak_inds, bool calc_weighted_sum, double *peak_ranges,
+    double *peak_powers_lin, double *noise_floor, int *num_peaks, 
+    double *adj_lin_thresh, double *adj_lin_contr, int *weight_sum_start,  
+    int *weight_sum_end);
+
+
 int extract_single_rangeline_peaks(double *rangeline_power, int rng_len, 
     double *range_lut_cm, double threshold_lin, 
     double contrast_lin, int half_peak_width, double min_range, 
