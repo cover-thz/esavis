@@ -244,6 +244,7 @@ def pulse_az_el_adj(el_val_in, az_val_in, channel_val_in,
         el_val_out = el_val_in - elev_side_1_start
     else: 
         el_mirror_side  = None
+        #el_val_out = el_val_in
         valid_rangeline = False
 
 
@@ -441,7 +442,7 @@ def update_grid(rangelines_grid_a, valid_grid_a, grid_az_a, grid_el_a,
                 of each rangeline from the ideal and selects the better one
                 """
                 rangelines_grid_out = np.zeros(rangelines_grid_a.shape, 
-                                        dtype=type(rangelines_grid_a[0][0]))
+                                        dtype=rangelines_grid_a.dtype)
                 grid_el_out = np.zeros(grid_el_a.shape)
                 grid_az_out = np.zeros(grid_az_a.shape)
                 dist_arr_a  = (np.square(grid_az_a-ideal_az_grid) + 
@@ -457,18 +458,34 @@ def update_grid(rangelines_grid_a, valid_grid_a, grid_az_a, grid_el_a,
                 dist_arr_a[~valid_grid_a] = max_val + 1
                 dist_arr_b[~valid_grid_b] = max_val + 1
 
-                # this is inefficient, but there are speedups available 
-                # if it becomes necessary
-                for i in range(dist_arr_a.shape[0]):
-                    for j in range(dist_arr_a.shape[1]):
-                        if dist_arr_a[i][j] <= dist_arr_b[i][j]:
-                            rangelines_grid_out[i][j] = rangelines_grid_a[i][j]
-                            grid_el_out[i][j] = grid_el_a[i][j]
-                            grid_az_out[i][j] = grid_az_a[i][j]
-                        else:
-                            rangelines_grid_out[i][j] = rangelines_grid_b[i][j]
-                            grid_el_out[i][j] = grid_el_b[i][j]
-                            grid_az_out[i][j] = grid_az_b[i][j]
+                #old_code = True
+                old_code = False 
+                if old_code:
+                    # this is inefficient, but there are speedups available 
+                    # if it becomes necessary
+                    for i in range(dist_arr_a.shape[0]):
+                        for j in range(dist_arr_a.shape[1]):
+                            if dist_arr_a[i][j] <= dist_arr_b[i][j]:
+                                rangelines_grid_out[i][j] = rangelines_grid_a[i][j]
+                                grid_el_out[i][j] = grid_el_a[i][j]
+                                grid_az_out[i][j] = grid_az_a[i][j]
+                            else:
+                                rangelines_grid_out[i][j] = rangelines_grid_b[i][j]
+                                grid_el_out[i][j] = grid_el_b[i][j]
+                                grid_az_out[i][j] = grid_az_b[i][j]
+                
+                else: 
+                    # a
+                    a_inds = np.where(dist_arr_a <= dist_arr_b)
+                    rangelines_grid_out[a_inds] = rangelines_grid_a[a_inds]
+                    grid_el_out[a_inds] = grid_el_a[a_inds]
+                    grid_az_out[a_inds] = grid_az_a[a_inds]
+
+                    # b 
+                    b_inds = np.where(dist_arr_a > dist_arr_b)
+                    rangelines_grid_out[b_inds] = rangelines_grid_b[b_inds]
+                    grid_el_out[b_inds] = grid_el_b[b_inds]
+                    grid_az_out[b_inds] = grid_az_b[b_inds]
 
                 valid_grid_out = valid_grid_a + valid_grid_b
                 return (rangelines_grid_out, valid_grid_out, grid_az_out, 
@@ -500,8 +517,11 @@ def spectra_conv(coarse_rangelines_grid, data_format_in, fft_len, fs_post_dec):
         coarse_power_grid = np.flip(coarse_power_grid, 2)
 
     else: # data_format_in.lower() == "power_spectrum"
-        # need to flip the axis for ranges to be correct
-        coarse_power_grid = np.flip(coarse_rangelines_grid, 2)
+        # need to convert to float64
+        # and flip the axis for ranges to be correct
+        #coarse_power_grid = 
+        coarse_power_grid = coarse_rangelines_grid.astype(np.float64)
+        coarse_power_grid = np.flip(coarse_power_grid, 2)
 
     # frequency vector, contains the frequency bins for each FFT (they're all
     # the same for each pulse, so it's just one vector.  Units are Hz.
@@ -581,7 +601,6 @@ def extract_aux_vals(rangeline_power_in, range_lut_cm_in, threshold_lin_in,
     adj_lin_contr       = np.empty(1).ctypes.data_as(ct.POINTER(ct.c_double))
     weight_sum_start    = np.empty(1).ctypes.data_as(ct.POINTER(ct.c_int))
     weight_sum_end      = np.empty(1).ctypes.data_as(ct.POINTER(ct.c_int))
-    #ipdb.set_trace()
 
 
     ##########################################################################

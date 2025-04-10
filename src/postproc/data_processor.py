@@ -18,6 +18,7 @@ import daq_comms as dc
 import main_proc_fcns as mpf
 import dat_file_fcns as dff
 import time
+import ipdb
 
 # simple method for moving the docstring above the function declaration
 # because having a big docstring underneath the arguments list is annoying
@@ -26,6 +27,24 @@ def docstring(docstr):
         f.__doc__ = docstr
         return f
     return assign_doc
+
+
+
+#############################################################################
+#############################################################################
+
+
+class Profiler:
+    num_rng_proc = 0
+    num_pix_proc = 0
+
+
+    def __init__(s):
+        pass
+
+    def reset(s):
+        s.num_rng_proc = 0
+        s.num_pix_proc = 0
 
 
 
@@ -123,6 +142,7 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe,
     radar       = dc.SimpRadar()
     proc_obj    = mpf.CoverProc()
     daq_connected = False
+    proc_prof = Profiler()
 
     # buffer containing data from most recent fileset
 
@@ -138,6 +158,7 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe,
     file_buf["dec_val"]     =  None
     file_buf["len_rangeline"]   = None
     file_buf["data_good"]   = None
+    profiler_enabled = False
 
     # setup everything 
     #   DAQ socket and sending that configuration
@@ -191,6 +212,10 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe,
                 else:
                     radar.set_en_channels(ch0_en, ch1_en)
 
+            # easy way to turn on and off profiling of the code
+            if "enable_profiler" in cfg_flags:
+                profiler_enabled = True
+
         else: # no updated config values
             cfg_flags = []
 
@@ -211,6 +236,8 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe,
             else:
                 ret_on_turnaround = False
 
+            if profiler_enabled:
+                daq_acq_start = time.time()
             # this step actually grabs the rangelines from the DAQ
             (rangelines_array, az_array, 
             el_array, ch_array, num_rangelines, turnaround_inds, 
@@ -218,8 +245,11 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe,
                                               ret_on_turnaround,
                                               daq_timeout)
 
-            if status_flag == "DAQ_NOT_CONNECTED":
-                time.sleep(0.01)
+
+            # basically indicates the DAQ is not connected, pause a moment 
+            # so the processor isn't thrashing around
+            if status_flag in ["DAQ_NOT_CONNECTED", "CONN_RESET"]:
+                time.sleep(0.1)
                 continue
 
             # can gather a lot of metadata here
@@ -227,9 +257,9 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe,
             # turnaround_inds not used right now
 
 
-            # currently just trash everything that's not perfectly OK
-            if status_flag not in ["OK", "TURNAROUND"]:
-                error_pipe.send(["DAQ STATUS FLAG NOT OK", status_flag])
+            if status_flag not in ["OK", "TURNAROUND", "TIMEOUT"]:
+                print(status_flag)
+                error_pipe.send(["DAQ STATUS FLAG ERROR", status_flag])
                 continue 
 
             if status_flag == "TURNAROUND":
@@ -237,19 +267,34 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe,
             else:
                 turnaround_flag = False
 
+            # this is required to resize the numpy arrays since those 
+            # arrays are pre-allocated
             if num_rangelines != daq_num_rangelines:
                 rangelines_array = rangelines_array[:num_rangelines]
                 az_array = az_array[:num_rangelines]
                 el_array = el_array[:num_rangelines]
                 ch_array = ch_array[:num_rangelines]
 
+            if profiler_enabled:
+                daq_acq_end = time.time()
+                daq_time_ms = (daq_acq_end - daq_acq_start) * 1000
+                print(f"    daq acq duration: {daq_time_ms:.4f} ms")
+                print(f"        daq rangelines acq: {num_rangelines}")
 
+
+
+            if profiler_enabled:
+                start_time = time.time()
             (frame_out, aux_data_out, 
              new_frame_flag) = proc_obj.postproc_data(rangelines_array, 
                                              az_array, el_array, ch_array, 
                                              turnaround_flag, cfg_dict, 
                                              cfg_flags, dbg_prof)
 
+            if profiler_enabled:
+                end_time = time.time()
+                proc_time_ms = (end_time - start_time) * 1000
+                print(f"    pixel processing time: {proc_time_ms:.4f}\n") 
 
         # future work
         #elif cfg_dict["data_src"] == "video_file"

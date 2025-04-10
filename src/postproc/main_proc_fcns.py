@@ -16,6 +16,7 @@ import lower_proc_fcns as lpf
 import os
 import ipdb
 import collections
+import plot_fcns as pf
             
 def docstring(docstr):
     def assign_doc(f):
@@ -30,6 +31,7 @@ class CoverProc:
     ideal_az_array  = None
     ideal_el_array  = None
     rng_len         = None
+    rng_dtype       = None
     def __init__(s):
         s.r_grid_data   = None
         s.r_grid_valids = None
@@ -57,8 +59,13 @@ class CoverProc:
     def clear_preproc_buffer(s):
         s.accum_rangelines = 0
 
+        if s.rng_dtype == object:
+            print_str  = "Warning: rangeline datatype is 'object'"
+            print_str += "this may produce unexpected errors"
+            print(print_str)
+
         s.r_grid_data   = np.zeros((s.xlen, s.ylen, s.rng_len), 
-                                  dtype=np.float64)
+                                  dtype=s.rng_dtype)
         s.r_grid_valids = np.zeros((s.xlen, s.ylen), dtype=bool)
         s.r_grid_az     = np.zeros((s.xlen, s.ylen), dtype=np.float64)
         s.r_grid_el     = np.zeros((s.xlen, s.ylen), dtype=np.float64)
@@ -72,19 +79,29 @@ class CoverProc:
                       ch_array, turnaround_flag, cfg_dict, cfg_flags, 
                       dbg_prof=False):
         len_rangeline = len(rangelines_array[-1])
+        rng_dtype = rangelines_array.dtype
                                                  
         num_rangelines = len(rangelines_array)
         s.accum_rangelines += num_rangelines
         #print(f"accumulated rangelines: {s.accum_rangelines}")
-
+        if dbg_prof:
+            #print(f"accumulated rangelines: {s.accum_rangelines}")
+            pass
 
         reset_proc = False
         if ((s.uninitialized) or ("recalc_coarse_grid" in cfg_flags)):
             reset_proc = True
 
+        # if rangeline length changed
         if len_rangeline != s.rng_len:
             s.rng_len       = len_rangeline
             reset_proc   = True
+
+
+        # if rangeline data type changed
+        if s.rng_dtype != rng_dtype:
+            s.rng_dtype = rng_dtype
+            reset_proc = True
 
 
         # Work on this later
@@ -160,7 +177,9 @@ class CoverProc:
                                 dbg_prof)
             
             num_valids = np.sum(new_valid_grid)
-            #print(f"pre update_grid valids: {num_valids}")
+            if dbg_prof:
+                #print(f"pre update_grid valids: {num_valids}")
+                pass
 
             # this compares the passed rangelines grid azimuth and elvation
             # values and evaluates how "close" they are to the ideal when
@@ -173,7 +192,9 @@ class CoverProc:
                                 s.ideal_el_array)
 
             num_valids = np.sum(valid_grid_out)
-            #print(f"post update_grid valids: {num_valids}")
+            if dbg_prof:
+                #print(f"post update_grid valids: {num_valids}")
+                pass
 
             s.r_grid_data   = r_grid_out
             s.r_grid_valids = valid_grid_out
@@ -251,6 +272,10 @@ class CoverProc:
                                         num_noise_pts, noise_start_frac, 
                                         calc_weighted_sum, min_range, 
                                         max_range, dead_pix_val, dbg_prof)                   
+                if dbg_prof:
+                    num_valids = np.sum(valid_pixels_grid)
+                    print(f"num_valid_pixels: {num_valids}")
+                #pf.plot_pixel_power(coarse_power_grid[10][10].astype(np.float64), range_lut_cm)
 
                 # frame data
                 frame_out = collections.OrderedDict()
@@ -285,6 +310,7 @@ class CoverProc:
                 aux_data_out["aux_weight_sum_end"]  = aux_weight_sum_end
 
                 new_frame_flag = True
+
 
                 # clear the preprocessed buffer now that we've processed the 
                 # frame

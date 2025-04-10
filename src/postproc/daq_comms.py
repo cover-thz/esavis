@@ -266,7 +266,6 @@ class SimpRadar:
                 if i == num_rangelines:
                     break
 
-
             # this is if there's a timeout
             if time.time() - start_time > timeout:
                 status_flag = "TIMEOUT"
@@ -330,6 +329,9 @@ class SimpRadar:
                                 #ipdb.set_trace()
                                 turnaround_inds.append(i)
                                 if ret_on_turnaround:
+                                    print("TURNAROUND")
+                                    print(f"    az_val   = {az_val}")
+                                    print(f"    prev_az  = {prev_az}")
                                     status_flag = "TURNAROUND"
                                     break
 
