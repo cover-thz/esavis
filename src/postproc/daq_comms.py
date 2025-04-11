@@ -283,6 +283,7 @@ class SimpRadar:
             try:
                 (radar_data, data_valid) = s.daq_sock.receive_message()
             except ConnectionResetError:
+                s.daq_connected = False
                 status_flag = "CONN_RESET"
                 turn_flag = "DISABLED"
                 break

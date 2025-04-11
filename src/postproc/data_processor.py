@@ -128,21 +128,27 @@ cfg_obj_pipe
     This config pipe actually should contain tagged data where only new values
     are sent, to minimize the overhead 
 
-rsvd_pipe
-    currently uncertain what's in here. But it feels like it should exist
+data_out_pipe
+    frame and auxiliary data (that needs to be synchronous with the frame) 
+    comes out here
+
+query_out_pipe
+    This is a pipe where if there's some kind of query in the cfg_flags like 
+    "is the DAQ connected?" then the response to that query would come on
+    this pipe.  Intended for infrequent queries with low data volume, for
+    flags within the processor core as well as for debugging
 
 frame_queue
     a queue object that contains an object that contains all relelvent frame
     data
 """)
-def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, 
+def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_out_pipe, 
                          cfg_dict):
 
     dbg_prof    = False
     radar       = dc.SimpRadar()
     proc_obj    = mpf.CoverProc()
-    daq_connected = False
-    proc_prof = Profiler()
+    proc_prof   = Profiler()
 
     # buffer containing data from most recent fileset
 
@@ -175,6 +181,7 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe,
         #                         SETUP CHANGES STEPS                       #
         #####################################################################
         # check for new confiugration data
+        cfg_update = False
         if (cfg_obj_pipe.poll()):
             new_cfg_vals = cfg_obj_pipe.recv()
 
@@ -205,9 +212,7 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe,
                 if not radar.daq_connected:
                     addr   = cfg_dict["daq_addr"]
                     conn_success = radar.setup_comms(addr, ch0_en, ch1_en)
-                    if conn_success:
-                        daq_connected = True
-                    else:
+                    if not conn_success:
                         error_pipe.send(["DAQ_CONN_FAILED"])
                 else:
                     radar.set_en_channels(ch0_en, ch1_en)
@@ -226,6 +231,9 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe,
         #                      DATA GATHERING STEPS                         #
         #####################################################################
         if cfg_dict["data_src"] == "daq":
+            if not radar.daq_connected:
+                continue
+
             daq_num_rangelines = cfg_dict["daq_num_rangelines"]
             daq_timeout         = cfg_dict["daq_timeout"]
 
@@ -304,6 +312,7 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe,
         #elif cfg_dict["data_src"] == "video_file"
 
 
+        # NOTE DAT FILE DATA SOURCE UNTESTED
         else: # cfg_dict["data_src"] == "dat_file":
             if cfg_update:
                 if (("fname_changed" in cfg_flags) or 

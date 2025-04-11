@@ -7,6 +7,22 @@ import numpy as np
 import time
 import matplotlib.pyplot as plt
 import ipdb
+from pynput.keyboard import Listener
+from queue import Queue, Empty
+
+def on_press(key, key_queue):
+    try:
+        key_queue.put(key.char)
+    except AttributeError:
+        pass
+
+def on_release(key):
+    try:
+        if key.char == "q":
+            return False
+    except:
+        pass
+
 
 
 # this tests a different DAQ file with power-spectrum data over a longer
@@ -117,9 +133,10 @@ if __name__ == "__main__":
     (dp_cfg_pipe, main_cfg_pipe)    = mp.Pipe(duplex=False)
     (main_err_pipe, dp_err_pipe)    = mp.Pipe(duplex=False)
     (main_data_pipe, dp_data_pipe)  = mp.Pipe(duplex=False)
+    (main_query_pipe, dp_query_pipe)  = mp.Pipe(duplex=False)
 
     proc = mp.Process(target=dp.main_proc_loop, args=(dp_cfg_pipe, 
-        dp_err_pipe, dp_data_pipe, cfg_dict,))
+        dp_err_pipe, dp_data_pipe, dp_query_pipe, cfg_dict,))
     proc.start()
 
     daq_setup_flag = False
@@ -155,6 +172,12 @@ if __name__ == "__main__":
     pause_len = 0.01
     plt.pause(pause_len)
     fig.canvas.draw()
+
+
+    key_queue = Queue()
+    listener = Listener(on_press=lambda key:on_press(key, key_queue),
+                                  on_release=on_release)
+    listener.start()
 
 
     prev_time = time.time()
@@ -194,19 +217,33 @@ if __name__ == "__main__":
                 main_cfg_pipe.send(cfg_params)
                 daq_setup_flag = True
 
-            if (time_elapsed_ms > 10000):
+        # check for errors
+        if main_err_pipe.poll():
+            error_str = main_err_pipe.recv()
+            print(error_str)
+
+        # check for keypresses
+        if not key_queue.empty():
+            key = key_queue.get()
+            if key == "q":
                 print("closing things down...")
                 cfg_params = collections.OrderedDict()
                 cfg_params["flags"] = ["close_process"]
                 main_cfg_pipe.send(cfg_params)
                 break
 
-        # check for errors
-        if main_err_pipe.poll():
-            error_str = main_err_pipe.recv()
-            print(error_str)
+            elif key == "c":
+                print("setting up DAQ...")
+                cfg_params = collections.OrderedDict()
+                #cfg_params["flags"] = ["setup_daq", "enable_profiler"]
+                cfg_params["flags"] = ["setup_daq"]
+                main_cfg_pipe.send(cfg_params)
+                daq_setup_flag = True
+
+
 
         time.sleep(0.1)
     plt.close(fig)
     proc.join()
-
+    listener.join()
+    
