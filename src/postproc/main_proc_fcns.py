@@ -76,8 +76,13 @@ class CoverProc:
 
     # Main Workhorse Function
     def postproc_data(s, rangelines_array, az_array, el_array, 
-                      ch_array, turnaround_flag, cfg_dict, cfg_flags, 
-                      dbg_prof=False):
+                      ch_array, turn_flag, reset_in_array, cfg_dict, 
+                      cfg_flags, dbg_prof=False):
+
+        #################################################################
+        #        Grab Some Data and Check for Reset Conditions          #
+        #################################################################
+
         len_rangeline = len(rangelines_array[-1])
         rng_dtype = rangelines_array.dtype
                                                  
@@ -104,6 +109,15 @@ class CoverProc:
             reset_proc = True
 
 
+        if cfg_dict["frame_style"] == "azimuth_turnaround":
+            if reset_in_array:
+                reset_proc = True
+            elif turn_flag == "RESET":
+                reset_proc = True
+
+
+
+        # NOTE TODO DATA IDEALLY SHOULDN'T AFFECT THIS FUNCTION
         # Work on this later
         if cfg_dict["data_src"] == "dat_file":
             pass
@@ -114,6 +128,7 @@ class CoverProc:
         
 
         else: # cfg_dict["data_src"] == "daq"
+
             # if certain parameters are changed, it messes with everything
             # and buffers etc. have to be recalculated and all the 
             # accumulated rangelines get trashed.  This usually occurs when
@@ -222,7 +237,7 @@ class CoverProc:
                     process_frame = True
 
             elif cfg_dict["frame_style"] == "azimuth_turnaround":
-                if turnaround_flag:
+                if turn_flag == "END_FRAME":
                     process_frame = True
 
             elif cfg_dict["frame_style"] == "accum_rangelines":

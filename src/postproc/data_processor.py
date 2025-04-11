@@ -228,21 +228,29 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe,
         if cfg_dict["data_src"] == "daq":
             daq_num_rangelines = cfg_dict["daq_num_rangelines"]
             daq_timeout         = cfg_dict["daq_timeout"]
-           
+
+            # a hysteresis parameter for turnaround
+            # Note: nonzero turn_hyst will produce "wobble" at frame edges
+            turn_hyst = cfg_dict["turn_hyst"]
+            min_az          = cfg_dict["min_az"] + cfg_dict["turn_az_margin"]
+            max_az          = cfg_dict["max_az"] - cfg_dict["turn_az_margin"]
+
+
             # this directs get_daq_data() to stop looking for rangelines after
             # a turnaround is detected and return immediately
             if cfg_dict["frame_style"] == "azimuth_turnaround":
-                ret_on_turnaround = True
+                turnaround_mode = True
             else:
-                ret_on_turnaround = False
+                turnaround_mode = False
 
             if profiler_enabled:
                 daq_acq_start = time.time()
             # this step actually grabs the rangelines from the DAQ
             (rangelines_array, az_array, 
-            el_array, ch_array, num_rangelines, turnaround_inds, 
+            el_array, ch_array, num_rangelines, turn_flag, reset_in_array,
             status_flag) = radar.get_daq_data(daq_num_rangelines, 
-                                              ret_on_turnaround,
+                                              turnaround_mode, turn_hyst,
+                                              min_az, max_az,
                                               daq_timeout)
 
 
@@ -257,15 +265,13 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe,
             # turnaround_inds not used right now
 
 
-            if status_flag not in ["OK", "TURNAROUND", "TIMEOUT"]:
+            if status_flag not in ["OK", "TIMEOUT"]:
                 print(status_flag)
                 error_pipe.send(["DAQ STATUS FLAG ERROR", status_flag])
                 continue 
 
-            if status_flag == "TURNAROUND":
-                turnaround_flag = True
-            else:
-                turnaround_flag = False
+            if turnaround_mode:
+                if status_flag == "RESET"
 
             # this is required to resize the numpy arrays since those 
             # arrays are pre-allocated
@@ -288,8 +294,9 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe,
             (frame_out, aux_data_out, 
              new_frame_flag) = proc_obj.postproc_data(rangelines_array, 
                                              az_array, el_array, ch_array, 
-                                             turnaround_flag, cfg_dict, 
-                                             cfg_flags, dbg_prof)
+                                             turn_flag, reset_in_arary, 
+                                             cfg_dict, cfg_flags, dbg_prof)
+                                             
 
             if profiler_enabled:
                 end_time = time.time()
@@ -340,16 +347,18 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe,
                     len_rangeline       = file_buf["len_rangeline"]
                     data_good           = file_buf["data_good"]
 
+                    proc_turnaround = False
                     if not data_good:
                         error_pipe.send("FILE_FRAME_DATA_BAD")
                         new_frame_flag = False
                     else:
                         (frame_out, aux_data_out, 
                          new_frame_flag) = proc_obj.postproc_data(
-                                            rangelines_array, 
-                                            az_array, el_array, ch_array, 
-                                            turnaround_flag, cfg_dict, 
-                                            cfg_flags, dbg_prof)
+                                             rangelines_array, 
+                                             az_array, el_array, ch_array, 
+                                             turn_flag, reset_in_arary, 
+                                             cfg_dict, cfg_flags, dbg_prof)
+                                             
 
 
         # send frame

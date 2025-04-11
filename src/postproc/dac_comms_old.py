@@ -160,7 +160,6 @@ class SimpRadar:
     en_channels         = None 
     daq_connected       = False
     rangeline_buffer    = None
-    state               = "RESET"
 
     def __init__(s):
         s.daq_sock = DAQSocket()
@@ -241,14 +240,8 @@ class SimpRadar:
 
 
     # main workhorse function
-    def get_daq_data(s, num_rangelines, turnaround_mode, turn_hyst, 
-                     timeout=3):
+    def get_daq_data(s, num_rangelines, ret_on_turnaround, timeout=3):
         start_time = time.time()
-        
-        if not turnaround_mode:
-            s.state = "RESET"
-            turn_flag = "DISABLED"
-
 
         buffer_setup = False
         status_flag = "OK"
@@ -256,9 +249,9 @@ class SimpRadar:
         az_array = None
         el_array = None
         ch_array = None
+        turnaround_inds = []
         prev_az = None
         az_diff_pos = None
-        reset_in_array = False
 
         # index of the rangeline.  Also doubles as number of rangelines 
         # captureed
@@ -316,6 +309,31 @@ class SimpRadar:
                         "big",
                         signed=False,)
 
+                    # setup turnaround detection
+                    if prev_az == None:
+                        prev_az = az_val
+                    else:
+                        diff = az_val - prev_az
+                        # is az_diff initialised yet?
+                        if az_diff_pos == None:
+                            if diff > 0:
+                                az_diff_pos = True
+                            elif diff < 0:
+                                az_diff_pos = False
+                            else: 
+                                # wait for an actual difference
+                                az_diff_pos = None
+                        else:
+                            diff_dir = bool(diff > 0)
+                            if diff_dir != az_diff_pos:
+                                #ipdb.set_trace()
+                                turnaround_inds.append(i)
+                                if ret_on_turnaround:
+                                    print("TURNAROUND")
+                                    print(f"    az_val   = {az_val}")
+                                    print(f"    prev_az  = {prev_az}")
+                                    status_flag = "TURNAROUND"
+                                    break
 
                     # setup the buffers now because you don't know the 
                     # length of the rangeline until now
@@ -330,98 +348,19 @@ class SimpRadar:
 
                     if len(rangeline) != len_rangeline:
                         status_flag = "RANGELINE_LEN_CHANGE"
-                        s.state = "RESET"
                         break
-
-
-                    # state machine
-                    # Note: nonzero turn_hyst will produce "wobble" at frame
-                    # edges
-                    if turnaround_mode:
-                        if s.state == "RESET":
-                            turn_flag = "RESET"
-                            if az_val < (min_az - turn_hyst):
-                                s.state = "TURNING_MIN"
-                            elif az_val > (max_az + turn_hyst):
-                                s.state = "TURNING_MAX"
-                            else:
-                                az_val = "WAITING_FOR_TURN"
-
-                        elif s.state == "WAITING_FOR_TURN":
-                            turn_flag = "RESET"
-                            if az_val < (min_az - turn_hyst):
-                                s.state = "TURNING_MIN"
-                            elif az_val > (max_az + turn_hyst):
-                                s.state = "TURNING_MAX"
-
-                            # else: s.state stays the same
-
-                        elif s.state == "TURNING_MIN":
-                            turn_flag = "RESET"
-                            # start of frame
-                            if az_val > (min_az + turn_hyst):
-                                s.state = "RUNNING_TO_MAX"
-                                turn_flag = "START_FRAME"
-
-                        elif s.state == "TURNING_MAX":
-                            turn_flag = "RESET"
-                            # start of frame
-                            if az_val < (max_az - turn_hyst):
-                                s.state = "RUNNING_TO_MIN"
-                                turn_flag = "START_FRAME"
-
-                        elif s.state == "RUNNING_TO_MAX":
-                            turn_flag = "RUNNING"
-                            if az_val > (max_az + turn_hyst):
-                                s.state = "TURNING_MAX"
-                                turn_flag = "END_FRAME"
-
-                        elif s.state == "RUNNING_TO_MIN":
-                            turn_flag = "RUNNING"
-                            if az_val < (min_az - turn_hyst):
-                                s.state = "TURNING_MIN"
-                                turn_flag = "END_FRAME"
-
-                        else:
-                            raise Exception("Invalid SimpRadar State")
-                        
-
-                        # Now we perform the appropriate updates based on 
-                        # state
-
-
-                        # this is to ensure the processing reset prior to 
-                        # grabbing the first data sample 
-                        if turn_flag in ["RESET", "START_FRAME"]:
-                            reset_in_array = True
-
-                        # only add values to the array in valid azimuth ranges
-                        if turn_flag in ["RUNNING", "START_FRAME", "END_FRAME"]:
-                            rangelines_array[i] = rangeline
-                            az_array[i] = az_val
-                            el_array[i] = el_val
-                            ch_array[i] = channel_val
-                            i += 1
-
-                        if turn_flag == "END_FRAME":
-                            #status_flag = "TURNAROUND"
-                            s.state = "RESET"
-                            break
-
-                    else: # turnaround mode not enabled
-                        rangelines_array[i] = rangeline
-                        az_array[i] = az_val
-                        el_array[i] = el_val
-                        ch_array[i] = channel_val
-                        i += 1
-
-
+                    rangelines_array[i] = rangeline
+                    az_array[i] = az_val
+                    el_array[i] = el_val
+                    ch_array[i] = channel_val
+                    i += 1
                         
                 else:
                     print("Warning: Received non-plot command data")
                     continue
 
         return (rangelines_array, az_array, el_array, ch_array, 
-                i, turn_flag, reset_in_array, status_flag)
+                i, turnaround_inds, status_flag)
+
 
 
