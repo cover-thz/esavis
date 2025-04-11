@@ -270,9 +270,6 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe,
                 error_pipe.send(["DAQ STATUS FLAG ERROR", status_flag])
                 continue 
 
-            if turnaround_mode:
-                if status_flag == "RESET"
-
             # this is required to resize the numpy arrays since those 
             # arrays are pre-allocated
             if num_rangelines != daq_num_rangelines:
@@ -294,7 +291,7 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe,
             (frame_out, aux_data_out, 
              new_frame_flag) = proc_obj.postproc_data(rangelines_array, 
                                              az_array, el_array, ch_array, 
-                                             turn_flag, reset_in_arary, 
+                                             turn_flag, reset_in_array, 
                                              cfg_dict, cfg_flags, dbg_prof)
                                              
 
@@ -356,7 +353,7 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe,
                          new_frame_flag) = proc_obj.postproc_data(
                                              rangelines_array, 
                                              az_array, el_array, ch_array, 
-                                             turn_flag, reset_in_arary, 
+                                             turn_flag, reset_in_array, 
                                              cfg_dict, cfg_flags, dbg_prof)
                                              
 

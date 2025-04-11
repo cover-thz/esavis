@@ -191,9 +191,9 @@ class SimpRadar:
         except IOError as e:
             s.daq_connected = False
             s.daq_sock.close()
-            print("Failed to connect to DAQ socket")
+            #print("Failed to connect to DAQ socket")
             #s.warning_made.emit(["Failed to connect to DAQ socket"])
-            print(e)
+            #print(e)
             return False
 
         s.daq_connected = True
@@ -241,8 +241,9 @@ class SimpRadar:
 
 
     # main workhorse function
-    def get_daq_data(s, num_rangelines, turnaround_mode, turn_hyst, 
-                     timeout=3):
+    def get_daq_data(s, num_rangelines, turnaround_mode, turn_hyst, min_az, 
+                     max_az, timeout=3):
+                     
         start_time = time.time()
         
         if not turnaround_mode:
@@ -266,6 +267,7 @@ class SimpRadar:
         while True:
 
             if not s.daq_connected:
+                turn_flag = "DISABLED"
                 status_flag = "DAQ_NOT_CONNECTED"
                 break
 
@@ -282,6 +284,7 @@ class SimpRadar:
                 (radar_data, data_valid) = s.daq_sock.receive_message()
             except ConnectionResetError:
                 status_flag = "CONN_RESET"
+                turn_flag = "DISABLED"
                 break
 
             # check for returning none

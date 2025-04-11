@@ -1,5 +1,4 @@
 
-
 import multiprocessing as mp
 import data_processor as dp
 import collections
@@ -22,12 +21,15 @@ if __name__ == "__main__":
     cfg_dict["data_src"]    = "daq"
 
     #cfg_dict["daq_num_rangelines"] = 27100
-    cfg_dict["daq_num_rangelines"] = 10000
+    cfg_dict["daq_num_rangelines"] = 15000
     cfg_dict["daq_timeout"] = 3
-    #cfg_dict["frame_style"] = "azimuth_turnaround"
+    cfg_dict["frame_style"] = "azimuth_turnaround"
     #cfg_dict["frame_style"] = "always"
-    cfg_dict["frame_style"] = "accum_rangelines"
-    cfg_dict["accum_rangelines_thresh"] = 27100
+    #cfg_dict["frame_style"] = "accum_rangelines"
+    #cfg_dict["accum_rangelines_thresh"] = 27100
+
+    cfg_dict["turn_hyst"] = 0
+    cfg_dict["turn_az_margin"] = 10
 
 
     fs_adc = 4e9
@@ -158,12 +160,12 @@ if __name__ == "__main__":
     prev_time = time.time()
     while True:   
         plt.pause(pause_len)
-        if (main_data_pipe.poll()):
+        if main_data_pipe.poll():
             [frame_out, aux_data_out] = main_data_pipe.recv()
             if frame_out != None:
                 curr_time = time.time()
                 time_elapsed_ms = (curr_time - prev_time)*1000
-                #print(f"Time elapsed since last frame: {time_elapsed_ms:.4f} ms")
+                print(f"Time elapsed since last frame: {time_elapsed_ms:.4f} ms")
                 prev_time = curr_time
                 pixel_ranges_grid   = frame_out["pixel_ranges_grid"]
                 valid_pixels_grid   = frame_out["valid_pixels_grid"]
@@ -187,8 +189,8 @@ if __name__ == "__main__":
             if ((time_elapsed_ms > 5000) and (not daq_setup_flag)):
                 print("setting up DAQ...")
                 cfg_params = collections.OrderedDict()
-                cfg_params["flags"] = ["setup_daq", "enable_profiler"]
-                #cfg_params["flags"] = ["setup_daq"]
+                #cfg_params["flags"] = ["setup_daq", "enable_profiler"]
+                cfg_params["flags"] = ["setup_daq"]
                 main_cfg_pipe.send(cfg_params)
                 daq_setup_flag = True
 
@@ -198,6 +200,11 @@ if __name__ == "__main__":
                 cfg_params["flags"] = ["close_process"]
                 main_cfg_pipe.send(cfg_params)
                 break
+
+        # check for errors
+        if main_err_pipe.poll():
+            error_str = main_err_pipe.recv()
+            print(error_str)
 
         time.sleep(0.1)
     plt.close(fig)
