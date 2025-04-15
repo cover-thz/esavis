@@ -148,7 +148,7 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_out_pipe,
     dbg_prof    = False
     radar       = dc.SimpRadar()
     proc_obj    = mpf.CoverProc()
-    proc_prof   = Profiler()
+    proc_prof   = Profiler() # presently unused
 
     # buffer containing data from most recent fileset
 
@@ -311,6 +311,8 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_out_pipe,
         # future work
         #elif cfg_dict["data_src"] == "video_file"
 
+        elif cfg_dict["data_src"] == "disabled":
+            pass
 
         # NOTE DAT FILE DATA SOURCE UNTESTED
         else: # cfg_dict["data_src"] == "dat_file":

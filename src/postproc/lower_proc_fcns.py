@@ -15,18 +15,14 @@ import numpy as np
 import ipdb
 import time
 import os
-import subprocess
 import ipdb
 
 
 # C function imports 
 ##############################################################################
-# remake the makefile
-CWD = os.getcwd() 
-c_funcs_dir = CWD + "\\c_funcs"
-result = subprocess.run(["make"], cwd=c_funcs_dir)
-
-c_peak_fcns_lib = ct.CDLL(CWD + "\\c_funcs\\peak_find_fcns.dll")
+CFUNCS_DIR  = os.path.abspath(os.path.join(os.path.dirname(__file__), 
+                'c_funcs'))
+c_peak_fcns_lib = ct.CDLL(CFUNCS_DIR + "\\peak_find_fcns.dll")
 extract_single_rangeline_peaks  = c_peak_fcns_lib.extract_single_rangeline_peaks
 extract_all_rangeline_peaks     = c_peak_fcns_lib.extract_all_rangeline_peaks
 extract_aux_data                = c_peak_fcns_lib.extract_aux_data
