@@ -111,6 +111,12 @@ class THzImageTab(QWidget):
         # builds up all the widgets and layout adds them to self
         bti.build_thz_image_tab(self)
 
+        # This sets up all the callback functions that detect when
+        # something has changed so that the configuration update is called
+        # with the appropriate dictionary parameter
+        ##################################bti.setup_thz_tab_callbacks(self, update_config)
+
+
         ####################################################################
         # signals/slots for connecting line edit textboxes to sliders
         #
@@ -122,9 +128,9 @@ class THzImageTab(QWidget):
         self.contr_slider.valueChanged.connect(self.update_contr_ledit)
         self.contr_ledit.editingFinished.connect(self.update_contr_slider)
 
-        # [REMOVED FOR NOW] Connect the lineEdit(textbox) and slider together
-        #pkwdth_slider.valueChanged.connect(self.update_pkwdth_ledit)
-        #pkwdth_ledit.textChanged.connect(self.update_pkwdth_slider)
+        # Connect the lineEdit(textbox) and slider together
+        self.pkwdth_slider.valueChanged.connect(self.update_pkwdth_ledit)
+        self.pkwdth_ledit.textChanged.connect(self.update_pkwdth_slider)
 
         # Connect the lineEdits(textboxes) and sliders together
         self.rc_slider_min.valueChanged.connect(self.update_rc_min_ledit)
@@ -144,8 +150,6 @@ class THzImageTab(QWidget):
         ####################################################################
         # assign some callbacks
         #
-        #update_btn.clicked.connect(self.update_image)
-        self.update_btn.clicked.connect(self.update_btn_clicked)
         self.load_cfg_btn.clicked.connect(self.load_cfg_btn_clicked)
         self.save_cfg_btn.clicked.connect(self.save_cfg_btn_clicked)
         self.save_dflt_cfg_btn.clicked.connect(self.save_dflt_cfg_btn_clicked)
@@ -162,8 +166,8 @@ class THzImageTab(QWidget):
         self.cs_autoscale_chkb.stateChanged.connect(self.update_image)
         self.cmap_cbox.currentIndexChanged.connect(self.cmap_box_index_changed)
 
-        self.image_save_btn.clicked.connect(self.image_save_btn_clicked)
-        self.image_autosave_btn.clicked.connect(self.image_autosave_btn_clicked)
+        self.ld_save_image_save_btn.clicked.connect(self.ld_save_image_save_btn_clicked)
+        self.ld_save_image_autosave_btn.clicked.connect(self.ld_save_image_autosave_btn_clicked)
         self.reset_camera_btn.clicked.connect(self.reset_camera_btn_clicked)
 
 
@@ -177,7 +181,7 @@ class THzImageTab(QWidget):
         
         postproc_config_dict["threshold_db"]    = self.thresh_ledit.text()
         postproc_config_dict["contrast_db"]     = self.contr_ledit.text()
-        #postproc_config_dict["peak_width"]      = 
+        postproc_config_dict["half_peak_width"] = self.pkwdth_ledit.text()
         postproc_config_dict["rangecut_min"]    = self.rc_ledit_min.text()
         postproc_config_dict["rangecut_max"]    = self.rc_ledit_max.text()
 
@@ -219,7 +223,8 @@ class THzImageTab(QWidget):
 
         self.thresh_ledit.setText(str(postproc_config_dict["threshold_db"])) 
         self.contr_ledit.setText(str(postproc_config_dict["contrast_db"]) )
-        #postproc_config_dict["peak_width"] 
+        self.pkwdth_ledit.setText(str(postproc_config_dict["half_peak_width"]))
+
         self.rc_ledit_min.setText(str(postproc_config_dict["rangecut_min"]))
         self.rc_ledit_max.setText(str(postproc_config_dict["rangecut_max"]))
 
@@ -315,8 +320,6 @@ class THzImageTab(QWidget):
         self.mainwin_obj.postproc_config_dict = postproc_config_dict
 
 
-
-
     #def update_thresh_slider(self):
     #def update_contr_slider(self):
     #def update_rc_min_slider(self):
@@ -333,9 +336,9 @@ class THzImageTab(QWidget):
 
     
     def update_thresh_slider(self):
-        value = int(float(self.thresh_ledit.text()))
+        value = float(self.thresh_ledit.text())
         if value != "":
-            self.thresh_slider.setValue(int(value))
+            self.thresh_slider.setValue(value)
             self.update_image()
 
 
@@ -346,22 +349,22 @@ class THzImageTab(QWidget):
 
     
     def update_contr_slider(self):
-        value = int(float(self.contr_ledit.text()))
+        value = float(self.contr_ledit.text())
         if value != "":
-            self.contr_slider.setValue(int(value))
+            self.contr_slider.setValue(value)
             self.update_image()
 
 
-    #def update_pkwdth_ledit(self, value):
-    #    self.pkwdth_ledit.clear()
-    #    self.pkwdth_ledit.insert(str(value))
-    #    self.update_image()
+    def update_pkwdth_ledit(self, value):
+        self.pkwdth_ledit.clear()
+        self.pkwdth_ledit.insert(str(value))
+        self.update_image()
 
     
-    #def update_pkwdth_slider(self, value):
-    #    if value != "":
-    #        self.pkwdth_slider.setValue(int(value))
-    #        self.update_image()
+    def update_pkwdth_slider(self, value):
+        if value != "":
+            self.pkwdth_slider.setValue(int(value))
+            self.update_image()
 
 
     def update_rc_min_ledit(self, value):
@@ -516,26 +519,11 @@ class THzImageTab(QWidget):
         #    print(print_str)
 
 
-    # NOTE Sort of a debug button
-    def update_btn_clicked(self):
-        """
-        triggered when the update button is clicked.  Both updates the 
-        interface and toggles a debug variable that indicates to debug code
-        whether a debug trace should engage
-        """
-        if self.set_trace_val:
-            self.set_trace_val = False
-
-        else:
-            self.set_trace_val = True
-        self.update_image(force_update=True)
-
-
     def cmap_box_index_changed(self):
         self.update_image(force_update=True)
 
 
-    def image_save_btn_clicked(self):
+    def ld_save_image_save_btn_clicked(self):
         postproc_config_dict = self.get_gui_config_params()
         fpath, ok = QFileDialog.getSaveFileName(
             self,
@@ -550,7 +538,7 @@ class THzImageTab(QWidget):
             self.thz_image_obj.save_cur_image(fpath, fname)
 
     # NOTE TODO need to add saving of surface plots functionality
-    def image_autosave_btn_clicked(self):
+    def ld_save_image_autosave_btn_clicked(self):
         postproc_config_dict = self.get_gui_config_params()
         plot_style = postproc_config_dict["plot_style"]
 

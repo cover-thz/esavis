@@ -6,6 +6,7 @@ from PySide6.QtCore import Qt
 import os
 import ipdb # NOTE REMOVE
 import json
+import collections
 #from math import nan
 #import sys
 #import signal
@@ -127,33 +128,36 @@ class SimpDialog(QDialog):
         self.setLayout(self.layout)
 
 
-
 ##############################################################################
 # Main Class
 ##############################################################################
-
 class ConfigTab(QScrollArea):
     """
     This is the default tab visible and contains all the main configuration 
     data for the image processing.  
 
     """
-    # data file paths for channels 0 and 1
-    data0_fpath = None
-    data1_fpath = None
 
-    def __init__(self, mainwin_obj, RADAR_DFLT_CFG_PATH, 
-                 POSTPROC_DFLT_CFG_PATH, CONFIG_DIR, DFLT_DATA_DIR):
+    def __init__(self, CFG_DFLT_PATH, CONFIG_DIR, DFLT_DATA_DIR, 
+                 load_config, save_config, update_config):
+                                    
         super().__init__()
 
-        self.mainwin_obj = mainwin_obj
-        self.RADAR_DFLT_CFG_PATH      = RADAR_DFLT_CFG_PATH
-        self.POSTPROC_DFLT_CFG_PATH   = POSTPROC_DFLT_CFG_PATH
+        self.load_config = load_config
+        self.save_config = save_config
+        self.update_config = update_config
+
+        self.CFG_DFLT_PATH            = CFG_DFLT_PATH
         self.CONFIG_DIR               = CONFIG_DIR
         self.DFLT_DATA_DIR            = DFLT_DATA_DIR
 
         # builds up all the widgets and layout adds them to self
-        bct.build_config_tab(self, mainwin_obj)
+        bct.build_config_tab(self)
+
+        # This sets up all the callback functions that detect when
+        # something has changed so that the configuration update is called
+        # with the appropriate dictionary parameter
+        bct.setup_config_callbacks(self, update_config)
 
         ####################################################################
         # Signals/Slots stuff
@@ -176,39 +180,49 @@ class ConfigTab(QScrollArea):
         self.load_latest_ch1_btn.clicked.connect(lambda: 
                 self.load_latest_dat_btn_clicked(1))
 
-        self.process_data_btn.clicked.connect(self.process_data_btn_clicked)
         self.autoload_btn.clicked.connect(self.autoload_btn_clicked)
 
         ####################################################################
-        # Activities that signal that the processing has become stale
+        # Activities that require an update to the cfg_dict
         #
-        self.el_s0_strt_ledit.textChanged.connect(self.make_stale)
-        self.el_s0_end_ledit.textChanged.connect(self.make_stale)
-        self.el_s1_strt_ledit.textChanged.connect(self.make_stale)
-        self.el_s1_end_ledit.textChanged.connect(self.make_stale)
-        self.process_side0_chkb.stateChanged.connect(self.make_stale)
-        self.process_side1_chkb.stateChanged.connect(self.make_stale)
-        self.num_elev_pix_ledit.textChanged.connect(self.make_stale)
-        self.num_azi_pix_ledit.textChanged.connect(self.make_stale)
-        self.fft_len_ledit.textChanged.connect(self.make_stale)
-        self.num_noise_pts_ledit.textChanged.connect(self.make_stale)
-
-        self.max_avgs_ledit.textChanged.connect(self.make_stale)
-        self.fft_avg_rbut.toggled.connect(self.make_stale)
-        self.pwr_avg_rbut.toggled.connect(self.make_stale)
-
-        self.fsamp_freq_ledit.textChanged.connect(self.make_stale)
-        self.chirp_time_us_ledit.textChanged.connect(self.make_stale)
-        self.enable_ch0_chkb.stateChanged.connect(self.make_stale)
-        self.enable_ch1_chkb.stateChanged.connect(self.make_stale)
-        self.rough_pwr_thresh_ledit.textChanged.connect(self.make_stale)
-        self.half_peak_width_ledit.textChanged.connect(self.make_stale)
-        self.center_rangeval_ledit.textChanged.connect(self.make_stale)
-        self.ch0_offset_ledit.textChanged.connect(self.make_stale)
-        self.ch1_offset_ledit.textChanged.connect(self.make_stale)
+        #self.el_s0_strt_ledit.textChanged.connect(self.make_stale)
+        #self.el_s0_end_ledit.textChanged.connect(self.make_stale)
+        #self.el_s1_strt_ledit.textChanged.connect(self.make_stale)
+        #self.el_s1_end_ledit.textChanged.connect(self.make_stale)
+        #self.process_side0_chkb.stateChanged.connect(self.make_stale)
+        #self.process_side1_chkb.stateChanged.connect(self.make_stale)
+        #self.num_elev_pix_ledit.textChanged.connect(self.make_stale)
+        #self.num_azi_pix_ledit.textChanged.connect(self.make_stale)
+        #self.fft_len_ledit.textChanged.connect(self.make_stale)
+        #self.num_noise_pts_ledit.textChanged.connect(self.make_stale)
 
 
+        #self.fsamp_freq_ledit.textChanged.connect(self.make_stale)
+        #self.chirp_time_us_ledit.textChanged.connect(self.make_stale)
+        #self.enable_ch0_chkb.stateChanged.connect(self.make_stale)
+        #self.enable_ch1_chkb.stateChanged.connect(self.make_stale)
+        #self.el_offset0_ledit.textChanged.connect(self.make_stale)
+        #self.el_offset1_ledit.textChanged.connect(self.make_stale)
+        #self.center_rangeval_ledit.textChanged.connect(self.make_stale)
+        #self.ch0_offset_ledit.textChanged.connect(self.make_stale)
+        #self.ch1_offset_ledit.textChanged.connect(self.make_stale)
 
+
+        # New stuff
+        #self.noise_frac_ledit.textChanged.connect(self.make_stale)
+        #self.df_time_domain_rbut.toggled.connect(self.make_stale)
+        #self.df_freq_domain_rbut.toggled.connect(self.make_stale)
+        #self.df_power_domain_rbut.toggled.connect(self.make_stale)
+        #self.chirp_span_ledit.textChanged.connect(self.make_stale)
+        #self.calc_wt_sum_chkb.stateChanged.connect(self.make_stale)
+        #self.dead_pix_ledit.textChanged.connect(self.make_stale)
+
+
+
+
+    ###########################################################################
+    #         Central function that grabs GUI configuration parameters        #
+    ###########################################################################
     def get_gui_config_params(self):
         """
         grabs the current set of configuration parameters entered into the 
@@ -230,16 +244,8 @@ class ConfigTab(QScrollArea):
         radar_config_dict["npts_az"]        = self.num_azi_pix_ledit.text()
         radar_config_dict["fft_len"]        = self.fft_len_ledit.text()
         radar_config_dict["num_noise_pts"]  = self.num_noise_pts_ledit.text()
-        radar_config_dict["max_num_avgs"]   = self.max_avgs_ledit.text()
 
-        if self.fft_avg_rbut.isChecked():
-            radar_config_dict["avg_style"]      = "fft"
 
-        elif self.pwr_avg_rbut.isChecked():
-            radar_config_dict["avg_style"]      = "power"
-
-        else:
-            radar_config_dict["avg_style"]      = "none"
 
         radar_config_dict["fs_adc_msps"]    = self.fsamp_freq_ledit.text()
         radar_config_dict["chirp_time_us"]  = self.chirp_time_us_ledit.text()
@@ -248,8 +254,8 @@ class ConfigTab(QScrollArea):
         ch1_en = self.enable_ch1_chkb.isChecked()
         radar_config_dict["channel_0_en"]  = ch0_en
         radar_config_dict["channel_1_en"]  = ch1_en
-        radar_config_dict["rough_pwr_thresh"]  = self.rough_pwr_thresh_ledit.text()
-        radar_config_dict["half_peak_width"]  = self.half_peak_width_ledit.text()
+        radar_config_dict["el_offset0"]  = self.el_offset0_ledit.text()
+        radar_config_dict["el_offset1"]  = self.el_offset1_ledit.text()
         radar_config_dict["center_rangeval"]  = self.center_rangeval_ledit.text()
 
         radar_config_dict["ch0_offset"]  = self.ch0_offset_ledit.text()
@@ -258,6 +264,9 @@ class ConfigTab(QScrollArea):
         
 
 
+    ###########################################################################
+    #         Central function that sets GUI configuration parameters         #
+    ###########################################################################
     def set_gui_config_params(self, radar_config_dict):
         """
         takes the passed radar config dictionary and distributes the values 
@@ -279,16 +288,7 @@ class ConfigTab(QScrollArea):
         self.fft_len_ledit.setText(str(radar_config_dict["fft_len"]))
         self.num_noise_pts_ledit.setText(str(radar_config_dict["num_noise_pts"]))
 
-        self.max_avgs_ledit.setText(str(radar_config_dict["max_num_avgs"])) 
 
-        self.fft_avg_rbut.setChecked(False)
-        self.pwr_avg_rbut.setChecked(False)
-
-        if radar_config_dict["avg_style"] == "fft":
-            self.fft_avg_rbut.setChecked(True)
-
-        elif radar_config_dict["avg_style"] == "power":
-            self.pwr_avg_rbut.setChecked(True)
 
         self.fsamp_freq_ledit.setText(str(radar_config_dict["fs_adc_msps"]))
         self.chirp_time_us_ledit.setText(str(radar_config_dict["chirp_time_us"]))
@@ -298,8 +298,8 @@ class ConfigTab(QScrollArea):
         self.enable_ch0_chkb.setChecked(ch0_en)
         self.enable_ch1_chkb.setChecked(ch1_en)
 
-        self.rough_pwr_thresh_ledit.setText(str(radar_config_dict["rough_pwr_thresh"]))
-        self.half_peak_width_ledit.setText(str(radar_config_dict["half_peak_width"]))
+        self.el_offset0_ledit.setText(str(radar_config_dict["el_offset0"]))
+        self.el_offset1_ledit.setText(str(radar_config_dict["el_offset1"]))
         self.center_rangeval_ledit.setText(str(radar_config_dict["center_rangeval"]))
 
         self.ch0_offset_ledit.setText(str(radar_config_dict["ch0_offset"]))
@@ -310,69 +310,6 @@ class ConfigTab(QScrollArea):
 
 
     
-    def update_radar_config(self, radar_config_dict):
-        """
-        this formally sets the radar_config_dict object in the main window
-        function.  I put it seperately in a function so that it's easier to
-        track all instances in which this variable is changed in this file
-        """
-        self.mainwin_obj.radar_config_dict = radar_config_dict
-
-
-
-    def load_config_file(self, cfg_path):
-        """
-        This loads the config data into a dictionary.  It's a rather simple
-        function, and may not be necessary to even exist, but in case things
-        change I would like the abstraction
-
-        note that this works for both radar configuration files and postproc 
-        configuration files
-
-        """
-        with open(cfg_path, "r", encoding="utf-8") as file:
-            cfg_dict = json.load(file)
-
-        return cfg_dict
-
-
-
-    def save_config_file(self, cfg_dict, cfg_path):
-        """
-        this saves a dictionary as a json file.  similar to "load_config_file" 
-        it is likely an unnecessary function, but the abstraction might be 
-        helpful
-
-        """
-        with open(cfg_path, 'w') as file:
-            json.dump(cfg_dict, file)
-
-
-
-    def set_proc_status(self, flag):
-        """
-        simple function that sets the processing status label to useful and 
-        easy to interpret colors / texts
-        """
-        if flag == "STALE":
-            style_options = "background-color: orange; color: black"
-            self.curr_dat_proc_lbl.setStyleSheet(style_options)
-            text_str = "Processing Status:    STALE       "
-            self.curr_dat_proc_lbl.setText(text_str)
-        elif flag == "COMPLETE":
-            style_options = "background-color: green; color: white"
-            self.curr_dat_proc_lbl.setStyleSheet(style_options)
-            text_str = "Processing Status:    COMPLETE    "
-            self.curr_dat_proc_lbl.setText(text_str)
-        elif flag == "IN PROGRESS":
-            style_options = "background-color: yellow; color: black"
-            self.curr_dat_proc_lbl.setStyleSheet(style_options)
-            text_str = "Processing Status:   IN PROGRESS  "
-            self.curr_dat_proc_lbl.setText(text_str)
-        else:
-            raise Exception("Invalid processing status flag")
-
-
 
     ##################### CALLBACK FUNCTIONS #####################
 
@@ -381,7 +318,8 @@ class ConfigTab(QScrollArea):
         make processing stale because something changed
         """
         # set data processing status to "STALE"
-        self.set_proc_status("STALE")
+        #self.set_proc_status("STALE")
+        pass
 
 
 
@@ -396,21 +334,8 @@ class ConfigTab(QScrollArea):
             ""
         )
         if fpath:
-            # update the textbox showing the current config file name
+            self.load_config(fpath)
             self.curr_cfg_val_ledit.setText(str(fpath))
-
-            # load the file
-            radar_config_dict = self.load_config_file(fpath)
-
-            # set the GUI values per the loaded file
-            self.set_gui_config_params(radar_config_dict)
-
-            # update the toplevel configuration variable
-            self.update_radar_config(radar_config_dict)
-
-            # set data processing status to "STALE"
-            self.make_stale()
-
 
 
     def save_cfg_btn_clicked(self):
@@ -418,7 +343,6 @@ class ConfigTab(QScrollArea):
         clicking the save config button will save the current configuration 
         to a file
         """
-        radar_config_dict = self.get_gui_config_params()
         fpath, ok = QFileDialog.getSaveFileName(
             self,
             "Save a Radar Configuration File", 
@@ -426,9 +350,7 @@ class ConfigTab(QScrollArea):
             ""
         )
         if fpath:
-            #os.path.isfile(fpath):
-            #path = Path(fpath)
-            self.save_config_file(radar_config_dict, fpath)
+            self.save_config(fpath)
             self.curr_cfg_val_ledit.setText(str(fpath))
 
 
@@ -442,16 +364,14 @@ class ConfigTab(QScrollArea):
         dlg = SimpDialog()
         proceed = bool(dlg.exec_())
         if proceed:
-            radar_config_dict = self.get_gui_config_params()
-            fpath = self.RADAR_DFLT_CFG_PATH 
+            fpath = self.CFG_DFLT_PATH
 
-            try:
-                self.save_config_file(radar_config_dict, fpath)
+            if fpath:
+                self.save_config(fpath)
                 self.curr_cfg_val_ledit.setText(str(fpath))
-            except Exception as except_val:
-                print(except_val)
+            else:
                 print_str = "You may need to add a 'config' directory in "
-                print_str += "the same directory as 'StillViewerGUI.py'"
+                print_str += "the same directory as 'THzVisGUI.py'"
                 print(print_str)
                     
 
@@ -461,26 +381,13 @@ class ConfigTab(QScrollArea):
         clicking the load default config button will load the default config
         file
         """
-        fpath = self.RADAR_DFLT_CFG_PATH 
+        fpath = self.CFG_DFLT_PATH 
 
-        try:
-            # update the textbox showing the current config file name
+        if fpath:
+            self.load_config(fpath)
             self.curr_cfg_val_ledit.setText(str(fpath))
 
-            # load the file
-            radar_config_dict = self.load_config_file(fpath)
-
-            # set the GUI values per the loaded file
-            self.set_gui_config_params(radar_config_dict)
-
-            # update the toplevel configuration variable
-            self.update_radar_config(radar_config_dict)
-
-            # set data processing status to "STALE"
-            self.make_stale()
-
-        except Exception as except_val:
-            print(except_val)
+        else:
             print_str = "Default config file may not exist"
             print(print_str)
 
@@ -497,18 +404,19 @@ class ConfigTab(QScrollArea):
             ""
         )
         if fpath:
-            # this is all the "loading" actually is
+            cfg_dict_updates = collections.OrderedDict()
+
             if channel==0:
-                self.data0_fpath = fpath
+                cfg_dict_updates["data0_fpath"] = fpath
                 self.curr_loaded0_val_ledit.setText(str(fpath))
             elif channel==1:
-                self.data1_fpath = fpath
+                cfg_dict_updates["data1_fpath"] = fpath
                 self.curr_loaded1_val_ledit.setText(str(fpath))
             else:
                 raise Exception("Invalid Channel")
 
-            # set data processing status to "STALE"
-            self.make_stale()
+            # update the configuration
+            self.update_config(cfg_dict_updates)
 
 
 
@@ -525,38 +433,29 @@ class ConfigTab(QScrollArea):
             fpath = data_dir + last_mod_fname
 
             if fpath:
+                cfg_dict_updates = collections.OrderedDict()
                 if channel==0:
-                    self.data0_fpath = fpath
+                    cfg_dict_updates["data0_fpath"] = fpath
                     self.curr_loaded0_val_ledit.setText(str(fpath))
                 elif channel==1:
-                    self.data1_fpath = fpath
+                    cfg_dict_updates["data1_fpath"] = fpath
                     self.curr_loaded1_val_ledit.setText(str(fpath))
                 else:
                     raise Exception("Invalid Channel")
 
+                # update the configuration
+                self.update_config(cfg_dict_updates)
+
+
             else:
-                except_str = "Invalid or non-existent default"
+                except_str = "Invalid or non-existent default "
                 except_str += "configuration directory"
                 raise Exception(except_str)
 
         except:
-            except_str = "Invalid or non-existent default"
+            except_str = "Invalid or non-existent default "
             except_str += "configuration directory"
             raise Exception(except_str)
-
-        # set data processing status to "STALE"
-        self.make_stale()
-
-
-
-
-    def process_data_btn_clicked(self):
-        """
-        callback for when process_data_btn is clicked.  It will process
-        the data file assuming one is loaded
-        """
-        self.process_data_files()
-
 
 
     def autoload_btn_clicked(self):
@@ -565,21 +464,9 @@ class ConfigTab(QScrollArea):
         the data files for the enabled channels (if the corresponding files 
         are also loaded
         """
-        radar_config_dict = self.get_gui_config_params()
-        if (radar_config_dict["channel_0_en"]):
+        if (self.cfg_dict["channel_0_en"]):
             self.load_latest_dat_btn_clicked(0)
-        if (radar_config_dict["channel_1_en"]):
+        if (self.cfg_dict["channel_1_en"]):
             self.load_latest_dat_btn_clicked(1)
-        self.process_data_files()
 
 
-    ##################### Central Processing Function #####################
-
-    def process_data_files(self):
-        """
-        This performs tier 1 and 2 post-processing on the data file with the 
-        configuration settings as they are in the GUI
-        
-        This will also update the radar configuration toplevel dictionary
-        """
-        print("TBD")

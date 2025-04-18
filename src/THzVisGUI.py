@@ -22,13 +22,13 @@ from PySide6.QtCore import Qt, QTimer
 import os
 import sys
 import ipdb # NOTE REMOVE
-#import json
+import json
 #from math import nan
 import signal
 import numpy as np
 import pyqtgraph as pg
 import multiprocessing as mp
-import collections
+from collections import OrderedDict
 import subprocess
 #from dataclasses import dataclass, field
 from ConfigTab import ConfigTab
@@ -97,8 +97,7 @@ class MainWindow(QMainWindow):
     and doesn't do much else.  The bulk of the widget-related code is in 
     the respective tab widget 
     """
-    plot_settings_dict      = None
-    postproc_config_dict    = None
+    cfg_dict    =   None
 
     powspec_matrix  = None
     coarse_azi_lut  = None
@@ -117,19 +116,17 @@ class MainWindow(QMainWindow):
     proc_pipes = None
 
 
-    def __init__(self, PLOT_SETTINGS_DFLT_PATH, POSTPROC_DFLT_CFG_PATH, 
-                 CONFIG_DIR, DFLT_DATA_DIR, proc_pipes):
+    def __init__(self, CFG_DFLT_PATH, CONFIG_DIR, DFLT_DATA_DIR, proc_pipes):
         super().__init__()
 
-        self.PLOT_SETTINGS_DFLT_PATH = PLOT_SETTINGS_DFLT_PATH
-        self.POSTPROC_DFLT_CFG_PATH = POSTPROC_DFLT_CFG_PATH
-        self.CONFIG_DIR             = CONFIG_DIR
-        self.DFLT_DATA_DIR          = DFLT_DATA_DIR
-        self.proc_pipes             = proc_pipes
-
+        # going with a single configuration file rather than two
+        self.CFG_DFLT_PATH      = CFG_DFLT_PATH
+        self.CONFIG_DIR         = CONFIG_DIR
+        self.DFLT_DATA_DIR      = DFLT_DATA_DIR
+        self.proc_pipes         = proc_pipes
 
         # sets ths title and default size of the window
-        self.setWindowTitle('Still Image Viewer GUI')
+        self.setWindowTitle('THz Vizualizer GUI')
         #self.setGeometry(100, 100, 400, 300)
         self.setGeometry(100, 100, 500, 700)
 
@@ -138,16 +135,16 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.central_widget)
         self.layout = QVBoxLayout(self.central_widget)
 
-
         # create the tab widget which contains pretty much the remainder of
         # the GUI objects
         self.tab_widget = QTabWidget()
-        self.cfg_tab    = ConfigTab(self, PLOT_SETTINGS_DFLT_PATH, 
-                                    POSTPROC_DFLT_CFG_PATH, CONFIG_DIR, 
-                                    DFLT_DATA_DIR)
-        self.main_thz_tab = THzImageTab(self, PLOT_SETTINGS_DFLT_PATH, 
-                                      POSTPROC_DFLT_CFG_PATH, CONFIG_DIR, 
-                                      DFLT_DATA_DIR)
+        self.cfg_tab    = ConfigTab(CFG_DFLT_PATH, CONFIG_DIR, 
+                                    DFLT_DATA_DIR, self.load_config, 
+                                    self.save_config, self.update_config)
+                                    
+                                    
+        self.main_thz_tab = THzImageTab(self, CFG_DFLT_PATH, CONFIG_DIR, 
+                                    DFLT_DATA_DIR, self.update_config)
         self.camera_tab   = QWidget() # TODO Placeholder until 
                                       # I get the camera working
 
@@ -169,23 +166,14 @@ class MainWindow(QMainWindow):
         # set the GUI to view the config tab
         self.tab_widget.setCurrentIndex(0)
 
-        # execute initial config operations 
-        # (for now we have no command line argument)
-        # check for default radar config and execute configuration sequence
-        # if there is a default radar config
-        if os.path.isfile(PLOT_SETTINGS_DFLT_PATH):
-            self.cfg_tab.load_dflt_cfg_btn_clicked()
-        else:
-            self.plot_settings_dict = {}
-
         # check for default postprocessing config and execute configuration 
         # sequence if there is a default postprocessing config
-        if os.path.isfile(POSTPROC_DFLT_CFG_PATH):
-            self.main_thz_tab.load_dflt_cfg_btn_clicked()
+        if os.path.isfile(CFG_DFLT_PATH):
+            self.load_config(CFG_DFLT_PATH)
         else:
-            self.postproc_config_dict = collections.OrderedDict()
-            self.postproc_config_dict["data_src"] = "disabled"
-
+            new_cfg_dict = OrderedDict()
+            new_cfg_dict["data_src"] = "disabled"
+            self.update_config(new_cfg_dict)
 
         # finally setup the timer
         self.timer = QTimer()
@@ -216,20 +204,37 @@ class MainWindow(QMainWindow):
         layout.addWidget(label)
 
 
+    # central function that loads files into our config dict
+    def load_config(self, fpath):
+        """
+        loads a config file creating a config dictionary
+        """
+        with open(fpath, "r", encoding="utf-8") as file:
+            cfg_dict = json.load(file, opbject_pairs_hook=OrderedDict)
+        self.update_config(cfg_dict)
+
+
+    # central function that saves our config dict to a file
+    def save_config(self, fpath):
+        """
+        saves a config file with the current configuration dictionary
+        """
+        with open(fpath, 'w') as file:
+            json.dump(self.cfg_dict, file)
+
+
+    # NOTE NOTE NOTE: ACTUALLY WRITE THIS FUNCTION!
     # NOTE so we need a few more functions to to "centralize" the configuration
     # and flag generation for the processing core (which is interacted 
     # with here)
-
-    # probably should change name to "update_postproc_config" once you've 
-    # removed that functionality above
-    def update_config(self, cfg_dict_in, cfg_flags_in):
+    def update_config(self, cfg_dict_in, cfg_flags_in=None):
         """
         This function is called by lower level objects (the tabs) to "update"
         the configuraiton dictionary and trigger the main window to send
         an updated version of the configuraiton to the processing core.
 
         note that cfg_dict_in is not a complete cfg_dict, it only contains 
-        keys that have been changed.  
+        keys that have been changed.   same with cfg_flags_in
         """
         
         # here we check the input dict to see if there are any changes that
@@ -238,6 +243,28 @@ class MainWindow(QMainWindow):
         # then here we append the cfg_flags_in, which is really just an 
         # opportunity for hte lower level tab to force-trigger a flag 
         # condition
+    
+        # NOTE we need to have some sort of buffering/throttling system so that
+        # we only send something line 3-4 updates per second maximum and if 
+        # there are more updates than that sent, then we combine them into a 
+        # single update with prefeerence to later update values.
+        #
+        # I can imagine changing the contrast slider repeatedly causing many
+        # contrast updates occuring in sort sequence, but only the last one 
+        # is actually propagated
+        #
+        # Alternatively we could have an "ACK" signal of some kind come back
+        # from the processor core along an new pipe to indicate the config
+        # has been recieved and is being processed so we could properly combine
+        # and buffer the requests 
+        #
+        #
+
+        # NOTE  you need to calculate fs_post_dec from fs_adc and dec_val
+        # whenever either of them change
+
+        print(cfg_dict_in)
+
         pass
         
 
@@ -317,10 +344,12 @@ if __name__ == '__main__':
     else:
         raise Exception("Invalid OS Name")
 
-    PLOT_SETTINGS_DFLT_FNAME    = "plot_settings_default.json"
-    POSTPROC_CFG_DFLT_FNAME     = "postproc_default_cfg.json"
-    PLOT_SETTINGS_DFLT_PATH     = CONFIG_DIR + PLOT_SETTINGS_DFLT_FNAME
-    POSTPROC_DFLT_CFG_PATH      = CONFIG_DIR + POSTPROC_CFG_DFLT_FNAME
+    CFG_DFLT_FNAME  = "default_cfg.json"
+    #PLOT_SETTINGS_DFLT_FNAME    = "plot_settings_default.json"
+    #POSTPROC_CFG_DFLT_FNAME     = "postproc_default_cfg.json"
+    #PLOT_SETTINGS_DFLT_PATH     = CONFIG_DIR + PLOT_SETTINGS_DFLT_FNAME
+    #POSTPROC_DFLT_CFG_PATH      = CONFIG_DIR + POSTPROC_CFG_DFLT_FNAME
+    CFG_DFLT_PATH   = CONFIG_DIR + CFG_DFLT_FNAME
 
     # this is supposed to allow quitting the app from CTRL-C on console
     signal.signal(signal.SIGINT, sigint_handler)
@@ -347,7 +376,7 @@ if __name__ == '__main__':
     #config_file = parser.value(config_file_option)
 
     # this should be all we need for the initial configuration dictionary
-    cfg_dict = collections.OrderedDict()
+    cfg_dict = OrderedDict()
     cfg_dict["data_src"] = "disabled"
 
     # construct the multiprocessing system
@@ -363,8 +392,8 @@ if __name__ == '__main__':
 
     # Defining and showing the main window
     #window = MainWindow(config_file)
-    window = MainWindow(PLOT_SETTINGS_DFLT_PATH, POSTPROC_DFLT_CFG_PATH, 
-                CONFIG_DIR, DFLT_DATA_DIR, proc_pipes)
+    window = MainWindow(CFG_DFLT_PATH, CONFIG_DIR, DFLT_DATA_DIR, proc_pipes)
+                
     window.show()
     sys.exit(app.exec())
 
