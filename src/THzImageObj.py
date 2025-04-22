@@ -26,8 +26,7 @@ import matplotlib.pyplot as plt
 
 from PySide6.QtWidgets import (
      QHBoxLayout,
-     QStackedWidget,
-)
+     QStackedWidget,)
 #from PySide6.QtWidgets import (
 #    QApplication,
 #    QCheckBox,
@@ -60,36 +59,35 @@ from PySide6.QtWidgets import (
 
 #class THzImage(pg.PlotWidget):
 class THzImageObj(QHBoxLayout):
-    parent          = None
     image_data      = None
     update_cntr     = 0
+
+    az_grid_1d      = None
+    el_grid_1d      = None
+
+    az_grid_2d      = None
+    el_grid_2d      = None
+
     
-    def __init__(self, thz_image_tab):
+    def __init__(self, thz_image_tab, cfg_dict):
         super().__init__()
         #super().__init__(background="transparent")
 
-
-        # we're actually going to stack the possible plot widgets on top
-        # of one another
+        # we're actually going to stack the plot widgets on top
+        # of one another and make only one of them visible at a time
         self.thz_image_stack = QStackedWidget()
 
-        self.thz_image_tab  = thz_image_tab
-        self.thz_mesh_obj   = THzMeshImage(self, thz_image_tab)
-        self.thz_surface_obj =  THzSurfaceObj(self, thz_image_tab)
+        self.thz_image_tab   = thz_image_tab
+        self.thz_mesh_obj    = THzMeshImage(thz_image_tab)
+        self.thz_surface_obj =  THzSurfaceObj(thz_image_tab)
 
         self.thz_image_stack.addWidget(self.thz_mesh_obj)
         self.thz_image_stack.addWidget(self.thz_surface_obj)
         self.thz_image_stack.setCurrentIndex(0)
 
-        # color bar
+        # color bar object
         self.color_bar_wg = pg.GraphicsLayoutWidget()
         self.color_bar_wg.setBackground(None)
-
-        # Removes warning spammed in console (also might disable touch 
-        # screen but i dont think we're using that)
-        #self.color_bar_wg.viewport().setAttribute(
-        #    QtCore.Qt.WidgetAttribute.WA_AcceptTouchEvents, False
-        #)
 
         self.color_bar = pg.ColorBarItem(width=15, interactive=False)
         self.color_bar_wg.addItem(self.color_bar)
@@ -98,6 +96,114 @@ class THzImageObj(QHBoxLayout):
         self.addWidget(self.thz_image_stack, 100)
         self.addWidget(self.color_bar_wg, 10)
 
+        self.cfg_dict = cfg_dict
+
+        # initializing the dimensions of the image
+        self.min_az = None
+        self.max_az = None
+
+        self.min_el = None
+        self.max_el = None
+
+
+    def calc_coarse_grids(s):
+        """
+        Only needs to be done if there's a change in the frame dimensions
+        or number of x or y pixels.  Should be "infrequent"
+        """
+        min_az      = s.cfg_dict["min_az"]
+        s.min_az    = min_az
+        max_az      = s.cfg_dict["max_az"]
+        s.max_az    = max_az
+
+        min_el      = s.cfg_dict["min_el"]
+        s.min_el    = min_el
+        max_el      = s.cfg_dict["max_el"]
+        s.max_el    = max_el
+
+        xlen        = s.cfg_dict["xlen"]
+        s.xlen      = xlen
+        ylen        = s.cfg_dict["ylen"]
+        s.ylen      = ylen
+
+        s.az_grid_1d = np.linspace(min_az, max_az, xlen)
+        s.el_grid_1d = np.linspace(min_el, max_el, ylen)
+
+        s.az_grid_2d = (np.tile(s.az_grid_1d, ylen).reshape((ylen,xlen))).T
+        s.el_grid_2d = (np.tile(s.el_grid_1d, xlen).reshape((xlen,ylen)))
+
+
+    def check_frame_params(s):
+        """
+        Checks to see if any of the frame parameters that would require a 
+        recalculation of the coarse grids have changed.  Returns true if the
+        coarse grids need to be recalculated, returns false otherwise 
+        """
+        if s.min_az != s.cfg_dict["min_az"]:
+            needs_update = True
+        elif s.max_az != s.cfg_dict["max_az"]:
+            needs_update = True
+        elif s.min_el != s.cfg_dict["min_el"]:
+            needs_update = True
+        elif s.max_el != s.cfg_dict["max_el"]:
+            needs_update = True
+        elif s.xlen != s.cfg_dict["xlen"]:
+            needs_update = True
+        elif s.ylen != s.cfg_dict["ylen"]:
+            needs_update = True
+        else:
+            needs_update = False
+        return needs_update
+
+
+    def update_image(s, frame_data, new_frame_flag, reset_camera_flag=False):
+        """
+        This performs the actual image updating
+        """
+        # first step is to check if the coarse grids need updating
+        if s.check_frame_params():
+            s.calc_coarse_grids()
+
+        cfg_dict = s.cfg_dict 
+
+        # NOTE TODO
+        # now we check if there's a new frame?
+
+        if new_frame_flag:
+
+            pixel_ranges_grid   = frame_data["pixel_ranges_grid"]
+            valid_pixels_grid   = frame_data["valid_pixels_grid"]
+            noise_floor_grid    = frame_data["noise_floor_grid"]
+        
+        # NOTE TODO work on this next: 4/21/2025
+        # LEFT OFF HERE!
+
+        """
+
+        # Now figure out the color scale limits
+        autocolor = cfg_dict["autoscale_color"]
+        if not autocolor:
+            color_min = cfg_dict["color_scale_min"]
+            color_max = cfg_dict["color_scale_max"]
+        else:
+            flat_img = image_data.flatten()
+            color_min = np.nanmin(flat_img)
+            color_max = np.nanmax(flat_img)
+            #print(f"color_min = {color_min}")
+            #print(f"color_max = {color_max}")
+            
+            # set the color scale textboxes to the autoscaled values
+            # when autoscale color is enabled
+            self.thz_image_tab.cs_ledit_min.setText(str(color_min))
+            self.thz_image_tab.cs_ledit_max.setText(str(color_max))
+
+            self.thz_image_tab.cs_slider_min.setValue(int(color_min))
+            self.thz_image_tab.cs_slider_max.setValue(int(color_max))
+        """
+
+
+
+        
 
     def update_plot(self, az_grid, el_grid, image_data, cmap_str, 
                     postproc_config_dict, 
@@ -163,6 +269,8 @@ class THzImageObj(QHBoxLayout):
         self.color_bar.setLevels((color_min, color_max))
 
 
+
+    # NOTE CONSIDER PUSHING THIS LOGIC BACK INTO THzImageTab()
     def save_cur_image(self, fpath, fprefix):
         """
         saves the current image to file, will probably move this to the 
@@ -225,27 +333,29 @@ class THzImageObj(QHBoxLayout):
         #"integ_power_plot", "num_avgs_plot"]:
 
 
+##############################################################################
+##############################################################################
+##############################################################################
+##############################################################################
+
 
 class THzMeshImage(pg.PlotWidget):
     """
     This is the 
 
     """
-    parent          = None
     thz_image_tab   = None
     
-    def __init__(self, parent, thz_image_tab):
+    def __init__(self, thz_image_tab):
         super().__init__()
         #super().__init__(background="transparent")
 
-        self.parent = parent
         self.thz_image_tab = thz_image_tab
 
         # Removes warning spammed in console (also might disable touch 
         # screen but i dont think we're using that)
         self.viewport().setAttribute(
-            QtCore.Qt.WidgetAttribute.WA_AcceptTouchEvents, False
-        )
+            QtCore.Qt.WidgetAttribute.WA_AcceptTouchEvents, False)
 
         # main color mesh image
         self.color_mesh = pg.PColorMeshItem()
@@ -293,23 +403,6 @@ class THzMeshImage(pg.PlotWidget):
         # sadly, this is what I'm going with. At least for now.  Darth Vader
         return (x_grid.T, y_grid.T)
 
-
-    #def remove_nans(self, image_in, replace_val):
-    #    """
-    #    Simplest way to remove nans
-    #    """
-    #    image = np.copy(image_in)
-    #    for i in range(image.shape[0]):
-    #        for j in range(image.shape[1]):
-    #            if bool(np.isnan(image[i][j])):
-    #                # set to "far" so they look uninteresting
-    #                image[i][j] = replace_val
-    #    return image
-
-
-##############################################################################
-##############################################################################
-##############################################################################
 ##############################################################################
 ##############################################################################
 ##############################################################################
@@ -320,7 +413,6 @@ class THzSurfaceObj(gl.GLViewWidget):
     """
     This is a widget that contains a surface plot for the THz data
     """
-    parent          = None
     first_update    = True
     k_val = 0.25
     
@@ -328,11 +420,10 @@ class THzSurfaceObj(gl.GLViewWidget):
     cmap_dict = None
 
 
-    def __init__(self, parent, thz_image_tab):
+    def __init__(self, thz_image_tab):
         super().__init__(rotationMethod="quaternion")
         #super().__init__(background="transparent")
 
-        self.parent = parent
         self.thz_image_tab = thz_image_tab
 
         self.surface_plot = gl.GLSurfacePlotItem()
@@ -401,18 +492,9 @@ class THzSurfaceObj(gl.GLViewWidget):
                                  rotation=rotation)
 
 
-    #def remove_nans(self, image_in, replace_val):
-    #    """
-    #    Simplest way to remove nans
-    #    """
-    #    image = np.copy(image_in)
-    #    for i in range(image.shape[0]):
-    #        for j in range(image.shape[1]):
-    #            if bool(np.isnan(image[i][j])):
-    #                # set to "far" so they look uninteresting
-    #                image[i][j] = replace_val
-    #    return image
-
+    ###########################################################################
+    ###################### Surface Plot Colormap Related ######################
+    ###########################################################################
 
     def brown_white_colormap(self, min_val, max_val):
         """

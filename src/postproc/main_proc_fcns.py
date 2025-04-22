@@ -226,14 +226,14 @@ class CoverProc:
             #################################################################
 
             process_frame = False
-            if cfg_dict["frame_style"] == "percent_col_filled":
-                curr_col_percent = lpf.check_col_percent(s.r_grid_valids)
-                if curr_col_percent >= cfg_dict["percent_filled_thresh"]:
+            if cfg_dict["frame_style"] == "fraction_col_filled":
+                curr_col_fraction = lpf.check_col_fraction(s.r_grid_valids)
+                if curr_col_fraction >= cfg_dict["fraction_filled_thresh"]:
                     process_frame = True
 
-            elif cfg_dict["frame_style"] == "percent_pix_filled":
-                curr_percent = lpf.check_pix_percent(s.r_grid_valids)
-                if curr_percent >= cfg_dict["percent_filled_thresh"]:
+            elif cfg_dict["frame_style"] == "fraction_pix_filled":
+                curr_fraction = lpf.check_pix_fraction(s.r_grid_valids)
+                if curr_fraction >= cfg_dict["fraction_filled_thresh"]:
                     process_frame = True
 
             elif cfg_dict["frame_style"] == "azimuth_turnaround":
@@ -277,6 +277,12 @@ class CoverProc:
                 min_range       = cfg_dict["min_range"]
                 max_range       = cfg_dict["max_range"]
                 dead_pix_val    = cfg_dict["dead_pix_val"]
+
+
+                # NOTE TODO: Need to put in code to perform power integration
+                # if "peak_selection" is not "front" or "back".  
+                # also point-cloud if we do that
+
 
                 (pixel_ranges_grid, valid_pixels_grid, 
                  noise_floor_grid) = lpf.extract_peaks_c(coarse_power_grid, 

@@ -83,8 +83,8 @@ new ones
         fixed number of rangelines per frame for the frame_style(s) calling 
         for such a value
 
-    frame_percent
-        frame percentage "filled" with rangelines required prior to generating
+    frac_filled_thresh
+        frame fraction "filled" with rangelines required prior to generating
         a frame.  Note that "filled" means a rangeline assigned to that pixel
         not necessarily a valid pixel (as that rangeline may have no 
         valid peaks)

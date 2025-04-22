@@ -9,6 +9,7 @@
 from PySide6 import QtCore, QtWidgets, QtGui
 from PySide6.QtCore import Qt
 import THzImageObj as tio
+from collections import OrderedDict
 
 from PySide6.QtWidgets import (
     QApplication,
@@ -43,11 +44,8 @@ from PySide6.QtWidgets import (
 
 
 class SourceTab(QWidget):
-
     def __init__(self):
         super().__init__()
-
-
 
 
 def build_thz_image_tab(thz_img_tab):
@@ -82,7 +80,11 @@ def build_thz_image_tab(thz_img_tab):
     # 
     # The processing config stuff below is the lower left 
     # portion of the screen
-    thz_img_tab.thz_image_obj = tio.THzImageObj(thz_img_tab)
+    # 
+    # NOTE: Giving the cfg_dict to THzImageObj but again it does NOT alter it
+    # only reads from it
+    thz_img_tab.thz_image_obj = tio.THzImageObj(thz_img_tab, 
+        thz_img_tab.cfg_dict)
 
     
     ####################################################################
@@ -120,6 +122,8 @@ def build_thz_image_tab(thz_img_tab):
     daq_status_lbl = QLabel("DAQ Status: ")
     daq_status_ledit = QLineEdit()
     daq_status_ledit.setFixedWidth(100)
+    daq_status_ledit.setReadOnly(True)
+
     src_tab_sublayout_row2.addWidget(daq_status_lbl)
     src_tab_sublayout_row2.addWidget(daq_status_ledit)
 
@@ -128,6 +132,7 @@ def build_thz_image_tab(thz_img_tab):
     file_status_lbl = QLabel("File Status: ")
     file_status_ledit = QLineEdit()
     file_status_ledit.setFixedWidth(100)
+    file_status_ledit.setReadOnly(True)
     src_tab_sublayout_row3.addWidget(file_status_lbl)
     src_tab_sublayout_row3.addWidget(file_status_ledit)
 
@@ -152,13 +157,16 @@ def build_thz_image_tab(thz_img_tab):
 
     ####################################################################
     # NOTE This currently does nothing as ConfigTab takes care of all 
-    # configuration considerations for now
+    # configuration considerations for now.  
+    #
+    # As a result it is currently not added as a tab and therefore does not
+    # appear in the current layout 
     # 
     # "Load/Save Config" tab
     #
     ld_sv_cfg_tab = QWidget()
-    proc_cfg_tab_widget.addTab(ld_sv_cfg_tab, 
-        "Load/Save\nConfig")
+    #proc_cfg_tab_widget.addTab(ld_sv_cfg_tab, 
+    #    "Load/Save\nConfig")
     ld_sv_cfg_tab_top_layout = QVBoxLayout()
 
     # ld_sv_cfg_sublaout_row1
@@ -188,7 +196,7 @@ def build_thz_image_tab(thz_img_tab):
     thz_img_tab.ld_sv_cfg_tab_top_layout = ld_sv_cfg_tab_top_layout
 
     # final piece
-    ld_sv_cfg_tab.setLayout(ld_sv_cfg_tab_top_layout)
+    #ld_sv_cfg_tab.setLayout(ld_sv_cfg_tab_top_layout)
 
 
     ####################################################################
@@ -214,9 +222,11 @@ def build_thz_image_tab(thz_img_tab):
     back_surface_plot_rbut   = QRadioButton()
     back_surface_plot_rbut.setText("Back Surface Plot")
     plot_style_sublayout_col1.addWidget(back_surface_plot_rbut)
-    num_avgs_rbut     = QRadioButton()
-    num_avgs_rbut.setText("Show Number of Averages")
-    plot_style_sublayout_col1.addWidget(num_avgs_rbut)
+    num_oversamp_rbut     = QRadioButton()
+    #num_oversamp_rbut.setText("Show Degree of Oversampling") 
+    num_oversamp_rbut.setEnabled(False)
+    num_oversamp_rbut.setText("RESERVED")
+    plot_style_sublayout_col1.addWidget(num_oversamp_rbut)
     integ_pwr_rbut     = QRadioButton()
     integ_pwr_rbut.setText("Integrated Power")
     plot_style_sublayout_col1.addWidget(integ_pwr_rbut)
@@ -242,7 +252,7 @@ def build_thz_image_tab(thz_img_tab):
     thz_img_tab.back_peak_rbut          = back_peak_rbut
     thz_img_tab.front_surface_plot_rbut = front_surface_plot_rbut
     thz_img_tab.back_surface_plot_rbut  = back_surface_plot_rbut
-    thz_img_tab.num_avgs_rbut           = num_avgs_rbut
+    thz_img_tab.num_oversamp_rbut       = num_oversamp_rbut
     thz_img_tab.integ_pwr_rbut          = integ_pwr_rbut
     thz_img_tab.point_cloud_rbut        = point_cloud_rbut
     thz_img_tab.reset_camera_btn        = reset_camera_btn
@@ -351,6 +361,7 @@ def build_thz_image_tab(thz_img_tab):
     ld_save_image_sublayout_row2 = QHBoxLayout()
     ld_save_image_curr_dir_lbl    = QLabel("Current Save Dir:")
     ld_save_image_curr_dir_ledit  = QLineEdit()
+    ld_save_image_curr_dir_ledit.setReadOnly(True)
     ld_save_image_sublayout_row2.addWidget(ld_save_image_curr_dir_lbl)
     ld_save_image_sublayout_row2.addWidget(ld_save_image_curr_dir_ledit)
 
@@ -387,12 +398,12 @@ def build_thz_image_tab(thz_img_tab):
     ####################################################################
 
     ####################################################################
-    # Update button
+    # Update button (REMOVED FOR NOW)
     #
-    update_btn = QPushButton("Update\nPlot")
+    #update_btn = QPushButton("Update\nPlot")
 
     # Add member variables
-    thz_img_tab.update_btn = update_btn
+    #thz_img_tab.update_btn = update_btn
     
 
     ####################################################################
@@ -468,7 +479,7 @@ def build_thz_image_tab(thz_img_tab):
     pkwdth_lbl = QLabel("Half Peak Width")
     pkwdth_ledit = QLineEdit()
     pkwdth_ledit.setFixedWidth(50)
-    pkwdth_vmin, pkwdth_vmax = (1,50)
+    pkwdth_vmin, pkwdth_vmax = (1,20)
     pkwdth_ledit.setValidator(QtGui.QIntValidator(pkwdth_vmin, 
                               pkwdth_vmax))
     pkwdth_ledit.setMaxLength(3)
@@ -704,7 +715,7 @@ def build_thz_image_tab(thz_img_tab):
     left_layout.addWidget(proc_cfg_tab_widget)
 
     # right side widgets 
-    right_layout.addWidget(update_btn)
+    #right_layout.addWidget(update_btn)
     right_layout.addLayout(thresh_grid_layout)
     right_layout.addLayout(contr_grid_layout)
     right_layout.addLayout(pkwdth_grid_layout) 
@@ -733,241 +744,149 @@ class setup_thz_tab_callbacks:
     def __init__(s, thz_tab, update_config):
         pass
         s.update_config = update_config
-        s.cfg_tab = cfg_tab
-
-
-
-
-
-
-
-
-
-
-
-
-
-    ###########################################################################
-    # NOTE Objects copy-pasted
-    ###########################################################################
-
-    # QLabels
-    src_tab_lbl_1   = QLabel("Data Source:")
-    blank1_src_lbl  = QLabel("")
-    blank2_src_lbl  = QLabel("")
-    daq_status_lbl  = QLabel("DAQ Status: ")
-    file_status_lbl = QLabel("File Status: ")
-    plot_style_lbl  = QLabel("Plot Style:")
-    azi_hyst_fs_lbl = QLabel("Az Hysteresis:")
-    azi_marg_fs_lbl = QLabel("Az Margin:")
-    num_rng_fs_lbl  = QLabel("Num Rangelines:")
-    tot_frac_fs_lbl = QLabel("Col/Pix Fraction*:")
-    frac_fs_lbl     = QLabel("*Between 0 and 1")
-    ld_save_image_curr_dir_lbl  = QLabel("Current Save Dir:")
-    ld_save_image_desc_lbl      = QLabel("Image Description:")
-    thresh_lbl                  = QLabel("Threshold (dB)")
-    contr_lbl = QLabel("Contrast (dB)")
-    pkwdth_lbl = QLabel("Half Peak Width")
-    rc_lbl_title = QLabel("Range Cut (cm)\n(modified)")
-    rc_lbl_min   = QLabel("Min:")
-    rc_lbl_max   = QLabel("Max:")
-    cs_lbl_title = QLabel("Color Scaling")
-    cs_lbl_min   = QLabel("Min:")
-    cs_lbl_max   = QLabel("Max:")
-    cmap_lbl_title = QLabel("Colormap")
-    frame_limits_lbl = QLabel("Frame Limits")
-    az_min_lim_lbl   = QLabel("Az min:")
-    az_max_lim_lbl   = QLabel("Az max:")
-    el_min_lim_lbl   = QLabel("El min:")
-    el_max_lim_lbl   = QLabel("El max:")
-
-
-    # QRadioButtons
-    file_src_rbut   = QRadioButton()
-    daq_src_rbut    = QRadioButton()
-
-    front_peak_rbut         = QRadioButton()
-    back_peak_rbut          = QRadioButton()
-    front_surface_plot_rbut = QRadioButton()
-    back_surface_plot_rbut  = QRadioButton()
-    num_avgs_rbut           = QRadioButton()
-    integ_pwr_rbut          = QRadioButton()
-    point_cloud_rbut        = QRadioButton()
-
-    azi_turn_fs_rbut        = QRadioButton()
-    num_rng_fs_rbut         = QRadioButton()
-    col_frac_fs_rbut        = QRadioButton()
-    pix_frac_fs_rbut        = QRadioButton()
-
-
-    # QLineEdit
-    daq_status_ledit  = QLineEdit()
-    file_status_ledit = QLineEdit()
-    azi_hyst_fs_ledit = QLineEdit()
-    azi_marg_fs_ledit = QLineEdit()
-    num_rng_fs_ledit  = QLineEdit()
-    tot_frac_fs_ledit = QLineEdit()
-    ld_save_image_curr_dir_ledit = QLineEdit()
-    ld_save_image_desc_ledit     = QLineEdit()
-    thresh_ledit = QLineEdit()
-    contr_ledit = QLineEdit()
-    pkwdth_ledit = QLineEdit()
-    rc_ledit_min = QLineEdit()
-    rc_ledit_max = QLineEdit()
-    cs_ledit_min = QLineEdit()
-    cs_ledit_max = QLineEdit()
-    az_min_lim_ledit    = QLineEdit()
-    az_max_lim_ledit    = QLineEdit()
-    el_min_lim_ledit    = QLineEdit()
-    el_max_lim_ledit    = QLineEdit()
-
-
-    # QPushButton
-    load_cfg_btn        = QPushButton("Load Config\nFile")
-    load_dflt_cfg_btn   = QPushButton("Load Config\nDefaults")
-    save_cfg_btn        = QPushButton("Save Config\nFile")
-    save_dflt_cfg_btn   = QPushButton("Save New\nDefault Config")
-    reset_camera_btn    = QPushButton("Reset Plot\nCamera")
-    ld_save_image_autosave_btn  = QPushButton("Autosave\nImage")
-    ld_save_image_chng_dir_btn  = QPushButton("Change Save\nDirectory")
-    ld_save_image_save_btn      = QPushButton("Save\nImage")
-    update_btn                  = QPushButton("Update\nPlot")
-
-
-    # QSlider
-    thresh_slider = QSlider(Qt.Orientation.Horizontal, thz_img_tab)
-    contr_slider  = QSlider(Qt.Orientation.Horizontal, thz_img_tab)
-    pkwdth_slider = QSlider(Qt.Orientation.Horizontal, thz_img_tab)
-    rc_slider_min = QSlider(Qt.Orientation.Horizontal, thz_img_tab)
-    rc_slider_max = QSlider(Qt.Orientation.Horizontal, thz_img_tab)
-    cs_slider_min = QSlider(Qt.Orientation.Horizontal, thz_img_tab)
-    cs_slider_max = QSlider(Qt.Orientation.Horizontal, thz_img_tab)
-
-
-    # QCheckBox
-    cs_autoscale_chkb  = QCheckBox()
-
-
-    # QComboBox
-    cmap_cbox = QComboBox()
-
-
-
-    ###########################################################################
-    # NOTE Objects copy-pasted end
-    ###########################################################################
-
-
-    # NOTE the stuff below is just copy-pasted from build_config_tab() and 
-    # is not right, though I keep it to show the formatting I used in 
-    # build_config_tab()
-
-    # Here is where you left off 4/18/2025
-
-
-
-
-
-
-
 
         # QLineEdits
-        cfg_tab.el_s0_strt_ledit.textChanged.connect(
-            lambda: s.ledit_update(cfg_tab.el_s0_strt_ledit, 
-            "elev_side_0_start", float))
-        cfg_tab.el_s0_end_ledit.textChanged.connect(
-            lambda: s.ledit_update(cfg_tab.el_s0_end_ledit,
-            "elev_side_0_end", float))
-        cfg_tab.el_s1_strt_ledit.textChanged.connect(
-            lambda: s.ledit_update(cfg_tab.el_s1_strt_ledit,
-            "elev_side_1_start", float))
-        cfg_tab.el_s1_end_ledit.textChanged.connect(
-            lambda: s.ledit_update(cfg_tab.el_s1_end_ledit,
-            "elev_side_1_end", float))
-        cfg_tab.num_elev_pix_ledit.textChanged.connect(
-            lambda: s.ledit_update(cfg_tab.num_elev_pix_ledit, 
-            "ylen", int))
-        cfg_tab.num_azi_pix_ledit.textChanged.connect(
-            lambda: s.ledit_update(cfg_tab.num_azi_pix_ledit,
-            "xlen", int))
-        cfg_tab.fft_len_ledit.textChanged.connect(
-            lambda: s.ledit_update(cfg_tab.fft_len_ledit,
-            "fft_len", int))
-        cfg_tab.num_noise_pts_ledit.textChanged.connect(
-            lambda: s.ledit_update(cfg_tab.num_noise_pts_ledit, 
-            "num_noise_pts", int))
-        cfg_tab.noise_frac_ledit.textChanged.connect(
-            lambda: s.ledit_update(cfg_tab.noise_frac_ledit,
-            "noise_start_frac", float))
+        thz_tab.azi_hyst_fs_ledit.editingFinished.connect(
+            lambda: s.ledit_update(thz_tab.azi_hyst_fs_ledit, 
+            "turn_hyst", float))
+        thz_tab.azi_marg_fs_ledit.editingFinished.connect(
+            lambda: s.ledit_update(thz_tab.azi_marg_fs_ledit, 
+            "turn_az_margin", float))
+        thz_tab.num_rng_fs_ledit.editingFinished.connect(
+            lambda: s.ledit_update(thz_tab.num_rng_fs_ledit, 
+            "daq_num_rangelines", int))
+        thz_tab.tot_frac_fs_ledit.editingFinished.connect(
+            lambda: s.ledit_update(thz_tab.tot_frac_fs_ledit, 
+            "fraction_filled_thresh", float))
 
-        cfg_tab.chirp_span_ledit.textChanged.connect(
-            lambda: s.ledit_update(cfg_tab.chirp_span_ledit,
-            "chirp_span", float, 1e9))
-        cfg_tab.chirp_time_us_ledit.textChanged.connect(
-            lambda: s.ledit_update(cfg_tab.chirp_time_us_ledit, 
-            "chirp_time", float, 1e-6))
+        thz_tab.ld_save_image_desc_ledit.editingFinished.connect(
+            lambda: s.ledit_update(thz_tab.ld_save_image_desc_ledit, 
+            "save_image_desc", str))
 
-        cfg_tab.dead_pix_ledit.textChanged.connect(
-            lambda: s.ledit_update(cfg_tab.dead_pix_ledit,
-            "dead_pix_val", float))
-        cfg_tab.fsamp_freq_ledit.textChanged.connect(
-            lambda: s.ledit_update(cfg_tab.fsamp_freq_ledit,
-            "fs_adc", float, 1e6))
+        # Setting the signal to textChanged for the slider bound line edits
+        # for now
+        thz_tab.thresh_ledit.textChanged.connect(
+            lambda: s.ledit_update(thz_tab.thresh_ledit, 
+            "threshold_db", float))
+        thz_tab.contr_ledit.textChanged.connect(
+            lambda: s.ledit_update(thz_tab.contr_ledit, 
+            "contrast_db", float))
+        thz_tab.pkwdth_ledit.textChanged.connect(
+            lambda: s.ledit_update(thz_tab.pkwdth_ledit, 
+            "half_peak_width", int))
+        thz_tab.rc_ledit_min.textChanged.connect(
+            lambda: s.ledit_update(thz_tab.rc_ledit_min, 
+            "min_range", float))
+        thz_tab.rc_ledit_max.textChanged.connect(
+            lambda: s.ledit_update(thz_tab.rc_ledit_max, 
+            "max_range", float))
+        thz_tab.cs_ledit_min.textChanged.connect(
+            lambda: s.ledit_update(thz_tab.cs_ledit_min, 
+            "color_scale_min", float))
+        thz_tab.cs_ledit_max.textChanged.connect(
+            lambda: s.ledit_update(thz_tab.cs_ledit_max, 
+            "color_scale_max", float))
 
-        cfg_tab.el_offset0_ledit.textChanged.connect(
-            lambda: s.ledit_update(cfg_tab.el_offset0_ledit,
-            "el_offset0", float))
-        cfg_tab.el_offset1_ledit.textChanged.connect(
-            lambda: s.ledit_update(cfg_tab.el_offset1_ledit,
-            "el_offset1", float))
-
-        cfg_tab.center_rangeval_ledit.textChanged.connect(
-            lambda: s.ledit_update(cfg_tab.center_rangeval_ledit, 
-            "center_rangeval", float))
-        cfg_tab.dec_val_ledit.textChanged.connect(
-            lambda: s.ledit_update(cfg_tab.dec_val_ledit,
-            "dec_val", int))
-
-        cfg_tab.ch0_offset_ledit.textChanged.connect(
-            lambda: s.ledit_update(cfg_tab.ch0_offset_ledit,
-            "ch0_offset", float))
-        cfg_tab.ch1_offset_ledit.textChanged.connect(
-            lambda: s.ledit_update(cfg_tab.ch1_offset_ledit,
-            "ch1_offset", float))
-
-
-        # QCheckBoxes
-        cfg_tab.process_side0_chkb.stateChanged.connect(
-            lambda: s.chkbox_update(cfg_tab.process_side0_chkb,
-            "disable_el_side0", True))
-
-        cfg_tab.process_side1_chkb.stateChanged.connect(
-            lambda: s.chkbox_update(cfg_tab.process_side1_chkb,
-            "disable_el_side1", True))
-
-        cfg_tab.calc_wt_sum_chkb.stateChanged.connect(
-            lambda: s.chkbox_update(cfg_tab.calc_wt_sum_chkb,
-            "calc_weighted_sum"))
-
-        cfg_tab.enable_ch0_chkb.stateChanged.connect(
-            lambda: s.chkbox_update(cfg_tab.enable_ch0_chkb,
-            "ch0_en"))
-
-
-        cfg_tab.enable_ch1_chkb.stateChanged.connect(
-            lambda: s.chkbox_update(cfg_tab.enable_ch1_chkb,
-            "ch1_en"))
+        thz_tab.az_min_lim_ledit.editingFinished.connect(
+            lambda: s.ledit_update(thz_tab.az_min_lim_ledit, 
+            "min_az", float))
+        thz_tab.az_max_lim_ledit.editingFinished.connect(
+            lambda: s.ledit_update(thz_tab.az_max_lim_ledit, 
+            "max_az", float))
+        thz_tab.el_min_lim_ledit.editingFinished.connect(
+            lambda: s.ledit_update(thz_tab.el_min_lim_ledit, 
+            "min_el", float))
+        thz_tab.el_max_lim_ledit.editingFinished.connect(
+            lambda: s.ledit_update(thz_tab.el_max_lim_ledit, 
+            "max_el", float))
 
 
         # QRadioButtons
-        cfg_tab.df_time_domin_rbut.toggled.connect(
-            lambda: s.data_format_update(cfg_tab, "data_format_in"))
+        thz_tab.file_src_rbut.toggled.connect(
+            lambda: s.rbut_update(thz_tab.file_src_rbut, 
+            "dat_file", "data_src"))
+        thz_tab.daq_src_rbut.toggled.connect(
+            lambda: s.rbut_update(thz_tab.daq_src_rbut, 
+            "daq", "data_src"))
 
-        cfg_tab.df_freq_domin_rbut.toggled.connect(
-            lambda: s.data_format_update(cfg_tab, "data_format_in"))
+        thz_tab.front_peak_rbut.toggled.connect(
+            lambda: s.rbut_update(thz_tab.front_peak_rbut, 
+            "front", "peak_selection"))
+        thz_tab.front_peak_rbut.toggled.connect(
+            lambda: s.rbut_update(thz_tab.front_peak_rbut, 
+            "front_peak", "plot_style"))
 
-        cfg_tab.df_power_domin_rbut.toggled.connect(
-            lambda: s.data_format_update(cfg_tab, "data_format_in"))
+        thz_tab.back_peak_rbut.toggled.connect(
+            lambda: s.rbut_update(thz_tab.back_peak_rbut, 
+            "back", "peak_selection"))
+        thz_tab.back_peak_rbut.toggled.connect(
+            lambda: s.rbut_update(thz_tab.back_peak_rbut, 
+            "back_peak", "plot_style"))
+
+        thz_tab.front_surface_plot_rbut.toggled.connect(
+            lambda: s.rbut_update(thz_tab.front_surface_plot_rbut, 
+            "front", "peak_selection"))
+        thz_tab.front_surface_plot_rbut.toggled.connect(
+            lambda: s.rbut_update(thz_tab.front_surface_plot_rbut, 
+            "front_surface", "plot_style"))
+
+        thz_tab.back_surface_plot_rbut.toggled.connect(
+            lambda: s.rbut_update(thz_tab.back_surface_plot_rbut, 
+            "front", "peak_selection"))
+        thz_tab.back_surface_plot_rbut.toggled.connect(
+            lambda: s.rbut_update(thz_tab.back_surface_plot_rbut, 
+            "back_surface", "plot_style"))
+
+        thz_tab.num_oversamp_rbut.toggled.connect(
+            lambda: s.rbut_update(thz_tab.num_oversamp_rbut, 
+            "num_oversamp_plot", "peak_selection"))
+        thz_tab.num_oversamp_rbut.toggled.connect(
+            lambda: s.rbut_update(thz_tab.num_oversamp_rbut, 
+            "num_oversamp_plot", "plot_style"))
+
+        thz_tab.integ_pwr_rbut.toggled.connect(
+            lambda: s.rbut_update(thz_tab.integ_pwr_rbut, 
+            "integ_pwr_plot", "peak_selection"))
+        thz_tab.integ_pwr_rbut.toggled.connect(
+            lambda: s.rbut_update(thz_tab.integ_pwr_rbut, 
+            "integ_pwr_plot", "plot_style"))
+
+        thz_tab.point_cloud_rbut.toggled.connect(
+            lambda: s.rbut_update(thz_tab.point_cloud_rbut, 
+            "point_cloud_plot", "peak_selection"))
+        thz_tab.point_cloud_rbut.toggled.connect(
+            lambda: s.rbut_update(thz_tab.point_cloud_rbut, 
+            "point_cloud_plot", "plot_style"))
+
+        thz_tab.azi_turn_fs_rbut.toggled.connect(
+            lambda: s.rbut_update(thz_tab.azi_turn_fs_rbut, 
+            "azimuth_turnaround", "frame_style"))
+        thz_tab.num_rng_fs_rbut.toggled.connect(
+            lambda: s.rbut_update(thz_tab.num_rng_fs_rbut, 
+            "accum_rangelines", "frame_style"))
+        thz_tab.col_frac_fs_rbut.toggled.connect(
+            lambda: s.rbut_update(thz_tab.col_frac_fs_rbut, 
+            "fraction_col_filled", "frame_style"))
+        thz_tab.pix_frac_fs_rbut.toggled.connect(
+            lambda: s.rbut_update(thz_tab.pix_frac_fs_rbut, 
+            "fraction_pix_filled", "frame_style"))
+
+        # QPushButtons
+        # any config updates occur in their respective callback functions
+
+        # QSliders
+        # these are each bound to QLineEdits that contain the true information
+        # so no need to handle these here
+
+        # QCheckBoxes
+        thz_tab.cs_autoscale_chkb.stateChanged.connect(
+            lambda: s.chkbox_update(thz_tab.cs_autoscale_chkb,
+            "autoscale_color", True))
+
+        # QComboBoxes
+        thz_tab.cmap_cbox.currentIndexChanged.connect(
+            lambda: s.combo_box_update(thz_tab.cmap_cbox,
+            "colormap"))
 
 
     ##########################################################################
@@ -988,6 +907,12 @@ class setup_thz_tab_callbacks:
             new_cfg_dict[key] = val
             s.update_config(new_cfg_dict)
         
+    def rbut_update(s, rbut_obj, val_if_en, key):
+        if rbut_obj.isChecked():
+            new_cfg_dict = OrderedDict()
+            new_cfg_dict[key] = val_if_en
+            s.update_config(new_cfg_dict)
+
 
     def chkbox_update(s, chkb_obj, key, invert=False):
         if invert:
@@ -998,26 +923,10 @@ class setup_thz_tab_callbacks:
         new_cfg_dict = OrderedDict()
         new_cfg_dict[key] = val
         s.update_config(new_cfg_dict)
-        
 
-
-    def data_format_update(s, thz_tab, key):
-        if thz_tab.df_time_domin_rbut.isChecked():
-            val = "time_domain"
-
-        elif thz_tab.df_freq_domin_rbut.isChecked():
-            val = "fft"
-
-        elif thz_tab.df_power_domin_rbut.isChecked():
-            val = "power_spectrum"
-
-        else:
-            raise Exception("Invalid data format")
-
+    def combo_box_update(s, cbox_obj, key):
         new_cfg_dict = OrderedDict()
-        new_cfg_dict[key] = val
+        new_cfg_dict[key] = cbox_obj.currentText()
         s.update_config(new_cfg_dict)
-
-
 
 

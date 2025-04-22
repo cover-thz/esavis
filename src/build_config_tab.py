@@ -274,7 +274,7 @@ def build_config_tab(cfg_tab):
     # Eight point 3rd row of widgets on this tab page
     #
     row8pt3_layout   = QHBoxLayout()
-    data_format_lbl  = QLabel("Data Format:")
+    data_format_lbl  = QLabel("Input Data Format:")
     df_time_domin_rbut  = QRadioButton()
     df_time_domin_rbut.setText("Time Domain")
 
@@ -512,6 +512,7 @@ def build_config_tab(cfg_tab):
     main_layout.addLayout(row6_layout)
     main_layout.addLayout(row7_layout)
     main_layout.addLayout(row8_layout)
+    main_layout.addLayout(row8pt3_layout)
     main_layout.addLayout(row8pt4_layout)
     main_layout.addLayout(row8pt5_layout)
     main_layout.addLayout(row8pt6_layout)
@@ -534,6 +535,7 @@ def build_config_tab(cfg_tab):
     cfg_tab.row6_layout = row6_layout
     cfg_tab.row7_layout = row7_layout
     cfg_tab.row8_layout = row8_layout
+    cfg_tab.row8pt3_layout = row8pt3_layout
     cfg_tab.row8pt4_layout = row8pt4_layout
     cfg_tab.row8pt5_layout = row8pt5_layout
     cfg_tab.row8pt6_layout = row8pt6_layout
@@ -565,72 +567,70 @@ def build_config_tab(cfg_tab):
 class setup_config_callbacks:
 
     def __init__(s, cfg_tab, update_config):
-        pass
-
         s.update_config = update_config
         s.cfg_tab = cfg_tab
 
         # QLineEdits
-        cfg_tab.el_s0_strt_ledit.textChanged.connect(
+        cfg_tab.el_s0_strt_ledit.editingFinished.connect(
             lambda: s.ledit_update(cfg_tab.el_s0_strt_ledit, 
             "elev_side_0_start", float))
-        cfg_tab.el_s0_end_ledit.textChanged.connect(
+        cfg_tab.el_s0_end_ledit.editingFinished.connect(
             lambda: s.ledit_update(cfg_tab.el_s0_end_ledit,
             "elev_side_0_end", float))
-        cfg_tab.el_s1_strt_ledit.textChanged.connect(
+        cfg_tab.el_s1_strt_ledit.editingFinished.connect(
             lambda: s.ledit_update(cfg_tab.el_s1_strt_ledit,
             "elev_side_1_start", float))
-        cfg_tab.el_s1_end_ledit.textChanged.connect(
+        cfg_tab.el_s1_end_ledit.editingFinished.connect(
             lambda: s.ledit_update(cfg_tab.el_s1_end_ledit,
             "elev_side_1_end", float))
-        cfg_tab.num_elev_pix_ledit.textChanged.connect(
+        cfg_tab.num_elev_pix_ledit.editingFinished.connect(
             lambda: s.ledit_update(cfg_tab.num_elev_pix_ledit, 
             "ylen", int))
-        cfg_tab.num_azi_pix_ledit.textChanged.connect(
+        cfg_tab.num_azi_pix_ledit.editingFinished.connect(
             lambda: s.ledit_update(cfg_tab.num_azi_pix_ledit,
             "xlen", int))
-        cfg_tab.fft_len_ledit.textChanged.connect(
+        cfg_tab.fft_len_ledit.editingFinished.connect(
             lambda: s.ledit_update(cfg_tab.fft_len_ledit,
             "fft_len", int))
-        cfg_tab.num_noise_pts_ledit.textChanged.connect(
+        cfg_tab.num_noise_pts_ledit.editingFinished.connect(
             lambda: s.ledit_update(cfg_tab.num_noise_pts_ledit, 
             "num_noise_pts", int))
-        cfg_tab.noise_frac_ledit.textChanged.connect(
+        cfg_tab.noise_frac_ledit.editingFinished.connect(
             lambda: s.ledit_update(cfg_tab.noise_frac_ledit,
             "noise_start_frac", float))
 
-        cfg_tab.chirp_span_ledit.textChanged.connect(
+        cfg_tab.chirp_span_ledit.editingFinished.connect(
             lambda: s.ledit_update(cfg_tab.chirp_span_ledit,
             "chirp_span", float, 1e9))
-        cfg_tab.chirp_time_us_ledit.textChanged.connect(
+        cfg_tab.chirp_time_us_ledit.editingFinished.connect(
             lambda: s.ledit_update(cfg_tab.chirp_time_us_ledit, 
             "chirp_time", float, 1e-6))
 
-        cfg_tab.dead_pix_ledit.textChanged.connect(
+        cfg_tab.dead_pix_ledit.editingFinished.connect(
             lambda: s.ledit_update(cfg_tab.dead_pix_ledit,
             "dead_pix_val", float))
-        cfg_tab.fsamp_freq_ledit.textChanged.connect(
+        cfg_tab.fsamp_freq_ledit.editingFinished.connect(
             lambda: s.ledit_update(cfg_tab.fsamp_freq_ledit,
             "fs_adc", float, 1e6))
 
-        cfg_tab.el_offset0_ledit.textChanged.connect(
+        cfg_tab.el_offset0_ledit.editingFinished.connect(
             lambda: s.ledit_update(cfg_tab.el_offset0_ledit,
             "el_offset0", float))
-        cfg_tab.el_offset1_ledit.textChanged.connect(
+        cfg_tab.el_offset1_ledit.editingFinished.connect(
             lambda: s.ledit_update(cfg_tab.el_offset1_ledit,
             "el_offset1", float))
 
-        cfg_tab.center_rangeval_ledit.textChanged.connect(
+        cfg_tab.center_rangeval_ledit.editingFinished.connect(
             lambda: s.ledit_update(cfg_tab.center_rangeval_ledit, 
             "center_rangeval", float))
-        cfg_tab.dec_val_ledit.textChanged.connect(
+        cfg_tab.dec_val_ledit.editingFinished.connect(
             lambda: s.ledit_update(cfg_tab.dec_val_ledit,
             "dec_val", int))
 
-        cfg_tab.ch0_offset_ledit.textChanged.connect(
+        cfg_tab.ch0_offset_ledit.editingFinished.connect(
             lambda: s.ledit_update(cfg_tab.ch0_offset_ledit,
             "ch0_offset", float))
-        cfg_tab.ch1_offset_ledit.textChanged.connect(
+        cfg_tab.ch1_offset_ledit.editingFinished.connect(
             lambda: s.ledit_update(cfg_tab.ch1_offset_ledit,
             "ch1_offset", float))
 
@@ -652,7 +652,6 @@ class setup_config_callbacks:
             lambda: s.chkbox_update(cfg_tab.enable_ch0_chkb,
             "ch0_en"))
 
-
         cfg_tab.enable_ch1_chkb.stateChanged.connect(
             lambda: s.chkbox_update(cfg_tab.enable_ch1_chkb,
             "ch1_en"))
@@ -660,13 +659,16 @@ class setup_config_callbacks:
 
         # QRadioButtons
         cfg_tab.df_time_domin_rbut.toggled.connect(
-            lambda: s.data_format_update(cfg_tab, "data_format_in"))
+            lambda: s.rbut_update(cfg_tab.df_time_domin_rbut, 
+            "time_domain", "data_format_in"))
 
         cfg_tab.df_freq_domin_rbut.toggled.connect(
-            lambda: s.data_format_update(cfg_tab, "data_format_in"))
+            lambda: s.rbut_update(cfg_tab.df_freq_domin_rbut, 
+            "fft", "data_format_in"))
 
         cfg_tab.df_power_domin_rbut.toggled.connect(
-            lambda: s.data_format_update(cfg_tab, "data_format_in"))
+            lambda: s.rbut_update(cfg_tab.df_power_domin_rbut, 
+            "power_spectrum", "data_format_in"))
 
 
     ##########################################################################
@@ -699,24 +701,29 @@ class setup_config_callbacks:
         s.update_config(new_cfg_dict)
         
 
+    #def data_format_update(s, cfg_tab, key):
+    #    if cfg_tab.df_time_domin_rbut.isChecked():
+    #        val = "time_domain"
 
-    def data_format_update(s, cfg_tab, key):
-        if cfg_tab.df_time_domin_rbut.isChecked():
-            val = "time_domain"
+    #    elif cfg_tab.df_freq_domin_rbut.isChecked():
+    #        val = "fft"
 
-        elif cfg_tab.df_freq_domin_rbut.isChecked():
-            val = "fft"
+    #    elif cfg_tab.df_power_domin_rbut.isChecked():
+    #        val = "power_spectrum"
 
-        elif cfg_tab.df_power_domin_rbut.isChecked():
-            val = "power_spectrum"
+    #    else:
+    #        raise Exception("Invalid data format")
 
-        else:
-            raise Exception("Invalid data format")
+    #    new_cfg_dict = OrderedDict()
+    #    new_cfg_dict[key] = val
+    #    s.update_config(new_cfg_dict)
 
-        new_cfg_dict = OrderedDict()
-        new_cfg_dict[key] = val
-        s.update_config(new_cfg_dict)
 
+    def rbut_update(s, rbut_obj, val_if_en, key):
+        if rbut_obj.isChecked():
+            new_cfg_dict = OrderedDict()
+            new_cfg_dict[key] = val_if_en
+            s.update_config(new_cfg_dict)
 
 
 

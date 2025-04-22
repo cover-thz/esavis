@@ -29,10 +29,12 @@ import numpy as np
 import pyqtgraph as pg
 import multiprocessing as mp
 from collections import OrderedDict
+import copy
 import subprocess
 #from dataclasses import dataclass, field
 from ConfigTab import ConfigTab
 from THzImageTab import THzImageTab
+import time
 
 # crude but effective way of getting the postprocessing directory in here
 # without playing maddening namespace games with the modules in the that
@@ -87,6 +89,84 @@ def sigint_handler(*_):
     print("HIT CTRL-C")
     QtGui.QGuiApplication.quit()
 
+##############################################################################
+# DEFAULT CONFIG SET
+##############################################################################
+##############################################################################
+# DEFAULT CONFIG SET
+##############################################################################
+
+DFLT_CFG_DICT = OrderedDict()
+DFLT_CFG_DICT["el_side_0_start"] = 0
+DFLT_CFG_DICT["el_side_0_end"] = 0
+DFLT_CFG_DICT["el_side_1_start"] = 0
+DFLT_CFG_DICT["el_side_1_end"] = 0
+
+DFLT_CFG_DICT["ylen"] = 1 
+DFLT_CFG_DICT["xlen"] = 1
+
+DFLT_CFG_DICT["fft_len"] = 1
+DFLT_CFG_DICT["num_noise_pts"] = 1
+DFLT_CFG_DICT["noise_start_frac"] = 0.
+DFLT_CFG_DICT["chirp_span"] = 0.
+DFLT_CFG_DICT["chirp_time"] = 0.
+
+DFLT_CFG_DICT["dead_pix_val"] = 0.
+DFLT_CFG_DICT["fs_adc"] = 0.
+
+DFLT_CFG_DICT["el_offset0"] = 0.
+DFLT_CFG_DICT["el_offset1"] = 0.
+
+DFLT_CFG_DICT["center_rangeval"] = 0.
+DFLT_CFG_DICT["dec_val"] = 1
+DFLT_CFG_DICT["ch0_offset"] = 0.
+DFLT_CFG_DICT["ch1_offset"] = 0.
+
+DFLT_CFG_DICT["disable_el_side0"] = 0.
+DFLT_CFG_DICT["disable_el_side1"] = 0.
+
+DFLT_CFG_DICT["calc_weighted_sum"] = True
+DFLT_CFG_DICT["ch0_en"] = True
+DFLT_CFG_DICT["ch1_en"] = True
+
+DFLT_CFG_DICT["data_format_in"] = "time_domain"
+
+DFLT_CFG_DICT["turn_hyst"]  = 0.
+DFLT_CFG_DICT["turn_az_margin"]  = 0.
+DFLT_CFG_DICT["daq_num_rangelines"]  = 0
+DFLT_CFG_DICT["fraction_filled_thresh"]  = 0.1
+DFLT_CFG_DICT["save_image_desc"] = "NONE"
+
+DFLT_CFG_DICT["threshold_db"] = 0.
+DFLT_CFG_DICT["contrast_db"] = 0.
+DFLT_CFG_DICT["half_peak_width"] = 1
+
+DFLT_CFG_DICT["min_range"] = 0.
+DFLT_CFG_DICT["max_range"] = 7000.
+
+DFLT_CFG_DICT["autoscale_color"] = False
+DFLT_CFG_DICT["color_scale_min"] = 0.
+DFLT_CFG_DICT["color_scale_max"] = 7000.
+
+DFLT_CFG_DICT["min_az"] = 0.
+DFLT_CFG_DICT["max_az"] = 1.
+DFLT_CFG_DICT["min_el"] = 0.
+DFLT_CFG_DICT["max_el"] = 1.
+
+DFLT_CFG_DICT["colormap"]        = "jet"
+DFLT_CFG_DICT["data_src"]        = "disabled"
+DFLT_CFG_DICT["plot_style"]      = "front_peak"
+DFLT_CFG_DICT["peak_selection"]  = "front"
+DFLT_CFG_DICT["fname_list"]  = None
+    
+
+##############################################################################
+# DEFAULT CONFIG SET
+##############################################################################
+##############################################################################
+# DEFAULT CONFIG SET
+##############################################################################
+
 
 ##############################################################################
 # Main Window Class
@@ -116,118 +196,142 @@ class MainWindow(QMainWindow):
     proc_pipes = None
 
 
-    def __init__(self, CFG_DFLT_PATH, CONFIG_DIR, DFLT_DATA_DIR, proc_pipes):
+    def __init__(s, CFG_DFLT_PATH, CONFIG_DIR, proc_pipes):
         super().__init__()
 
         # going with a single configuration file rather than two
-        self.CFG_DFLT_PATH      = CFG_DFLT_PATH
-        self.CONFIG_DIR         = CONFIG_DIR
-        self.DFLT_DATA_DIR      = DFLT_DATA_DIR
-        self.proc_pipes         = proc_pipes
+        s.CFG_DFLT_PATH     = CFG_DFLT_PATH
+        s.CONFIG_DIR        = CONFIG_DIR
+        s.proc_pipes        = proc_pipes
+        s.pre_first_update  = True
+        s.last_update_time  = None
+        #s.min_cfg_period    = 0.5
+        s.min_cfg_period    = 2.5
 
         # sets ths title and default size of the window
-        self.setWindowTitle('THz Vizualizer GUI')
-        #self.setGeometry(100, 100, 400, 300)
-        self.setGeometry(100, 100, 500, 700)
+        s.setWindowTitle('THz Vizualizer GUI')
+        #s.setGeometry(100, 100, 400, 300)
+        s.setGeometry(100, 100, 500, 700)
 
         # central widget needs to be defined
-        self.central_widget = QWidget()
-        self.setCentralWidget(self.central_widget)
-        self.layout = QVBoxLayout(self.central_widget)
+        s.central_widget = QWidget()
+        s.setCentralWidget(s.central_widget)
+        s.layout = QVBoxLayout(s.central_widget)
+
+        # Construct the default configuration dictionary
+        s.cfg_dict = DFLT_CFG_DICT
+        s.cfg_dict["flags"] = []
 
         # create the tab widget which contains pretty much the remainder of
         # the GUI objects
-        self.tab_widget = QTabWidget()
-        self.cfg_tab    = ConfigTab(CFG_DFLT_PATH, CONFIG_DIR, 
-                                    DFLT_DATA_DIR, self.load_config, 
-                                    self.save_config, self.update_config)
+        s.tab_widget = QTabWidget()
+        s.cfg_tab    = ConfigTab(CFG_DFLT_PATH, CONFIG_DIR, 
+                                    s.load_config, 
+                                    s.save_config, s.update_config,
+                                    s.cfg_dict)
                                     
-                                    
-        self.main_thz_tab = THzImageTab(self, CFG_DFLT_PATH, CONFIG_DIR, 
-                                    DFLT_DATA_DIR, self.update_config)
-        self.camera_tab   = QWidget() # TODO Placeholder until 
+
+        s.main_thz_tab = THzImageTab(CFG_DFLT_PATH, CONFIG_DIR, 
+                                        s.update_config, 
+                                        s.cfg_dict)
+        s.camera_tab   = QWidget() # TODO Placeholder until 
                                       # I get the camera working
 
-        self.single_pix_tab  = QWidget() # TODO Placeholder 
-
+        s.single_pix_tab  = QWidget() # TODO Placeholder 
 
 
         # add the tabs to the tab widget 
-        self.tab_widget.addTab(self.cfg_tab, "Config")
-        self.tab_widget.addTab(self.main_thz_tab, "Main THz Image")
-        self.tab_widget.addTab(self.camera_tab, "Camera Overlay")
-        self.tab_widget.addTab(self.single_pix_tab, "Single Pixel")
+        s.tab_widget.addTab(s.cfg_tab, "Config")
+        s.tab_widget.addTab(s.main_thz_tab, "Main THz Image")
+        s.tab_widget.addTab(s.camera_tab, "Camera Overlay")
+        s.tab_widget.addTab(s.single_pix_tab, "Single Pixel")
 
-        self.layout.addWidget(self.tab_widget)
+        s.layout.addWidget(s.tab_widget)
 
-        self.init_camera_tab() # TODO Placeholder
-        self.init_single_pix_tab() # TODO Placeholder
+        s.init_camera_tab()      # TODO Placeholder
+        s.init_single_pix_tab()  # TODO Placeholder
 
         # set the GUI to view the config tab
-        self.tab_widget.setCurrentIndex(0)
+        s.tab_widget.setCurrentIndex(0)
 
         # check for default postprocessing config and execute configuration 
         # sequence if there is a default postprocessing config
         if os.path.isfile(CFG_DFLT_PATH):
-            self.load_config(CFG_DFLT_PATH)
+            s.load_config(CFG_DFLT_PATH)
         else:
             new_cfg_dict = OrderedDict()
             new_cfg_dict["data_src"] = "disabled"
-            self.update_config(new_cfg_dict)
+            s.update_config(new_cfg_dict)
 
         # finally setup the timer
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.timer_handler)
+        s.timer = QTimer()
+        s.timer.timeout.connect(s.timer_handler)
+        s.cfg_dict["flags"] = []
 
         # setting timer to update 10 times a second)
-        self.timer.start(100)
+        s.timer.start(100)
 
 
 
-    def init_camera_tab(self):
+    def init_camera_tab(s):
         """
         This is just a placeholder for Tab 3 until I actually create GUI 
         content for the camera overlay
         """
-        layout = QVBoxLayout(self.camera_tab)
+        layout = QVBoxLayout(s.camera_tab)
         label = QLabel("Camera Overlay goes here")
         layout.addWidget(label)
 
 
-    def init_single_pix_tab(self):
+    def init_single_pix_tab(s):
         """
         This is just a placeholder for Tab 4 until I actually create GUI 
         content for the single pixel tab
         """
-        layout = QVBoxLayout(self.single_pix_tab)
+        layout = QVBoxLayout(s.single_pix_tab)
         label = QLabel("Single Pixel goes here")
         layout.addWidget(label)
 
 
     # central function that loads files into our config dict
-    def load_config(self, fpath):
+    def load_config(s, fpath):
         """
         loads a config file creating a config dictionary
         """
         with open(fpath, "r", encoding="utf-8") as file:
-            cfg_dict = json.load(file, opbject_pairs_hook=OrderedDict)
-        self.update_config(cfg_dict)
+            cfg_dict = json.load(file, object_pairs_hook=OrderedDict)
+        s.update_config(cfg_dict)
+
+        # pass the config to the various functions that set the appropriate 
+        # GUI objects
+        if cfg_dict != None:
+            s.cfg_tab.set_gui_config_params(cfg_dict)
+            s.main_thz_tab.set_gui_config_params(cfg_dict)
+
+
+
 
 
     # central function that saves our config dict to a file
-    def save_config(self, fpath):
+    def save_config(s, fpath):
         """
         saves a config file with the current configuration dictionary
         """
         with open(fpath, 'w') as file:
-            json.dump(self.cfg_dict, file)
+            json.dump(s.cfg_dict, file)
+
+    @staticmethod
+    def append_if_absent(cfg_flags, new_flag):
+        if new_flag not in cfg_flags:
+            cfg_flags.append(new_flag)
+        return cfg_flags
 
 
     # NOTE NOTE NOTE: ACTUALLY WRITE THIS FUNCTION!
     # NOTE so we need a few more functions to to "centralize" the configuration
     # and flag generation for the processing core (which is interacted 
     # with here)
-    def update_config(self, cfg_dict_in, cfg_flags_in=None):
+    def update_config(s, cfg_dict_in, cfg_flags_in=None):
         """
         This function is called by lower level objects (the tabs) to "update"
         the configuraiton dictionary and trigger the main window to send
@@ -263,13 +367,94 @@ class MainWindow(QMainWindow):
         # NOTE  you need to calculate fs_post_dec from fs_adc and dec_val
         # whenever either of them change
 
+        # NOTE construct some sort of buffering of changes when you have 
+        # tabs that don't have THz images visible so you don't hammer the
+        # processing
+        cfg_dict = s.cfg_dict
+        if (cfg_dict_in != None) and (cfg_dict_in != {}):
+            # construct an old dictionary
+            old_cfg_dict = copy.deepcopy(cfg_dict)
+
+            # update the dictionary
+            for key in cfg_dict_in.keys():
+                cfg_dict[key] = cfg_dict_in[key]
+
+            cfg_flags = []
+            # flag checks
+            if cfg_dict["fname_list"] != old_cfg_dict["fname_list"]:
+                s.append_if_absent(cfg_flags, "fname_changed")
+
+            # always send the "setup_daq" flag if daq is data source
+            if cfg_dict["data_src"] == "daq":
+                cfg_flags = s.append_if_absent(cfg_flags, "setup_daq")
+
+                if cfg_dict["ch0_en"] != old_cfg_dict["ch0_en"]:
+                    cfg_flags = s.append_if_absent(cfg_flags, "update_daq_ch")
+                elif cfg_dict["ch1_en"] != old_cfg_dict["ch1_en"]:
+                    cfg_flags = s.append_if_absent(cfg_flags, "update_daq_ch")
+
+            if cfg_dict["min_az"] != old_cfg_dict["min_az"]:
+                cfg_flags = s.append_if_absent(cfg_flags, "recalc_coarse_grid")
+            elif cfg_dict["max_az"] != old_cfg_dict["max_az"]:
+                cfg_flags = s.append_if_absent(cfg_flags, "recalc_coarse_grid")
+            elif cfg_dict["min_el"] != old_cfg_dict["min_el"]:
+                cfg_flags = s.append_if_absent(cfg_flags, "recalc_coarse_grid")
+            elif cfg_dict["max_el"] != old_cfg_dict["max_el"]:
+                cfg_flags = s.append_if_absent(cfg_flags, "recalc_coarse_grid")
+            elif cfg_dict["xlen"] != old_cfg_dict["xlen"]:
+                cfg_flags = s.append_if_absent(cfg_flags, "recalc_coarse_grid")
+            elif cfg_dict["ylen"] != old_cfg_dict["ylen"]:
+                cfg_flags = s.append_if_absent(cfg_flags, "recalc_coarse_grid")
+
+            # calculate fs_post_dec
+            fs_adc = cfg_dict["fs_adc"]
+            dec_val = cfg_dict["dec_val"]
+            cfg_dict["fs_post_dec"] = fs_adc/(16*(dec_val))
+
+            # calculate the linear versions of threshold and contrast
+            cfg_dict["threshold_lin"]   = 10**(cfg_dict["threshold_db"]/10)
+            cfg_dict["contrast_lin"]    = 10**(cfg_dict["contrast_db"]/10)
+
+        if ((cfg_flags_in != None) and (cfg_flags_in != [])):
+            # now the stuffing of the flags
+            for flag in cfg_flags_in:
+                cfg_flags = s.append_if_absent(cfg_flags, flag)
+
+            for flag in cfg_dict["flags"]:
+                cfg_flags = s.append_if_absent(cfg_flags, flag)
+            
+            cfg_dict["flags"] = cfg_flags
+
         print(cfg_dict_in)
+        print(cfg_flags_in)
 
-        pass
-        
+        update = False
+        if s.pre_first_update:
+            s.pre_first_update = False
+            update = True
+
+        elif s.last_update_time == None:
+            update = True
+
+        elif "force_update" in cfg_dict["flags"]:
+            update = True
+
+        else:
+            if ((time.time() - s.last_update_time) > s.min_cfg_period):
+                update = True
+
+        if update:
+            s.last_update_time = time.time()
+            s.proc_pipes.cfg_pipe.send(cfg_dict)
+            print("Update!")
+
+            # clear the flags now that the configuration has been sent
+            cfg_dict["flags"] = []
 
 
-    def frame_update(self, frame_in):
+
+
+    def frame_update(s, frame_in):
         """
         this updates all the appropriate THz image objects when a new frame 
         comes in
@@ -278,7 +463,7 @@ class MainWindow(QMainWindow):
 
 
 
-    def aux_update(self, aux_data_in):
+    def aux_update(s, aux_data_in):
         """
         this updates all the appropriate auxilary plto objects when a new 
         frame ( + auxiliary data) comes in
@@ -287,14 +472,14 @@ class MainWindow(QMainWindow):
 
 
     
-    def timer_handler(self):
+    def timer_handler(s):
         """
         timer event handler
         """
-        cfg_pipe    = self.proc_pipes.cfg_pipe
-        err_pipe    = self.proc_pipes.err_pipe
-        data_pipe   = self.proc_pipes.data_pipe
-        query_pipe  = self.proc_pipes.query_pipe
+        cfg_pipe    = s.proc_pipes.cfg_pipe
+        err_pipe    = s.proc_pipes.err_pipe
+        data_pipe   = s.proc_pipes.data_pipe
+        query_pipe  = s.proc_pipes.query_pipe
         
         # Error handling first
         if err_pipe.poll():
@@ -303,22 +488,24 @@ class MainWindow(QMainWindow):
             # do stuff with the err_val
             print(err_val) # just this for now
 
-
         # Main frame data comes in here
         if data_pipe.poll():
             data_in     = data_pipe.recv()
             frame_in    = data_in[0]
             aux_data_in = data_in[1]
             
-            self.frame_update(frame_in)
-            self.aux_update(aux_data_in)
-
+            s.frame_update(frame_in)
+            s.aux_update(aux_data_in)
 
         # query pipe is presently unused
         if query_pipe.poll():
             pass
 
-
+        # a little clunky but if there hasn't been an update in a while we
+        # call the update function
+        if s.last_update_time != None:
+            if ((time.time() - s.last_update_time) > s.min_cfg_period):
+                s.update_config(None, None)
 
 
 
@@ -378,6 +565,7 @@ if __name__ == '__main__':
     # this should be all we need for the initial configuration dictionary
     cfg_dict = OrderedDict()
     cfg_dict["data_src"] = "disabled"
+    cfg_dict["default_data_dir"] = DFLT_DATA_DIR
 
     # construct the multiprocessing system
     (proc_cfg_pipe, cfg_pipe)      = mp.Pipe(duplex=False)
@@ -392,7 +580,7 @@ if __name__ == '__main__':
 
     # Defining and showing the main window
     #window = MainWindow(config_file)
-    window = MainWindow(CFG_DFLT_PATH, CONFIG_DIR, DFLT_DATA_DIR, proc_pipes)
+    window = MainWindow(CFG_DFLT_PATH, CONFIG_DIR, proc_pipes)
                 
     window.show()
     sys.exit(app.exec())
