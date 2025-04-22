@@ -13,7 +13,7 @@
 #############################################################################
 
 import multiprocessing as mp
-import collections
+from collections import OrderedDict
 import daq_comms as dc
 import main_proc_fcns as mpf
 import dat_file_fcns as dff
@@ -142,8 +142,8 @@ frame_queue
     a queue object that contains an object that contains all relelvent frame
     data
 """)
-def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_out_pipe, 
-                         cfg_dict):
+def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe, 
+                   query_out_pipe, cfg_dict):
 
     dbg_prof    = False
     radar       = dc.SimpRadar()
@@ -151,20 +151,19 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_out_pipe,
     proc_prof   = Profiler() # presently unused
 
     # buffer containing data from most recent fileset
-
-    file_buf = collections.OrderedDict()
-    file_buf["initialized"] = False
-    file_buf["rangelines"]  = None
-    file_buf["elevation"]   = None
-    file_buf["azimuth"]     = None
-    file_buf["channels"]    = None
-    file_buf["fs_post_dec"] = None
-    file_buf["fft_flag"]    = None
+    file_buf = OrderedDict()
+    file_buf["initialized"]     = False
+    file_buf["rangelines"]      = None
+    file_buf["elevation"]       = None
+    file_buf["azimuth"]         = None
+    file_buf["channels"]        = None
+    file_buf["fs_post_dec"]     = None
+    file_buf["fft_flag"]        = None
     file_buf["powcalc_flag"]    = None
-    file_buf["dec_val"]     =  None
+    file_buf["dec_val"]         = None
     file_buf["len_rangeline"]   = None
-    file_buf["data_good"]   = None
-    profiler_enabled = False
+    file_buf["data_good"]       = None
+    profiler_enabled            = False
 
     # setup everything 
     #   DAQ socket and sending that configuration
@@ -173,6 +172,24 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_out_pipe,
     #   multiprocessing concurrent.futures stuff as desired
 
     while True:
+        print("while loop called")
+        #####################################################################
+        #                      QUERY HANDLING STEPS                         #
+        #####################################################################
+        send_status = False
+        while query_in_pipe.poll():
+            query_in_list = query_in_pipe.recv()
+            if "DAQ_STATUS" in query_in_list:
+                send_status = True
+                query_out_dict = OrderedDict()
+                if radar.daq_connected:
+                    query_out_dict["DAQ_STATUS"] = "CONNECTED"
+                else:
+                    query_out_dict["DAQ_STATUS"] = "NOT_CONNECTED"
+        if send_status:
+            query_out_pipe.send(query_out_dict)
+
+
         new_frame_flag = False
         # do a status check of everything, the DAQ connection in particular
         # but anything that could periodically change asynchronously
@@ -187,8 +204,7 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_out_pipe,
 
             # update the configuration
             for keyval in new_cfg_vals.keys():
-                if keyval in cfg_dict.keys():
-                    cfg_dict[keyval] = new_cfg_vals[keyval]
+                cfg_dict[keyval] = new_cfg_vals[keyval]
 
                 cfg_update = True
                 # ultimately we'll want to not do an update on any change
@@ -212,8 +228,8 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_out_pipe,
                 if not radar.daq_connected:
                     addr   = cfg_dict["daq_addr"]
                     conn_success = radar.setup_comms(addr, ch0_en, ch1_en)
-                    if not conn_success:
-                        error_pipe.send(["DAQ_CONN_FAILED"])
+                    #if not conn_success:
+                    #    error_pipe.send(["DAQ_CONN_FAILED"])
                 else:
                     radar.set_en_channels(ch0_en, ch1_en)
 
@@ -316,62 +332,64 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_out_pipe,
 
         # NOTE DAT FILE DATA SOURCE UNTESTED
         else: # cfg_dict["data_src"] == "dat_file":
-            if cfg_update:
-                if (("fname_changed" in cfg_flags) or 
-                   (file_buf["initialized"] == False)):
+            if False: # NOTE TEMPORARY
+                if cfg_update:
+                    if (("fname_changed" in cfg_flags) or 
+                       (file_buf["initialized"] == False)):
 
-                    fs_adc = cfg_dict["fs_adc"]
-                    fname_list = cfg_dict["fname_list"]
+                        fs_adc = cfg_dict["fs_adc"]
+                        fname_list = cfg_dict["fname_list"]
 
-                    (rangelines, elevation, azimuth, channels, 
-                     fs_post_dec, fft_flag, powcalc_flag, dec_val, 
-                     len_rangeline, 
-                     data_good) = dff.get_rangelines_from_file(fname_list, 
-                                                               fs_adc)
-            
-                    file_buf["initialized"] = True
-                    file_buf["rangelines"]  = rangelines
-                    file_buf["elevation"]   = elevation
-                    file_buf["azimuth"]     = azimuth
-                    file_buf["channels"]    = channels
-                    file_buf["fs_post_dec"] = fs_post_dec
-                    file_buf["fft_flag"]    = fft_flag
-                    file_buf["powcalc_flag"]    = powcalc_flag
-                    file_buf["dec_val"]     =  dec_val
-                    file_buf["len_rangeline"]   = len_rangeline
-                    file_buf["data_good"]   = data_good
+                        (rangelines, elevation, azimuth, channels, 
+                         fs_post_dec, fft_flag, powcalc_flag, dec_val, 
+                         len_rangeline, 
+                         data_good) = dff.get_rangelines_from_file(fname_list, 
+                                                                   fs_adc)
+                
+                        file_buf["initialized"] = True
+                        file_buf["rangelines"]  = rangelines
+                        file_buf["elevation"]   = elevation
+                        file_buf["azimuth"]     = azimuth
+                        file_buf["channels"]    = channels
+                        file_buf["fs_post_dec"] = fs_post_dec
+                        file_buf["fft_flag"]    = fft_flag
+                        file_buf["powcalc_flag"]    = powcalc_flag
+                        file_buf["dec_val"]     =  dec_val
+                        file_buf["len_rangeline"]   = len_rangeline
+                        file_buf["data_good"]   = data_good
 
-                else:
-                    # grab the stored data of the most recent file and 
-                    # re-process it
-                    rangelines_array    = file_buf["rangelines"]
-                    el_array            = file_buf["elevation"]
-                    az_array            = file_buf["azimuth"]
-                    ch_array            = file_buf["channels"]
-                    fs_post_dec         = file_buf["fs_post_dec"]
-                    fft_flag            = file_buf["fft_flag"]
-                    powcalc_flag        = file_buf["powcalc_flag"]
-                    dec_val             = file_buf["dec_val"]
-                    len_rangeline       = file_buf["len_rangeline"]
-                    data_good           = file_buf["data_good"]
-
-                    proc_turnaround = False
-                    if not data_good:
-                        error_pipe.send("FILE_FRAME_DATA_BAD")
-                        new_frame_flag = False
                     else:
-                        (frame_out, aux_data_out, 
-                         new_frame_flag) = proc_obj.postproc_data(
-                                             rangelines_array, 
-                                             az_array, el_array, ch_array, 
-                                             turn_flag, reset_in_array, 
-                                             cfg_dict, cfg_flags, dbg_prof)
-                                             
+                        # grab the stored data of the most recent file and 
+                        # re-process it
+                        rangelines_array    = file_buf["rangelines"]
+                        el_array            = file_buf["elevation"]
+                        az_array            = file_buf["azimuth"]
+                        ch_array            = file_buf["channels"]
+                        fs_post_dec         = file_buf["fs_post_dec"]
+                        fft_flag            = file_buf["fft_flag"]
+                        powcalc_flag        = file_buf["powcalc_flag"]
+                        dec_val             = file_buf["dec_val"]
+                        len_rangeline       = file_buf["len_rangeline"]
+                        data_good           = file_buf["data_good"]
+
+                        proc_turnaround = False
+                        if not data_good:
+                            error_pipe.send("FILE_FRAME_DATA_BAD")
+                            new_frame_flag = False
+                        else:
+                            (frame_out, aux_data_out, 
+                             new_frame_flag) = proc_obj.postproc_data(
+                                                 rangelines_array, 
+                                                 az_array, el_array, ch_array, 
+                                                 turn_flag, reset_in_array, 
+                                                 cfg_dict, cfg_flags, dbg_prof)
+                                                 
 
 
         # send frame
         if new_frame_flag:
             data_out_pipe.send([frame_out, aux_data_out])
+
 
 
 ##############################################################################

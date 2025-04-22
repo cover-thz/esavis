@@ -164,11 +164,11 @@ class CoverProc:
             #################################################################
             #                        Regridding Steps                       #
             #################################################################
-            elev_side_0_start   = cfg_dict["elev_side_0_start"]
-            elev_side_1_start   = cfg_dict["elev_side_1_start"]
+            el_side_0_start   = cfg_dict["el_side_0_start"]
+            el_side_1_start   = cfg_dict["el_side_1_start"]
 
-            elev_side_0_end     = cfg_dict["elev_side_0_end"]
-            elev_side_1_end     = cfg_dict["elev_side_1_end"]
+            el_side_0_end     = cfg_dict["el_side_0_end"]
+            el_side_1_end     = cfg_dict["el_side_1_end"]
 
             disable_el_side0    = cfg_dict["disable_el_side0"]
             disable_el_side1    = cfg_dict["disable_el_side1"]
@@ -183,9 +183,9 @@ class CoverProc:
             (new_rangelines_grid, new_valid_grid, ideal_az_array, 
              ideal_el_array, new_az_out, 
              new_el_out) = lpf.regrid_rangelines(rangelines_array, el_array, 
-                                az_array, ch_array, elev_side_0_start, 
-                                elev_side_0_end,  elev_side_1_start, 
-                                elev_side_1_end,  disable_el_side0, 
+                                az_array, ch_array, el_side_0_start, 
+                                el_side_0_end,  el_side_1_start, 
+                                el_side_1_end,  disable_el_side0, 
                                 disable_el_side1,  ch0_en, ch1_en, 
                                 ch0_offset, ch1_offset, s.coarse_az_1d, 
                                 s.coarse_el_1d,  s.xlen, s.ylen, 

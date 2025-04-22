@@ -814,28 +814,28 @@ class setup_thz_tab_callbacks:
             "front", "peak_selection"))
         thz_tab.front_peak_rbut.toggled.connect(
             lambda: s.rbut_update(thz_tab.front_peak_rbut, 
-            "front_peak", "plot_style"))
+            "front_peak_range", "plot_style"))
 
         thz_tab.back_peak_rbut.toggled.connect(
             lambda: s.rbut_update(thz_tab.back_peak_rbut, 
             "back", "peak_selection"))
         thz_tab.back_peak_rbut.toggled.connect(
             lambda: s.rbut_update(thz_tab.back_peak_rbut, 
-            "back_peak", "plot_style"))
+            "back_peak_range", "plot_style"))
 
         thz_tab.front_surface_plot_rbut.toggled.connect(
             lambda: s.rbut_update(thz_tab.front_surface_plot_rbut, 
             "front", "peak_selection"))
         thz_tab.front_surface_plot_rbut.toggled.connect(
             lambda: s.rbut_update(thz_tab.front_surface_plot_rbut, 
-            "front_surface", "plot_style"))
+            "front_surface_range", "plot_style"))
 
         thz_tab.back_surface_plot_rbut.toggled.connect(
             lambda: s.rbut_update(thz_tab.back_surface_plot_rbut, 
             "front", "peak_selection"))
         thz_tab.back_surface_plot_rbut.toggled.connect(
             lambda: s.rbut_update(thz_tab.back_surface_plot_rbut, 
-            "back_surface", "plot_style"))
+            "back_surface_range", "plot_style"))
 
         thz_tab.num_oversamp_rbut.toggled.connect(
             lambda: s.rbut_update(thz_tab.num_oversamp_rbut, 
@@ -881,7 +881,7 @@ class setup_thz_tab_callbacks:
         # QCheckBoxes
         thz_tab.cs_autoscale_chkb.stateChanged.connect(
             lambda: s.chkbox_update(thz_tab.cs_autoscale_chkb,
-            "autoscale_color", True))
+            "autoscale_color"))
 
         # QComboBoxes
         thz_tab.cmap_cbox.currentIndexChanged.connect(

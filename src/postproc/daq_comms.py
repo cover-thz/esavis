@@ -216,14 +216,15 @@ class SimpRadar:
     def send_trace_config(s):
         # need to have trace_config.xml in the same directory as the 
         # postprocessing code
+        current_dir = os.path.dirname(os.path.abspath(__file__))
         if os.name == "nt":
             #REPO_TOP_DIR = os.path.dirname(os.getcwd())
-            trace_cfg_fname = "trace_config.xml"
+            trace_cfg_fpath = current_dir + "\\trace_config.xml"
         else:
-            trace_cfg_fname = "trace_config.xml"
+            trace_cfg_fpath = current_dir + "/trace_config.xml"
 
         trace_template = ""
-        with open(trace_cfg_fname, "r", encoding="utf-8") as tc:
+        with open(trace_cfg_fpath, "r", encoding="utf-8") as tc:
             trace_template = tc.read()
         traces = []
         for channel in s.en_channels:
@@ -277,6 +278,7 @@ class SimpRadar:
 
             # this is if there's a timeout
             if time.time() - start_time > timeout:
+                turn_flag = "DISABLED" 
                 status_flag = "TIMEOUT"
                 break
 

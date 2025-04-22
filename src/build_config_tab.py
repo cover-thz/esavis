@@ -573,16 +573,16 @@ class setup_config_callbacks:
         # QLineEdits
         cfg_tab.el_s0_strt_ledit.editingFinished.connect(
             lambda: s.ledit_update(cfg_tab.el_s0_strt_ledit, 
-            "elev_side_0_start", float))
+            "el_side_0_start", float))
         cfg_tab.el_s0_end_ledit.editingFinished.connect(
             lambda: s.ledit_update(cfg_tab.el_s0_end_ledit,
-            "elev_side_0_end", float))
+            "el_side_0_end", float))
         cfg_tab.el_s1_strt_ledit.editingFinished.connect(
             lambda: s.ledit_update(cfg_tab.el_s1_strt_ledit,
-            "elev_side_1_start", float))
+            "el_side_1_start", float))
         cfg_tab.el_s1_end_ledit.editingFinished.connect(
             lambda: s.ledit_update(cfg_tab.el_s1_end_ledit,
-            "elev_side_1_end", float))
+            "el_side_1_end", float))
         cfg_tab.num_elev_pix_ledit.editingFinished.connect(
             lambda: s.ledit_update(cfg_tab.num_elev_pix_ledit, 
             "ylen", int))

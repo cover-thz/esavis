@@ -252,7 +252,7 @@ class ConfigTab(QScrollArea):
         s.chirp_time_us_ledit.setText(str(cfg_dict["chirp_time"]*1e6))
 
         s.dead_pix_ledit.setText(str(cfg_dict["dead_pix_val"]))
-        s.fsamp_freq_ledit.setText(str(cfg_dict["fs_adc"]*1e6))
+        s.fsamp_freq_ledit.setText(str(cfg_dict["fs_adc"]/1e6))
 
         s.el_offset0_ledit.setText(str(cfg_dict["el_offset0"]))
         s.el_offset1_ledit.setText(str(cfg_dict["el_offset1"]))
@@ -417,12 +417,12 @@ class ConfigTab(QScrollArea):
 
             else:
                 except_str = "Invalid or non-existent default "
-                except_str += "configuration directory"
+                except_str += "data directory"
                 raise Exception(except_str)
 
         except:
             except_str = "Invalid or non-existent default "
-            except_str += "configuration directory"
+            except_str += "data directory"
             raise Exception(except_str)
 
 
@@ -432,9 +432,9 @@ class ConfigTab(QScrollArea):
         the data files for the enabled channels (if the corresponding files 
         are also loaded
         """
-        if (s.cfg_dict["channel_0_en"]):
+        if (s.cfg_dict["ch0_en"]):
             s.load_latest_dat_btn_clicked(0)
-        if (s.cfg_dict["channel_1_en"]):
+        if (s.cfg_dict["ch1_en"]):
             s.load_latest_dat_btn_clicked(1)
 
 

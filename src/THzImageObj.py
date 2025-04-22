@@ -68,42 +68,44 @@ class THzImageObj(QHBoxLayout):
     az_grid_2d      = None
     el_grid_2d      = None
 
+    pixel_ranges_grid = None
+    valid_pixels_grid = None
     
-    def __init__(self, thz_image_tab, cfg_dict):
+    def __init__(s, thz_image_tab, cfg_dict):
         super().__init__()
         #super().__init__(background="transparent")
 
         # we're actually going to stack the plot widgets on top
         # of one another and make only one of them visible at a time
-        self.thz_image_stack = QStackedWidget()
+        s.thz_image_stack = QStackedWidget()
 
-        self.thz_image_tab   = thz_image_tab
-        self.thz_mesh_obj    = THzMeshImage(thz_image_tab)
-        self.thz_surface_obj =  THzSurfaceObj(thz_image_tab)
+        s.thz_image_tab   = thz_image_tab
+        s.thz_mesh_obj    = THzMeshImage(thz_image_tab)
+        s.thz_surface_obj =  THzSurfaceObj(thz_image_tab)
 
-        self.thz_image_stack.addWidget(self.thz_mesh_obj)
-        self.thz_image_stack.addWidget(self.thz_surface_obj)
-        self.thz_image_stack.setCurrentIndex(0)
+        s.thz_image_stack.addWidget(s.thz_mesh_obj)
+        s.thz_image_stack.addWidget(s.thz_surface_obj)
+        s.thz_image_stack.setCurrentIndex(0)
 
         # color bar object
-        self.color_bar_wg = pg.GraphicsLayoutWidget()
-        self.color_bar_wg.setBackground(None)
+        s.color_bar_wg = pg.GraphicsLayoutWidget()
+        s.color_bar_wg.setBackground(None)
 
-        self.color_bar = pg.ColorBarItem(width=15, interactive=False)
-        self.color_bar_wg.addItem(self.color_bar)
+        s.color_bar = pg.ColorBarItem(width=15, interactive=False)
+        s.color_bar_wg.addItem(s.color_bar)
 
         # final layout
-        self.addWidget(self.thz_image_stack, 100)
-        self.addWidget(self.color_bar_wg, 10)
+        s.addWidget(s.thz_image_stack, 100)
+        s.addWidget(s.color_bar_wg, 10)
 
-        self.cfg_dict = cfg_dict
+        s.cfg_dict = cfg_dict
 
         # initializing the dimensions of the image
-        self.min_az = None
-        self.max_az = None
+        s.min_az = None
+        s.max_az = None
 
-        self.min_el = None
-        self.max_el = None
+        s.min_el = None
+        s.max_el = None
 
 
     def calc_coarse_grids(s):
@@ -129,8 +131,22 @@ class THzImageObj(QHBoxLayout):
         s.az_grid_1d = np.linspace(min_az, max_az, xlen)
         s.el_grid_1d = np.linspace(min_el, max_el, ylen)
 
-        s.az_grid_2d = (np.tile(s.az_grid_1d, ylen).reshape((ylen,xlen))).T
-        s.el_grid_2d = (np.tile(s.el_grid_1d, xlen).reshape((xlen,ylen)))
+        # due to the strange way that the mesh grid plots we have to do this
+        az_grid_1d_adj = np.append(s.az_grid_1d, s.az_grid_1d[-1])
+        el_grid_1d_adj = np.append(s.el_grid_1d, s.el_grid_1d[-1])
+
+        ylen_adj = ylen + 1
+        xlen_adj = xlen + 1
+        s.az_grid_2d = (np.tile(az_grid_1d_adj, ylen_adj).reshape((ylen_adj,
+                        xlen_adj))).T
+        s.el_grid_2d = np.tile(el_grid_1d_adj, xlen_adj).reshape((xlen_adj,
+                        ylen_adj))
+
+        # convert the grids to centimeters
+        el_to_cm = s.cfg_dict["el_encoder_to_cm"]
+        az_to_cm = s.cfg_dict["az_encoder_to_cm"]
+        s.az_grid_1d_cm = s.az_grid_1d * az_to_cm
+        s.el_grid_1d_cm = s.el_grid_1d * el_to_cm
 
 
     def check_frame_params(s):
@@ -156,9 +172,10 @@ class THzImageObj(QHBoxLayout):
         return needs_update
 
 
-    def update_image(s, frame_data, new_frame_flag, reset_camera_flag=False):
+    def update_image(s, frame_data, new_frame_flag, reset_camera=False, 
+                     set_trace_val=False):
         """
-        This performs the actual image updating
+        This performs the actual image updating.  Replaces update_plot()
         """
         # first step is to check if the coarse grids need updating
         if s.check_frame_params():
@@ -170,51 +187,74 @@ class THzImageObj(QHBoxLayout):
         # now we check if there's a new frame?
 
         if new_frame_flag:
+            s.pixel_ranges_grid   = frame_data["pixel_ranges_grid"]
+            s.valid_pixels_grid   = frame_data["valid_pixels_grid"]
+            #noise_floor_grid    = frame_data["noise_floor_grid"]
 
-            pixel_ranges_grid   = frame_data["pixel_ranges_grid"]
-            valid_pixels_grid   = frame_data["valid_pixels_grid"]
-            noise_floor_grid    = frame_data["noise_floor_grid"]
+            # construct a version with nans for ease of use
+            s.pixel_ranges_grid_nans = copy.deepcopy(
+                    frame_data["pixel_ranges_grid"])
+                
+            s.pixel_ranges_grid_nans[~s.valid_pixels_grid] = np.nan
         
-        # NOTE TODO work on this next: 4/21/2025
-        # LEFT OFF HERE!
+        # only continue if there is a real frame stored in the class
+        if type(s.pixel_ranges_grid) != type(None):
+            # Now figure out the color scale limits
+            autocolor = cfg_dict["autoscale_color"]
+            cmap_str  = cfg_dict["colormap"]
+            if not autocolor:
+                color_min = cfg_dict["color_scale_min"]
+                color_max = cfg_dict["color_scale_max"]
+            else:
+                flat_img = s.pixel_ranges_grid_nans.flatten()
+                color_min = np.nanmin(flat_img)
+                color_max = np.nanmax(flat_img)
+                #print(f"color_min = {color_min}")
+                #print(f"color_max = {color_max}")
+                
+                # set the color scale textboxes to the autoscaled values
+                # when autoscale color is enabled
+                s.thz_image_tab.update_autocolors(color_min, color_max)
 
-        """
+            plot_style = cfg_dict["plot_style"]
+            if plot_style in ["front_peak_range", "back_peak_range", 
+                              "integ_power_plot", "num_avgs_plot"]:
+                s.thz_image_stack.setCurrentIndex(0)
+                s.thz_mesh_obj.update_plot(s.az_grid_2d, s.el_grid_2d, 
+                        s.pixel_ranges_grid, cmap_str, color_min, color_max, 
+                        reset_camera, set_trace_val)
+                                              
 
-        # Now figure out the color scale limits
-        autocolor = cfg_dict["autoscale_color"]
-        if not autocolor:
-            color_min = cfg_dict["color_scale_min"]
-            color_max = cfg_dict["color_scale_max"]
-        else:
-            flat_img = image_data.flatten()
-            color_min = np.nanmin(flat_img)
-            color_max = np.nanmax(flat_img)
-            #print(f"color_min = {color_min}")
-            #print(f"color_max = {color_max}")
-            
-            # set the color scale textboxes to the autoscaled values
-            # when autoscale color is enabled
-            self.thz_image_tab.cs_ledit_min.setText(str(color_min))
-            self.thz_image_tab.cs_ledit_max.setText(str(color_max))
+            elif plot_style in ["front_surface_range", "back_surface_range"]:
+                s.thz_image_stack.setCurrentIndex(1)
+                s.thz_surface_obj.update_plot(s.az_grid_1d_cm, s.el_grid_1d_cm, 
+                        s.pixel_ranges_grid_nans, cmap_str, 
+                        color_min, color_max, reset_camera, set_trace_val)
+                        
 
-            self.thz_image_tab.cs_slider_min.setValue(int(color_min))
-            self.thz_image_tab.cs_slider_max.setValue(int(color_max))
-        """
 
+            else:
+                except_str = "unsupported or invalid plot style: {plot_style}"
+                raise Exception(except_str)
+
+            # I'll need to fix this to show the surface plot colormap
+            cmap = pg.colormap.getFromMatplotlib(cmap_str) 
+            s.color_bar.setColorMap(cmap)
+            s.color_bar.setLevels((color_min, color_max))
 
 
         
-
-    def update_plot(self, az_grid, el_grid, image_data, cmap_str, 
+    """
+    def update_plot(s, az_grid, el_grid, image_data, cmap_str, 
                     postproc_config_dict, 
                     reset_camera=False, set_trace_val=False):
 
-        print(f"image update: {self.update_cntr}")
-        self.update_cntr += 1
-        self.az_grid = az_grid
-        self.el_grid = el_grid
-        self.image_data = image_data
-        self.cmap_str = cmap_str
+        print(f"image update: {s.update_cntr}")
+        s.update_cntr += 1
+        s.az_grid = az_grid
+        s.el_grid = el_grid
+        s.image_data = image_data
+        s.cmap_str = cmap_str
 
         # compute minimum and maximum color stuff
 
@@ -232,14 +272,14 @@ class THzImageObj(QHBoxLayout):
             
             # set the color scale textboxes to the autoscaled values
             # when autoscale color is enabled
-            self.thz_image_tab.cs_ledit_min.setText(str(color_min))
-            self.thz_image_tab.cs_ledit_max.setText(str(color_max))
+            s.thz_image_tab.cs_ledit_min.setText(str(color_min))
+            s.thz_image_tab.cs_ledit_max.setText(str(color_max))
 
-            self.thz_image_tab.cs_slider_min.setValue(int(color_min))
-            self.thz_image_tab.cs_slider_max.setValue(int(color_max))
+            s.thz_image_tab.cs_slider_min.setValue(int(color_min))
+            s.thz_image_tab.cs_slider_max.setValue(int(color_max))
 
-        self.color_min = color_min
-        self.color_max = color_max
+        s.color_min = color_min
+        s.color_max = color_max
 
         # call the actual sub-class's update function
         # put the decision tree here for when you have multiple subclasses
@@ -248,14 +288,14 @@ class THzImageObj(QHBoxLayout):
         plot_style = postproc_config_dict["plot_style"]
 
         if plot_style in ["front_peak_range", "back_peak_range", "integ_power_plot", "num_avgs_plot"]:
-            self.thz_image_stack.setCurrentIndex(0)
-            self.thz_mesh_obj.update_plot(az_grid, el_grid, image_data, cmap_str, 
+            s.thz_image_stack.setCurrentIndex(0)
+            s.thz_mesh_obj.update_plot(az_grid, el_grid, image_data, cmap_str, 
                                           color_min, color_max, reset_camera, set_trace_val)
 
 
         elif plot_style in ["front_surface_plot", "back_surface_plot"]:
-            self.thz_image_stack.setCurrentIndex(1)
-            self.thz_surface_obj.update_plot(az_grid, el_grid, image_data, cmap_str, 
+            s.thz_image_stack.setCurrentIndex(1)
+            s.thz_surface_obj.update_plot(az_grid, el_grid, image_data, cmap_str, 
                                           color_min, color_max, reset_camera, set_trace_val)
 
 
@@ -265,29 +305,30 @@ class THzImageObj(QHBoxLayout):
 
         # I'll need to fix this to show the surface plot colormap
         cmap = pg.colormap.getFromMatplotlib(cmap_str) 
-        self.color_bar.setColorMap(cmap)
-        self.color_bar.setLevels((color_min, color_max))
+        s.color_bar.setColorMap(cmap)
+        s.color_bar.setLevels((color_min, color_max))
 
+    """
 
 
     # NOTE CONSIDER PUSHING THIS LOGIC BACK INTO THzImageTab()
-    def save_cur_image(self, fpath, fprefix):
+    def save_cur_image(s, fpath, fprefix):
         """
         saves the current image to file, will probably move this to the 
         seperate image types later so the appropriate image class will save
         the image
         """
         #ipdb.set_trace() # TODO Debug REMOVE
-        image_data = self.image_data
+        image_data = s.image_data
         #if image_data == None:
         #    raise Exception("There is no image data to save")
 
-        az_grid     = self.az_grid
-        el_grid     = self.el_grid
-        color_min   = self.color_min
-        color_max   = self.color_max
+        az_grid     = s.az_grid
+        el_grid     = s.el_grid
+        color_min   = s.color_min
+        color_max   = s.color_max
 
-        postproc_config_dict  = self.thz_image_tab.get_gui_config_params()
+        postproc_config_dict  = s.thz_image_tab.get_gui_config_params()
         plot_style  = postproc_config_dict["plot_style"]
         cmap_str = postproc_config_dict["colormap"]
 
@@ -346,62 +387,55 @@ class THzMeshImage(pg.PlotWidget):
     """
     thz_image_tab   = None
     
-    def __init__(self, thz_image_tab):
+    def __init__(s, thz_image_tab):
         super().__init__()
         #super().__init__(background="transparent")
 
-        self.thz_image_tab = thz_image_tab
+        s.thz_image_tab = thz_image_tab
 
         # Removes warning spammed in console (also might disable touch 
         # screen but i dont think we're using that)
-        self.viewport().setAttribute(
+        s.viewport().setAttribute(
             QtCore.Qt.WidgetAttribute.WA_AcceptTouchEvents, False)
 
         # main color mesh image
-        self.color_mesh = pg.PColorMeshItem()
-        self.color_mesh.setColorMap(pg.colormap.getFromMatplotlib("jet_r"))
-        self.addItem(self.color_mesh)
+        s.color_mesh = pg.PColorMeshItem()
+        s.color_mesh.setColorMap(pg.colormap.getFromMatplotlib("jet_r"))
+        s.addItem(s.color_mesh)
 
-        self.setTitle("THz Image")
-        self.getPlotItem().invertX(True)
-        self.getPlotItem().invertY(True)
-
-
-    def set_levels(self, min_val, max_val):
-        self.color_mesh.setLevels((min_val, max_val))
+        s.setTitle("THz Image")
+        s.getPlotItem().invertX(True)
+        s.getPlotItem().invertY(True)
 
 
-    def update_plot(self, az_grid, el_grid, image, cmap_str, color_min, 
+    def set_levels(s, min_val, max_val):
+        s.color_mesh.setLevels((min_val, max_val))
+
+
+    def update_plot(s, az_grid_2d, el_grid_2d, image, cmap_str, color_min, 
                     color_max, reset_camera=False, set_trace_val=False):
-        self.set_levels(color_min, color_max)
+        s.set_levels(color_min, color_max)
 
-        # magic number 2000 is what we set the image values that are "nans" to
-        image_adj = np.nan_to_num(image, nan=2000)
-
-        az_grid = np.append(az_grid, az_grid[-1])
-        el_grid = np.append(el_grid, el_grid[-1])
-        (x_grid, y_grid) = self.make_grids_2d(az_grid, el_grid)
-        self.color_mesh.setData(x_grid, y_grid, image_adj, autoLevels=False)
-
+        s.color_mesh.setData(az_grid_2d, el_grid_2d, image, autoLevels=False)
         cmap = pg.colormap.getFromMatplotlib(cmap_str) 
-        self.color_mesh.setColorMap(cmap)
+        s.color_mesh.setColorMap(cmap)
 
 
-    def make_grids_2d(self, x_grid, y_grid):
-        """
-        This appears to be necessary for properly setting up the color_mesh
-        """
-        n_x = x_grid.shape[-1]
-        n_y = y_grid.shape[0]
-        if x_grid.ndim != 2 or x_grid.shape[0] == 1:
-            x = x_grid.reshape(1, n_x)
-            x_grid = x.repeat(n_y, axis=0)
-        if y_grid.ndim != 2 or y_grid.shape[1] == 1:
-            y = y_grid.reshape(n_y, 1)
-            y_grid = y.repeat(n_x, axis=1)
+    #def make_grids_2d(s, x_grid, y_grid):
+    #    """
+    #    This appears to be necessary for properly setting up the color_mesh
+    #    """
+    #    n_x = x_grid.shape[-1]
+    #    n_y = y_grid.shape[0]
+    #    if x_grid.ndim != 2 or x_grid.shape[0] == 1:
+    #        x = x_grid.reshape(1, n_x)
+    #        x_grid = x.repeat(n_y, axis=0)
+    #    if y_grid.ndim != 2 or y_grid.shape[1] == 1:
+    #        y = y_grid.reshape(n_y, 1)
+    #        y_grid = y.repeat(n_x, axis=1)
         
-        # sadly, this is what I'm going with. At least for now.  Darth Vader
-        return (x_grid.T, y_grid.T)
+    #    # sadly, this is what I'm going with. At least for now.  Darth Vader
+    #    return (x_grid.T, y_grid.T)
 
 ##############################################################################
 ##############################################################################
@@ -420,67 +454,65 @@ class THzSurfaceObj(gl.GLViewWidget):
     cmap_dict = None
 
 
-    def __init__(self, thz_image_tab):
+    def __init__(s, thz_image_tab):
         super().__init__(rotationMethod="quaternion")
         #super().__init__(background="transparent")
 
-        self.thz_image_tab = thz_image_tab
+        s.thz_image_tab = thz_image_tab
 
-        self.surface_plot = gl.GLSurfacePlotItem()
-        self.addItem(self.surface_plot)
+        s.surface_plot = gl.GLSurfacePlotItem()
+        s.addItem(s.surface_plot)
         distance    = 1.0
         elevation   = -72.0
         azimuth     = 442.0
         fov         = 127
         pos = pg.Vector(-3.3, 19.9, 380) 
-        self.setCameraParams(center=pos, distance=distance, fov=fov, 
+        s.setCameraParams(center=pos, distance=distance, fov=fov, 
                              elevation=elevation, azimuth=azimuth)
+
+        # NOTE This needs to be upgraded
         # organization is: [min_rgb, max_rgb]
-        self.cmap_dict = {}
-        self.cmap_dict["jet"]        = [(0.,0.,1.),(1.,0.,0.)]
-        self.cmap_dict["jet_r"]      = [(1.,0.,0.),(0.,0.,1.)]
-        self.cmap_dict["gray"]       = [(0.,0.,0.),(1.,1.,1.)]
-        self.cmap_dict["binary"]     = [(1.,1.,1.),(0.,0.,0.)]
-        self.cmap_dict["Blues"]      = [(1.,1.,1.),(0.,0.,1.)]
-        self.cmap_dict["Greens"]     = [(1.,1.,1.),(0.,1.,0.)]
-        self.cmap_dict["Reds"]       = [(1.,1.,1.),(1.,0.,0.)]
-        #self.cmap_dict["copper"]     = [(0.541,0.338,0.150),(0.05,0.05,0.05)]
-        #self.cmap_dict["copper"]     = [(0.05,0.05,0.05),(0.541,0.338,0.150)]
-        self.cmap_dict["copper"]     = [(0.05,0.05,0.05),(0.722,0.451,0.2)]
-        self.cmap_dict["twilight"]   = [(0.8,0.8,0.8),(0.125, 0.,0.125)]
+        s.cmap_dict = {}
+        s.cmap_dict["jet"]        = [(0.,0.,1.),(1.,0.,0.)]
+        s.cmap_dict["jet_r"]      = [(1.,0.,0.),(0.,0.,1.)]
+        s.cmap_dict["gray"]       = [(0.,0.,0.),(1.,1.,1.)]
+        s.cmap_dict["binary"]     = [(1.,1.,1.),(0.,0.,0.)]
+        s.cmap_dict["Blues"]      = [(1.,1.,1.),(0.,0.,1.)]
+        s.cmap_dict["Greens"]     = [(1.,1.,1.),(0.,1.,0.)]
+        s.cmap_dict["Reds"]       = [(1.,1.,1.),(1.,0.,0.)]
+        #s.cmap_dict["copper"]     = [(0.541,0.338,0.150),(0.05,0.05,0.05)]
+        #s.cmap_dict["copper"]     = [(0.05,0.05,0.05),(0.541,0.338,0.150)]
+        s.cmap_dict["copper"]     = [(0.05,0.05,0.05),(0.722,0.451,0.2)]
+        s.cmap_dict["twilight"]   = [(0.8,0.8,0.8),(0.125, 0.,0.125)]
 
 
-    def set_levels(self, min_val, max_val):
-        self.surface_plot.setLevels((min_val, max_val))
+    def set_levels(s, min_val, max_val):
+        s.surface_plot.setLevels((min_val, max_val))
 
 
-    def update_plot(self, az_grid, el_grid, image, cmap_str, color_min, 
+    def update_plot(s, az_grid_cm, el_grid_cm, image, cmap_str, color_min, 
                     color_max, reset_camera=False, set_trace_val=False):
 
         image_adj = image
         image_adj = np.flip(image, 1)
 
-        #print(self.cameraPosition())
-
-        # convert azimuth and elevation to centimeters
-        az_grid_cm = az_grid * (16/500)
-        el_grid_cm = el_grid * (16/500)
-
+        #print(s.cameraPosition())
         
         # color_min and color_max are acutally the range values for min and 
         # max color, 
-        [cmap_min, cmap_max] = self.cmap_dict[cmap_str]
-        self.color_map = self.rgb_colormap(cmap_min, cmap_max, color_min, color_max)
+        [cmap_min, cmap_max] = s.cmap_dict[cmap_str]
+        s.color_map = s.rgb_colormap(cmap_min, cmap_max, color_min, color_max)
 
-        color_map = self.color_map
+        color_map = s.color_map
         #print(f"color_map: {color_map}")
-        self.surface_plot.setData(az_grid_cm, el_grid_cm, image_adj)
-        self.surface_plot.setShader("heightColor")
-        #self.surface_plot.setShader("shaded")
-        self.surface_plot.shader()["colorMap"] = color_map
 
-        if (self.first_update) or (reset_camera):
-            self.first_update = False
+        s.surface_plot.setData(az_grid_cm, el_grid_cm, image_adj)
+        s.surface_plot.setShader("heightColor")
+        #s.surface_plot.setShader("shaded")
+        s.surface_plot.shader()["colorMap"] = color_map
+
+        if (s.first_update) or (reset_camera):
+            s.first_update = False
             distance    = 40.0
             fov         = 25
             rotation    = QtGui.QQuaternion(0.0, 0.0, -1.0, 0.0)
@@ -488,7 +520,7 @@ class THzSurfaceObj(gl.GLViewWidget):
             pos_y = (np.nanmax(el_grid_cm) - np.nanmin(el_grid_cm)) / 2
             pos_z = color_min
             pos         = pg.Vector(pos_x, pos_y, pos_z) 
-            self.setCameraParams(center=pos, distance=distance, fov=fov, 
+            s.setCameraParams(center=pos, distance=distance, fov=fov, 
                                  rotation=rotation)
 
 
@@ -496,7 +528,7 @@ class THzSurfaceObj(gl.GLViewWidget):
     ###################### Surface Plot Colormap Related ######################
     ###########################################################################
 
-    def brown_white_colormap(self, min_val, max_val):
+    def brown_white_colormap(s, min_val, max_val):
         """
         scales the default shader to z: 
         - lowest will be black
@@ -511,7 +543,7 @@ class THzSurfaceObj(gl.GLViewWidget):
         ]
 
 
-    def green_colormap(self, min_val, max_val):
+    def green_colormap(s, min_val, max_val):
         """
          colors fragments by z-value.
          This is useful for coloring surface plots by height.
@@ -528,7 +560,7 @@ class THzSurfaceObj(gl.GLViewWidget):
         return colormap
 
 
-    def rgb_colormap(self, min_color, max_color, min_val, max_val):
+    def rgb_colormap(s, min_color, max_color, min_val, max_val):
         """
         this generates a colormap that smoothly goes from min_color to 
         max_color.  min_color and max_color are a tuple of three RGB floats
@@ -537,9 +569,9 @@ class THzSurfaceObj(gl.GLViewWidget):
         """
         span = max_val - min_val
 
-        (rk0, rk1) = self.conv_rgb(min_color[0], max_color[0], min_val, max_val)
-        (gk0, gk1) = self.conv_rgb(min_color[1], max_color[1], min_val, max_val)
-        (bk0, bk1) = self.conv_rgb(min_color[2], max_color[2], min_val, max_val)
+        (rk0, rk1) = s.conv_rgb(min_color[0], max_color[0], min_val, max_val)
+        (gk0, gk1) = s.conv_rgb(min_color[1], max_color[1], min_val, max_val)
+        (bk0, bk1) = s.conv_rgb(min_color[2], max_color[2], min_val, max_val)
 
         red_vals    = [rk0, rk1, 1]
         green_vals  = [gk0, gk1, 1]
@@ -549,7 +581,7 @@ class THzSurfaceObj(gl.GLViewWidget):
         return colormap
 
 
-    def conv_rgb(self, min_single_color, max_single_color, min_val, max_val):
+    def conv_rgb(s, min_single_color, max_single_color, min_val, max_val):
         """
         converts an rgb color tuple to the constants required for generating 
         a colormap

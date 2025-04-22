@@ -266,30 +266,35 @@ class THzImageTab(QWidget):
 
         if cfg_dict["data_src"] == "dat_file":
             s.file_src_rbut.setChecked(True)
-            
         elif cfg_dict["data_src"] == "daq":
             s.daq_src_rbut.setChecked(True)
             
-        if cfg_dict["plot_style"] == "front_peak":
-            s.front_peak_rbut.setChecked(True)
-            
-        elif cfg_dict["plot_style"] == "back_peak":
-            s.back_peak_rbut.setChecked(True)
-            
-        elif cfg_dict["plot_style"] == "front_surface":
-            s.front_surface_plot_rbut.setChecked(True)
-            
-        elif cfg_dict["plot_style"] == "back_surface":
-            s.back_surface_plot_rbut.setChecked(True)
 
+        if cfg_dict["plot_style"] == "front_peak_range":
+            s.front_peak_rbut.setChecked(True)
+        elif cfg_dict["plot_style"] == "back_peak_range":
+            s.back_peak_rbut.setChecked(True)
+        elif cfg_dict["plot_style"] == "front_surface_range":
+            s.front_surface_plot_rbut.setChecked(True)
+        elif cfg_dict["plot_style"] == "back_surface_range":
+            s.back_surface_plot_rbut.setChecked(True)
         elif cfg_dict["plot_style"] == "num_oversamp_plot":
             s.num_oversamp_rbut.setChecked(True)
-
         elif cfg_dict["plot_style"] == "integ_power_plot":
             s.integ_pwr_rbut.setChecked(True)
-            
         elif cfg_dict["plot_style"] == "point_cloud_plot":
             s.point_cloud_rbut.setChecked(True)
+
+
+        if cfg_dict["frame_style"]  == "azimuth_turnaround":
+            s.azi_turn_fs_rbut.setChecked(True)
+        elif cfg_dict["frame_style"] == "accum_rangelines":
+            s.num_rng_fs_rbut.setChecked(True)
+        elif cfg_dict["frame_style"] == "fraction_col_filled":
+            s.col_frac_fs_rbut.setChecked(True)
+        elif cfg_dict["frame_style"] == "fraction_pix_filled":
+            s.pix_frac_fs_rbut.setChecked(True)
+        
 
         # need to update these because the proper signals won't be generated 
         # with automatic editing
@@ -470,16 +475,32 @@ class THzImageTab(QWidget):
         """
         s.update_image(None, False,reset_camera=True)
 
+
+
+    def update_daq_status(s, stat_id):
+        if stat_id == "NOT_CONNECTED":
+            style_options = "background-color: yellow; color: black"
+            s.daq_status_ledit.setStyleSheet(style_options)
+            s.daq_status_ledit.setText("CONNECTING...")
+        elif stat_id == "CONNECTED":
+            style_options = "background-color: green; color: black"
+            s.daq_status_ledit.setStyleSheet(style_options)
+            s.daq_status_ledit.setText("CONNECTED")
+
+
+
+
+
     #########################################################################
     ###################### MAIN IMAGE UPDATE FUNCTION #######################
     #########################################################################
-    def update_image(s, frame_data, new_frame_flag, reset_camera_flag=False):
+    def update_image(s, frame_data, new_frame_flag, reset_camera=False):
         """
         This is called whenver a new frame comes in and properly distributes 
         it to the THzImageObj widgets 
         """
         s.thz_image_obj.update_image(frame_data, new_frame_flag, 
-            reset_camera_flag)
+            reset_camera)
 
 
     #########################################################################

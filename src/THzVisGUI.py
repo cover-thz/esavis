@@ -77,11 +77,12 @@ from PySide6.QtWidgets import (
 # they can be packaged nicely into one object to pass around the program
 class ProcPipes:
     def __init__(s, cfg_pipe, err_pipe, data_pipe, 
-                    query_pipe):
+                    query_pipe_in, query_pipe_out):
         s.cfg_pipe = cfg_pipe
         s.err_pipe   = err_pipe
         s.data_pipe    = data_pipe
-        s.query_pipe   = query_pipe
+        s.query_pipe_in   = query_pipe_in
+        s.query_pipe_out  = query_pipe_out
 
 
 # quit the app on Ctrl + C from console
@@ -155,10 +156,24 @@ DFLT_CFG_DICT["max_el"] = 1.
 
 DFLT_CFG_DICT["colormap"]        = "jet"
 DFLT_CFG_DICT["data_src"]        = "disabled"
-DFLT_CFG_DICT["plot_style"]      = "front_peak"
+DFLT_CFG_DICT["plot_style"]      = "front_peak_range"
 DFLT_CFG_DICT["peak_selection"]  = "front"
 DFLT_CFG_DICT["fname_list"]  = None
     
+# These values do not appear in the GUI yet
+# so they are "hard-coded"
+DFLT_CFG_DICT["daq_timeout"]  = 2.
+DFLT_CFG_DICT["el_encoder_to_cm"]  = 16/500
+DFLT_CFG_DICT["az_encoder_to_cm"]  = 16/500
+DFLT_CFG_DICT["daq_addr"]  = "localhost"
+
+
+# These are currently hard-coded but need to be propagated to the single-pixel
+# GUIl
+DFLT_CFG_DICT["aux_x_ind"] = 10
+DFLT_CFG_DICT["aux_y_ind"] = 10
+
+
 
 ##############################################################################
 # DEFAULT CONFIG SET
@@ -194,6 +209,7 @@ class MainWindow(QMainWindow):
     cur_proc_data_file_0 = None
     cur_proc_data_file_1 = None
     proc_pipes = None
+    daq_connected = False
 
 
     def __init__(s, CFG_DFLT_PATH, CONFIG_DIR, proc_pipes):
@@ -205,8 +221,12 @@ class MainWindow(QMainWindow):
         s.proc_pipes        = proc_pipes
         s.pre_first_update  = True
         s.last_update_time  = None
-        #s.min_cfg_period    = 0.5
-        s.min_cfg_period    = 2.5
+        s.min_update_period    = 0.25
+
+        # this is used to mark time for how often we're querying the processing
+        # core to see if the DAQ is connected
+        s.last_daq_query_time   = None
+        s.daq_query_period      = 1
 
         # sets ths title and default size of the window
         s.setWindowTitle('THz Vizualizer GUI')
@@ -219,7 +239,7 @@ class MainWindow(QMainWindow):
         s.layout = QVBoxLayout(s.central_widget)
 
         # Construct the default configuration dictionary
-        s.cfg_dict = DFLT_CFG_DICT
+        s.cfg_dict = copy.deepcopy(DFLT_CFG_DICT)
         s.cfg_dict["flags"] = []
 
         # create the tab widget which contains pretty much the remainder of
@@ -298,16 +318,21 @@ class MainWindow(QMainWindow):
         """
         loads a config file creating a config dictionary
         """
-        with open(fpath, "r", encoding="utf-8") as file:
-            cfg_dict = json.load(file, object_pairs_hook=OrderedDict)
-        s.update_config(cfg_dict)
+        ret_val = False
+        try:
+            with open(fpath, "r", encoding="utf-8") as file:
+                cfg_dict = json.load(file, object_pairs_hook=OrderedDict)
+            s.update_config(cfg_dict)
+        except:
+            print("load_config failed")
+            ret_val = True
 
         # pass the config to the various functions that set the appropriate 
         # GUI objects
-        if cfg_dict != None:
-            s.cfg_tab.set_gui_config_params(cfg_dict)
-            s.main_thz_tab.set_gui_config_params(cfg_dict)
-
+        if s.cfg_dict != None:
+            s.cfg_tab.set_gui_config_params(s.cfg_dict)
+            s.main_thz_tab.set_gui_config_params(s.cfg_dict)
+        return ret_val
 
 
 
@@ -370,7 +395,9 @@ class MainWindow(QMainWindow):
         # NOTE construct some sort of buffering of changes when you have 
         # tabs that don't have THz images visible so you don't hammer the
         # processing
+        print("update_config called")
         cfg_dict = s.cfg_dict
+        cfg_flags = []
         if (cfg_dict_in != None) and (cfg_dict_in != {}):
             # construct an old dictionary
             old_cfg_dict = copy.deepcopy(cfg_dict)
@@ -379,19 +406,10 @@ class MainWindow(QMainWindow):
             for key in cfg_dict_in.keys():
                 cfg_dict[key] = cfg_dict_in[key]
 
-            cfg_flags = []
             # flag checks
             if cfg_dict["fname_list"] != old_cfg_dict["fname_list"]:
                 s.append_if_absent(cfg_flags, "fname_changed")
 
-            # always send the "setup_daq" flag if daq is data source
-            if cfg_dict["data_src"] == "daq":
-                cfg_flags = s.append_if_absent(cfg_flags, "setup_daq")
-
-                if cfg_dict["ch0_en"] != old_cfg_dict["ch0_en"]:
-                    cfg_flags = s.append_if_absent(cfg_flags, "update_daq_ch")
-                elif cfg_dict["ch1_en"] != old_cfg_dict["ch1_en"]:
-                    cfg_flags = s.append_if_absent(cfg_flags, "update_daq_ch")
 
             if cfg_dict["min_az"] != old_cfg_dict["min_az"]:
                 cfg_flags = s.append_if_absent(cfg_flags, "recalc_coarse_grid")
@@ -406,14 +424,27 @@ class MainWindow(QMainWindow):
             elif cfg_dict["ylen"] != old_cfg_dict["ylen"]:
                 cfg_flags = s.append_if_absent(cfg_flags, "recalc_coarse_grid")
 
-            # calculate fs_post_dec
-            fs_adc = cfg_dict["fs_adc"]
-            dec_val = cfg_dict["dec_val"]
-            cfg_dict["fs_post_dec"] = fs_adc/(16*(dec_val))
 
-            # calculate the linear versions of threshold and contrast
-            cfg_dict["threshold_lin"]   = 10**(cfg_dict["threshold_db"]/10)
-            cfg_dict["contrast_lin"]    = 10**(cfg_dict["contrast_db"]/10)
+            if cfg_dict["data_src"] == "daq":
+                if cfg_dict["ch0_en"] != old_cfg_dict["ch0_en"]:
+                    cfg_flags = s.append_if_absent(cfg_flags, "update_daq_ch")
+                elif cfg_dict["ch1_en"] != old_cfg_dict["ch1_en"]:
+                    cfg_flags = s.append_if_absent(cfg_flags, "update_daq_ch")
+
+
+        # calculate fs_post_dec
+        fs_adc = cfg_dict["fs_adc"]
+        dec_val = cfg_dict["dec_val"]
+        cfg_dict["fs_post_dec"] = fs_adc/(16*(dec_val))
+
+        # calculate the linear versions of threshold and contrast
+        cfg_dict["threshold_lin"]   = 10**(cfg_dict["threshold_db"]/10)
+        cfg_dict["contrast_lin"]    = 10**(cfg_dict["contrast_db"]/10)
+
+        # always send the "setup_daq" flag if daq is data source
+        if cfg_dict["data_src"] == "daq":
+            cfg_flags = s.append_if_absent(cfg_flags, "setup_daq")
+
 
         if ((cfg_flags_in != None) and (cfg_flags_in != [])):
             # now the stuffing of the flags
@@ -423,10 +454,8 @@ class MainWindow(QMainWindow):
             for flag in cfg_dict["flags"]:
                 cfg_flags = s.append_if_absent(cfg_flags, flag)
             
-            cfg_dict["flags"] = cfg_flags
+        cfg_dict["flags"] = cfg_flags
 
-        print(cfg_dict_in)
-        print(cfg_flags_in)
 
         update = False
         if s.pre_first_update:
@@ -440,18 +469,15 @@ class MainWindow(QMainWindow):
             update = True
 
         else:
-            if ((time.time() - s.last_update_time) > s.min_cfg_period):
+            if ((time.time() - s.last_update_time) > s.min_update_period):
                 update = True
 
         if update:
             s.last_update_time = time.time()
             s.proc_pipes.cfg_pipe.send(cfg_dict)
-            print("Update!")
 
             # clear the flags now that the configuration has been sent
             cfg_dict["flags"] = []
-
-
 
 
     def frame_update(s, frame_in):
@@ -459,8 +485,8 @@ class MainWindow(QMainWindow):
         this updates all the appropriate THz image objects when a new frame 
         comes in
         """
-        pass
-
+        new_frame_flag = True
+        s.main_thz_tab.update_image(frame_in, new_frame_flag)
 
 
     def aux_update(s, aux_data_in):
@@ -470,7 +496,6 @@ class MainWindow(QMainWindow):
         """
         pass
 
-
     
     def timer_handler(s):
         """
@@ -479,7 +504,8 @@ class MainWindow(QMainWindow):
         cfg_pipe    = s.proc_pipes.cfg_pipe
         err_pipe    = s.proc_pipes.err_pipe
         data_pipe   = s.proc_pipes.data_pipe
-        query_pipe  = s.proc_pipes.query_pipe
+        query_pipe_in  = s.proc_pipes.query_pipe_in
+        query_pipe_out  = s.proc_pipes.query_pipe_out
         
         # Error handling first
         if err_pipe.poll():
@@ -490,6 +516,7 @@ class MainWindow(QMainWindow):
 
         # Main frame data comes in here
         if data_pipe.poll():
+            print("Frame available")
             data_in     = data_pipe.recv()
             frame_in    = data_in[0]
             aux_data_in = data_in[1]
@@ -497,14 +524,40 @@ class MainWindow(QMainWindow):
             s.frame_update(frame_in)
             s.aux_update(aux_data_in)
 
-        # query pipe is presently unused
-        if query_pipe.poll():
-            pass
+        # check for DAQ connected
+        if s.cfg_dict["data_src"] == "daq":
+            if query_pipe_in.poll():
+                query_in_dict = query_pipe_in.recv()
+                if "DAQ_STATUS" in query_in_dict.keys():
+                    s.last_daq_query_time = time.time()
+                    if query_in_dict["DAQ_STATUS"] == "CONNECTED":
+                        stat_id = "CONNECTED"
+                        if not s.daq_connected:
+                            print(f"stat_id = {stat_id}")
+                        s.daq_connected = True
+                        s.main_thz_tab.update_daq_status(stat_id)
+                    else:
+                        stat_id = "NOT_CONNECTED"
+                        if s.daq_connected:
+                            print(f"stat_id = {stat_id}")
+                        s.daq_connected = False
+                        s.main_thz_tab.update_daq_status(stat_id)
+                else:
+                    print(f"Warning: invalid query keys: {query_in_dict.keys()}")
+                       
+            if s.last_daq_query_time == None:
+                query_pipe_out.send(["DAQ_STATUS"])
+                s.last_daq_query_time = time.time()
+            elif (time.time() - s.last_daq_query_time) > s.daq_query_period:
+                query_pipe_out.send(["DAQ_STATUS"])
+                s.last_daq_query_time = time.time()
+
+        #def update_daq_status(s, stat_id):
 
         # a little clunky but if there hasn't been an update in a while we
         # call the update function
         if s.last_update_time != None:
-            if ((time.time() - s.last_update_time) > s.min_cfg_period):
+            if ((time.time() - s.last_update_time) > s.min_update_period):
                 s.update_config(None, None)
 
 
@@ -571,12 +624,15 @@ if __name__ == '__main__':
     (proc_cfg_pipe, cfg_pipe)      = mp.Pipe(duplex=False)
     (err_pipe, proc_err_pipe)      = mp.Pipe(duplex=False)
     (data_pipe, proc_data_pipe)    = mp.Pipe(duplex=False)
-    (query_pipe, proc_query_pipe)  = mp.Pipe(duplex=False)
+    (proc_query_pipe_in, query_pipe_out)  = mp.Pipe(duplex=False)
+    (query_pipe_in, proc_query_pipe_out)  = mp.Pipe(duplex=False)
 
     proc = mp.Process(target=dp.main_proc_loop, args=(proc_cfg_pipe, 
-        proc_err_pipe, proc_data_pipe, proc_query_pipe, cfg_dict,))
+        proc_err_pipe, proc_data_pipe, proc_query_pipe_in, proc_query_pipe_out,
+        cfg_dict,))
     proc.start()
-    proc_pipes = ProcPipes(cfg_pipe, err_pipe, data_pipe, query_pipe)
+    proc_pipes = ProcPipes(cfg_pipe, err_pipe, data_pipe, query_pipe_in, 
+                           query_pipe_out)
 
     # Defining and showing the main window
     #window = MainWindow(config_file)
