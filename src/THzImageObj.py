@@ -108,7 +108,7 @@ class THzImageObj(QHBoxLayout):
         s.max_el = None
 
 
-    def calc_coarse_grids(s):
+    def calc_coarse_grids(s, new_xlen, new_ylen):
         """
         Only needs to be done if there's a change in the frame dimensions
         or number of x or y pixels.  Should be "infrequent"
@@ -123,9 +123,9 @@ class THzImageObj(QHBoxLayout):
         max_el      = s.cfg_dict["max_el"]
         s.max_el    = max_el
 
-        xlen        = s.cfg_dict["xlen"]
+        xlen        = new_xlen
         s.xlen      = xlen
-        ylen        = s.cfg_dict["ylen"]
+        ylen        = new_ylen
         s.ylen      = ylen
 
         s.az_grid_1d = np.linspace(min_az, max_az, xlen)
@@ -137,6 +137,8 @@ class THzImageObj(QHBoxLayout):
 
         ylen_adj = ylen + 1
         xlen_adj = xlen + 1
+
+
         s.az_grid_2d = (np.tile(az_grid_1d_adj, ylen_adj).reshape((ylen_adj,
                         xlen_adj))).T
         s.el_grid_2d = np.tile(el_grid_1d_adj, xlen_adj).reshape((xlen_adj,
@@ -149,7 +151,7 @@ class THzImageObj(QHBoxLayout):
         s.el_grid_1d_cm = s.el_grid_1d * el_to_cm
 
 
-    def check_frame_params(s):
+    def check_frame_params(s, new_xlen, new_ylen):
         """
         Checks to see if any of the frame parameters that would require a 
         recalculation of the coarse grids have changed.  Returns true if the
@@ -163,9 +165,9 @@ class THzImageObj(QHBoxLayout):
             needs_update = True
         elif s.max_el != s.cfg_dict["max_el"]:
             needs_update = True
-        elif s.xlen != s.cfg_dict["xlen"]:
+        elif s.xlen != new_xlen:
             needs_update = True
-        elif s.ylen != s.cfg_dict["ylen"]:
+        elif s.ylen != new_ylen:
             needs_update = True
         else:
             needs_update = False
@@ -177,19 +179,22 @@ class THzImageObj(QHBoxLayout):
         """
         This performs the actual image updating.  Replaces update_plot()
         """
-        # first step is to check if the coarse grids need updating
-        if s.check_frame_params():
-            s.calc_coarse_grids()
 
         cfg_dict = s.cfg_dict 
-
-        # NOTE TODO
-        # now we check if there's a new frame?
 
         if new_frame_flag:
             s.pixel_ranges_grid   = frame_data["pixel_ranges_grid"]
             s.valid_pixels_grid   = frame_data["valid_pixels_grid"]
             #noise_floor_grid    = frame_data["noise_floor_grid"]
+
+            # first step is to check if the coarse grids need updating
+            # we have to use the pixel_ranges_grid shape to infer xlen and
+            # ylen because the cfg_dict values are "ahead" of the current
+            # frame
+            (new_xlen, new_ylen) = s.pixel_ranges_grid.shape
+            if s.check_frame_params(new_xlen, new_ylen):
+                s.calc_coarse_grids(new_xlen, new_ylen)
+                print("recalculated grids")
 
             # construct a version with nans for ease of use
             s.pixel_ranges_grid_nans = copy.deepcopy(
@@ -232,7 +237,6 @@ class THzImageObj(QHBoxLayout):
                         color_min, color_max, reset_camera, set_trace_val)
                         
 
-
             else:
                 except_str = "unsupported or invalid plot style: {plot_style}"
                 raise Exception(except_str)
@@ -243,72 +247,6 @@ class THzImageObj(QHBoxLayout):
             s.color_bar.setLevels((color_min, color_max))
 
 
-        
-    """
-    def update_plot(s, az_grid, el_grid, image_data, cmap_str, 
-                    postproc_config_dict, 
-                    reset_camera=False, set_trace_val=False):
-
-        print(f"image update: {s.update_cntr}")
-        s.update_cntr += 1
-        s.az_grid = az_grid
-        s.el_grid = el_grid
-        s.image_data = image_data
-        s.cmap_str = cmap_str
-
-        # compute minimum and maximum color stuff
-
-        autoscale_color = bool(postproc_config_dict["autoscale_color"])
-        if not autoscale_color:
-            color_min = float(postproc_config_dict["color_scale_min"])
-            color_max = float(postproc_config_dict["color_scale_max"])
-        
-        else:
-            flat_img = image_data.flatten()
-            color_min = np.nanmin(flat_img)
-            color_max = np.nanmax(flat_img)
-            #print(f"color_min = {color_min}")
-            #print(f"color_max = {color_max}")
-            
-            # set the color scale textboxes to the autoscaled values
-            # when autoscale color is enabled
-            s.thz_image_tab.cs_ledit_min.setText(str(color_min))
-            s.thz_image_tab.cs_ledit_max.setText(str(color_max))
-
-            s.thz_image_tab.cs_slider_min.setValue(int(color_min))
-            s.thz_image_tab.cs_slider_max.setValue(int(color_max))
-
-        s.color_min = color_min
-        s.color_max = color_max
-
-        # call the actual sub-class's update function
-        # put the decision tree here for when you have multiple subclasses
-
-        
-        plot_style = postproc_config_dict["plot_style"]
-
-        if plot_style in ["front_peak_range", "back_peak_range", "integ_power_plot", "num_avgs_plot"]:
-            s.thz_image_stack.setCurrentIndex(0)
-            s.thz_mesh_obj.update_plot(az_grid, el_grid, image_data, cmap_str, 
-                                          color_min, color_max, reset_camera, set_trace_val)
-
-
-        elif plot_style in ["front_surface_plot", "back_surface_plot"]:
-            s.thz_image_stack.setCurrentIndex(1)
-            s.thz_surface_obj.update_plot(az_grid, el_grid, image_data, cmap_str, 
-                                          color_min, color_max, reset_camera, set_trace_val)
-
-
-        else:
-            except_str = "unsupported or invalid plot style"
-            raise Exception(except_str)
-
-        # I'll need to fix this to show the surface plot colormap
-        cmap = pg.colormap.getFromMatplotlib(cmap_str) 
-        s.color_bar.setColorMap(cmap)
-        s.color_bar.setLevels((color_min, color_max))
-
-    """
 
 
     # NOTE CONSIDER PUSHING THIS LOGIC BACK INTO THzImageTab()
@@ -328,7 +266,7 @@ class THzImageObj(QHBoxLayout):
         color_min   = s.color_min
         color_max   = s.color_max
 
-        postproc_config_dict  = s.thz_image_tab.get_gui_config_params()
+        postproc_config_dict  = s.cfg_dict
         plot_style  = postproc_config_dict["plot_style"]
         cmap_str = postproc_config_dict["colormap"]
 
@@ -577,7 +515,7 @@ class THzSurfaceObj(gl.GLViewWidget):
         green_vals  = [gk0, gk1, 1]
         blue_vals   = [bk0, bk1, 1]
         colormap    = red_vals + green_vals + blue_vals
-        print(f"colormap = {colormap}")
+        #print(f"colormap = {colormap}")
         return colormap
 
 

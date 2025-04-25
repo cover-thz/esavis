@@ -151,11 +151,6 @@ class THzImageTab(QWidget):
         ####################################################################
         # assign some callbacks
         #
-        #s.load_cfg_btn.clicked.connect(s.load_cfg_btn_clicked)
-        #s.save_cfg_btn.clicked.connect(s.save_cfg_btn_clicked)
-        #s.save_dflt_cfg_btn.clicked.connect(s.save_dflt_cfg_btn_clicked)
-        #s.load_dflt_cfg_btn.clicked.connect(s.load_dflt_cfg_btn_clicked)
-
         # Button callbacks
         s.ld_save_image_save_btn.clicked.connect(
             s.ld_save_image_save_btn_clicked)
@@ -171,50 +166,6 @@ class THzImageTab(QWidget):
             s.reset_camera_btn_clicked)
 
 
-
-
-    def get_gui_config_params(s):
-        """
-        grabs the current set of configuration parameters on the GUI and 
-        converts them to a config dictionary which is returned
-        """
-        cfg_dict = {}
-        
-        cfg_dict["threshold_db"]    = s.thresh_ledit.text()
-        cfg_dict["contrast_db"]     = s.contr_ledit.text()
-        cfg_dict["half_peak_width"] = s.pkwdth_ledit.text()
-        cfg_dict["rangecut_min"]    = s.rc_ledit_min.text()
-        cfg_dict["rangecut_max"]    = s.rc_ledit_max.text()
-
-        cfg_dict["autoscale_color"] = s.cs_autoscale_chkb.isChecked()
-
-        cfg_dict["color_scale_min"] = s.cs_ledit_min.text()
-        cfg_dict["color_scale_max"] = s.cs_ledit_max.text()
-
-        cfg_dict["colormap"] = s.cmap_cbox.currentText()
-
-        if s.front_peak_rbut.isChecked():
-            cfg_dict["plot_style"]      = "front_peak_range"
-        elif s.back_peak_rbut.isChecked():
-            cfg_dict["plot_style"]      = "back_peak_range"
-        elif s.front_surface_plot_rbut.isChecked():
-            cfg_dict["plot_style"]      = "front_surface_plot"
-        elif s.back_surface_plot_rbut.isChecked():
-            cfg_dict["plot_style"]      = "back_surface_plot"
-        elif s.num_oversamp_rbut.isChecked():
-            cfg_dict["plot_style"]      = "num_oversamp_plot"
-        elif s.integ_pwr_rbut.isChecked():
-            cfg_dict["plot_style"]      = "integ_power_plot"
-        elif s.point_cloud_rbut.isChecked():
-            cfg_dict["plot_style"]      = "point_cloud_plot"
-        else:
-            except_str = "I admit defeat, I have no idea how this error happened"
-            raise Exception(except_str)
-
-        return cfg_dict
-
-
-
     def set_gui_config_params(s, cfg_dict):
         """
         takes the passed postprocessing config dictionary and distributes 
@@ -222,7 +173,8 @@ class THzImageTab(QWidget):
         """
         s.azi_hyst_fs_ledit.setText(str(cfg_dict["turn_hyst"])) 
         s.azi_marg_fs_ledit.setText(str(cfg_dict["turn_az_margin"])) 
-        s.num_rng_fs_ledit.setText(str(cfg_dict["daq_num_rangelines"])) 
+        s.daq_num_rng_fs_ledit.setText(str(cfg_dict["daq_num_rangelines"])) 
+        s.num_rng_fs_ledit.setText(str(cfg_dict["accum_rangelines_thresh"])) 
         s.tot_frac_fs_ledit.setText(str(cfg_dict["fraction_filled_thresh"])) 
         s.ld_save_image_desc_ledit.setText(str(cfg_dict["save_image_desc"])) 
 

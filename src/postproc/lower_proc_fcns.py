@@ -22,7 +22,17 @@ import ipdb
 ##############################################################################
 CFUNCS_DIR  = os.path.abspath(os.path.join(os.path.dirname(__file__), 
                 'c_funcs'))
-c_peak_fcns_lib = ct.CDLL(CFUNCS_DIR + "\\peak_find_fcns.dll")
+
+if os.name == "nt":
+    c_peak_fcns_lib = ct.CDLL(CFUNCS_DIR + "\\peak_find_fcns.dll")
+elif os.name == "posix":
+
+
+else:
+    raise Exception("Invalid OS Name")
+
+
+
 extract_single_rangeline_peaks  = c_peak_fcns_lib.extract_single_rangeline_peaks
 extract_all_rangeline_peaks     = c_peak_fcns_lib.extract_all_rangeline_peaks
 extract_aux_data                = c_peak_fcns_lib.extract_aux_data
@@ -210,7 +220,7 @@ def calc_range(freq_lut, chirp_span, chirp_time, center_rangeval):
 def pulse_az_el_adj(el_val_in, az_val_in, channel_val_in, 
     elev_side_0_start, elev_side_0_end, elev_side_1_start, elev_side_1_end, 
     disable_el_side0, disable_el_side1, ch0_en, ch1_en, ch0_offset, 
-    ch1_offset):
+    ch1_offset, el_offset0, el_offset1):
     """
     While the raw elevation and azimuth values do provide useful information
     for the location of each radar rangeline, due to various offsets and other 
@@ -233,11 +243,11 @@ def pulse_az_el_adj(el_val_in, az_val_in, channel_val_in,
     if ((el_val_in >= elev_side_0_start) and 
         (el_val_in <= elev_side_0_end) and (not disable_el_side0)):
         el_mirror_side = 0
-        el_val_out = el_val_in - elev_side_0_start
+        el_val_out = el_val_in - elev_side_0_start + el_offset0
     elif ((el_val_in >= elev_side_1_start) and 
           (el_val_in <= elev_side_1_end) and (not disable_el_side1)):
         el_mirror_side = 1
-        el_val_out = el_val_in - elev_side_1_start
+        el_val_out = el_val_in - elev_side_1_start + el_offset1
     else: 
         el_mirror_side  = None
         #el_val_out = el_val_in
@@ -274,7 +284,7 @@ def pulse_az_el_adj(el_val_in, az_val_in, channel_val_in,
 def adj_rangelines(rangelines_in, el_array_in, az_array_in, channels_in, 
     elev_side_0_start, elev_side_0_end, elev_side_1_start, elev_side_1_end, 
     disable_el_side0, disable_el_side1, ch0_en, ch1_en, ch0_offset, 
-    ch1_offset): 
+    ch1_offset, el_offset0, el_offset1): 
     """
     this takes the raw rangelines, elevation, and azimuth encoder values in
     and performs the appropriate adjustments based on elevation mirror encoder
@@ -297,7 +307,8 @@ def adj_rangelines(rangelines_in, el_array_in, az_array_in, channels_in,
             el_mirror_side, az_val_out) = pulse_az_el_adj(el_array_in[i], 
             az_array_in[i], channels_in[i], elev_side_0_start, elev_side_0_end, 
             elev_side_1_start, elev_side_1_end, disable_el_side0, 
-            disable_el_side1, ch0_en, ch1_en, ch0_offset, ch1_offset)
+            disable_el_side1, ch0_en, ch1_en, ch0_offset, ch1_offset, 
+            el_offset0, el_offset1)
     
         if not valid_rangeline:
             continue
@@ -363,7 +374,8 @@ def calc_coarse_grid(min_el, max_el, min_az, max_az, xlen,
 def regrid_rangelines(rangelines_in, el_array_in, az_array_in, channels_in, 
     elev_side_0_start, elev_side_0_end, elev_side_1_start, elev_side_1_end, 
     disable_el_side0, disable_el_side1, ch0_en, ch1_en, ch0_offset, ch1_offset, 
-    ideal_az_array, ideal_el_array, xlen, ylen, dbg_prof=False):
+    el_offset0, el_offset1, ideal_az_array, ideal_el_array, xlen, ylen, 
+    dbg_prof=False):
     
 
     """
@@ -394,7 +406,8 @@ def regrid_rangelines(rangelines_in, el_array_in, az_array_in, channels_in,
         el_mirror_side_array_adj) = adj_rangelines(rangelines_in, el_array_in, 
         az_array_in, channels_in, elev_side_0_start, elev_side_0_end, 
         elev_side_1_start, elev_side_1_end, disable_el_side0, 
-        disable_el_side1, ch0_en, ch1_en, ch0_offset, ch1_offset)
+        disable_el_side1, ch0_en, ch1_en, ch0_offset, ch1_offset, 
+        el_offset0, el_offset1)
 
 
     # Each rangeline must be the same size 
@@ -491,10 +504,31 @@ def update_grid(rangelines_grid_a, valid_grid_a, grid_az_a, grid_el_a,
 ###############################################################################
 
 
-def check_col_percent(r_grid_valids):
+def check_col_fraction(r_grid_valids):
+    """
+    checks the number of "almost full" columns are in the passed frame of 
+    valids.  "almost full" in this case is defined by the magic number 
+    FULL_FRAC
+    """
+    # going to do this the slow way
+    (xlen, ylen) = r_grid_valids.shape
+    num_full_cols = 0
+    for col in r_grid_valids:
+        if col.sum()/ylen >= 0.9:
+            num_full_cols += 1
+
+    frac_full = num_full_cols / xlen
+    return frac_full
+
+    
+
+def check_pix_fraction(r_grid_valids):
     """
     To be written
     """
+    frac_full = r_grid_valids.sum() / r_grid_valids.size
+    return frac_full
+
 
             
 ###############################################################################
@@ -507,10 +541,12 @@ def spectra_conv(coarse_rangelines_grid, data_format_in, fft_len, fs_post_dec):
         coarse_power_grid = np.square(np.abs(np.fft.fft(
             coarse_rangelines_grid, fft_len)))
         coarse_power_grid = np.flip(coarse_power_grid, 2)
+        fft_len_out = fft_len
 
     elif data_format_in.lower() == "fft":
         coarse_power_grid = np.square(np.abs(coarse_rangelines_grid))
         coarse_power_grid = np.flip(coarse_power_grid, 2)
+        fft_len_out = coarse_power_grid.shape[2]
 
     else: # data_format_in.lower() == "power_spectrum"
         # need to convert to float64
@@ -518,6 +554,7 @@ def spectra_conv(coarse_rangelines_grid, data_format_in, fft_len, fs_post_dec):
         #coarse_power_grid = 
         coarse_power_grid = coarse_rangelines_grid.astype(np.float64)
         coarse_power_grid = np.flip(coarse_power_grid, 2)
+        fft_len_out = coarse_power_grid.shape[2]
 
     # frequency vector, contains the frequency bins for each FFT (they're all
     # the same for each pulse, so it's just one vector.  Units are Hz.
@@ -532,7 +569,7 @@ def spectra_conv(coarse_rangelines_grid, data_format_in, fft_len, fs_post_dec):
     coarse_power_grid = np.fft.fftshift(coarse_power_grid, 2)
     freq_lut = np.fft.fftshift(freq_lut)
 
-    return (coarse_power_grid, freq_lut)
+    return (coarse_power_grid, freq_lut, fft_len_out)
 
 ##############################################################################
 ##############################################################################

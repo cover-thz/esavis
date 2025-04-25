@@ -176,14 +176,6 @@ DFLT_CFG_DICT["aux_y_ind"] = 10
 
 
 ##############################################################################
-# DEFAULT CONFIG SET
-##############################################################################
-##############################################################################
-# DEFAULT CONFIG SET
-##############################################################################
-
-
-##############################################################################
 # Main Window Class
 ##############################################################################
 class MainWindow(QMainWindow):
@@ -221,7 +213,12 @@ class MainWindow(QMainWindow):
         s.proc_pipes        = proc_pipes
         s.pre_first_update  = True
         s.last_update_time  = None
-        s.min_update_period    = 0.25
+        s.lock_pipes = False
+
+        # starts out at 2 seconds when the daq is not connected, changes t
+        s.NO_DAQ_PERIOD = 2.5
+        s.DAQ_CONNECTED_PERIOD = 1.0
+        s.min_update_period    = s.NO_DAQ_PERIOD
 
         # this is used to mark time for how often we're querying the processing
         # core to see if the DAQ is connected
@@ -263,7 +260,8 @@ class MainWindow(QMainWindow):
         # add the tabs to the tab widget 
         s.tab_widget.addTab(s.cfg_tab, "Config")
         s.tab_widget.addTab(s.main_thz_tab, "Main THz Image")
-        s.tab_widget.addTab(s.camera_tab, "Camera Overlay")
+        #s.tab_widget.addTab(s.camera_tab, "Camera Overlay")
+        s.tab_widget.addTab(s.camera_tab, "Large Viewer")
         s.tab_widget.addTab(s.single_pix_tab, "Single Pixel")
 
         s.layout.addWidget(s.tab_widget)
@@ -292,6 +290,31 @@ class MainWindow(QMainWindow):
         s.timer.start(100)
 
 
+
+    def closeEvent(s, event):
+        s.lock_pipes = True
+        s.timer.stop()
+
+        cfg_pipe    = s.proc_pipes.cfg_pipe
+        err_pipe    = s.proc_pipes.err_pipe
+        data_pipe   = s.proc_pipes.data_pipe
+        query_pipe_in  = s.proc_pipes.query_pipe_in
+        query_pipe_out  = s.proc_pipes.query_pipe_out
+
+        # empty the pipes quickly
+        while err_pipe.poll():
+            _ = err_pipe.recv()
+
+        while data_pipe.poll():
+            _ = data_pipe.recv()
+
+        while query_pipe_in.poll():
+            _ = query_pipe_in.recv()
+
+        close_dict = OrderedDict()
+        close_dict["flags"] = "close_process"
+        cfg_pipe.send(close_dict)
+        event.accept()
 
     def init_camera_tab(s):
         """
@@ -395,7 +418,6 @@ class MainWindow(QMainWindow):
         # NOTE construct some sort of buffering of changes when you have 
         # tabs that don't have THz images visible so you don't hammer the
         # processing
-        print("update_config called")
         cfg_dict = s.cfg_dict
         cfg_flags = []
         if (cfg_dict_in != None) and (cfg_dict_in != {}):
@@ -474,18 +496,18 @@ class MainWindow(QMainWindow):
 
         if update:
             s.last_update_time = time.time()
-            s.proc_pipes.cfg_pipe.send(cfg_dict)
+            if not s.lock_pipes:
+                s.proc_pipes.cfg_pipe.send(cfg_dict)
 
             # clear the flags now that the configuration has been sent
             cfg_dict["flags"] = []
 
 
-    def frame_update(s, frame_in):
+    def frame_update(s, frame_in, new_frame_flag):
         """
         this updates all the appropriate THz image objects when a new frame 
         comes in
         """
-        new_frame_flag = True
         s.main_thz_tab.update_image(frame_in, new_frame_flag)
 
 
@@ -516,12 +538,12 @@ class MainWindow(QMainWindow):
 
         # Main frame data comes in here
         if data_pipe.poll():
-            print("Frame available")
+            #print("Frame available")
             data_in     = data_pipe.recv()
             frame_in    = data_in[0]
             aux_data_in = data_in[1]
             
-            s.frame_update(frame_in)
+            s.frame_update(frame_in, True)
             s.aux_update(aux_data_in)
 
         # check for DAQ connected
@@ -535,12 +557,14 @@ class MainWindow(QMainWindow):
                         if not s.daq_connected:
                             print(f"stat_id = {stat_id}")
                         s.daq_connected = True
+                        s.min_update_period = s.DAQ_CONNECTED_PERIOD
                         s.main_thz_tab.update_daq_status(stat_id)
                     else:
                         stat_id = "NOT_CONNECTED"
                         if s.daq_connected:
                             print(f"stat_id = {stat_id}")
                         s.daq_connected = False
+                        s.min_update_period = s.NO_DAQ_PERIOD
                         s.main_thz_tab.update_daq_status(stat_id)
                 else:
                     print(f"Warning: invalid query keys: {query_in_dict.keys()}")
@@ -559,6 +583,7 @@ class MainWindow(QMainWindow):
         if s.last_update_time != None:
             if ((time.time() - s.last_update_time) > s.min_update_period):
                 s.update_config(None, None)
+                s.frame_update(None, False)
 
 
 

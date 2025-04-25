@@ -292,7 +292,7 @@ def build_thz_image_tab(thz_img_tab):
     frame_style_sublayout_row3  = QHBoxLayout()
     col_frac_fs_rbut               = QRadioButton()
     col_frac_fs_rbut.setText("Col Fraction Filled")
-    num_rng_fs_lbl              = QLabel("Num Rangelines:")
+    num_rng_fs_lbl              = QLabel("Rangelines Thresh:")
     num_rng_fs_ledit            = QLineEdit()
     frame_style_sublayout_row3.addWidget(col_frac_fs_rbut)
     frame_style_sublayout_row3.addWidget(num_rng_fs_lbl)
@@ -308,6 +308,15 @@ def build_thz_image_tab(thz_img_tab):
     frame_style_sublayout_row4.addWidget(tot_frac_fs_lbl)
     frame_style_sublayout_row4.addWidget(tot_frac_fs_ledit)
 
+
+    # frame_style_sublayout_row4pt1
+    frame_style_sublayout_row4pt1  = QHBoxLayout()
+    daq_num_rng_fs_lbl        = QLabel("Num Rangelines Per\nDAQ Grab:")
+    daq_num_rng_fs_ledit      = QLineEdit()
+    frame_style_sublayout_row4pt1.addWidget(daq_num_rng_fs_lbl)
+    frame_style_sublayout_row4pt1.addWidget(daq_num_rng_fs_ledit)
+
+
     # frame_style_sublayout_row5
     frame_style_sublayout_row5  = QHBoxLayout()
     frac_fs_lbl                 = QLabel("*Between 0 and 1")
@@ -318,6 +327,7 @@ def build_thz_image_tab(thz_img_tab):
     frame_style_tab_top_layout.addLayout(frame_style_sublayout_row2)
     frame_style_tab_top_layout.addLayout(frame_style_sublayout_row3)
     frame_style_tab_top_layout.addLayout(frame_style_sublayout_row4)
+    frame_style_tab_top_layout.addLayout(frame_style_sublayout_row4pt1)
     frame_style_tab_top_layout.addLayout(frame_style_sublayout_row5)
 
     # Add member variables
@@ -330,6 +340,10 @@ def build_thz_image_tab(thz_img_tab):
     thz_img_tab.azi_marg_fs_ledit = azi_marg_fs_ledit
     thz_img_tab.col_frac_fs_rbut = col_frac_fs_rbut
     thz_img_tab.num_rng_fs_lbl = num_rng_fs_lbl
+    thz_img_tab.daq_num_rng_fs_lbl   = daq_num_rng_fs_lbl
+    thz_img_tab.daq_num_rng_fs_ledit = daq_num_rng_fs_ledit
+
+
     thz_img_tab.num_rng_fs_ledit = num_rng_fs_ledit
     thz_img_tab.pix_frac_fs_rbut = pix_frac_fs_rbut
     thz_img_tab.tot_frac_fs_lbl = tot_frac_fs_lbl
@@ -754,7 +768,12 @@ class setup_thz_tab_callbacks:
             "turn_az_margin", float))
         thz_tab.num_rng_fs_ledit.editingFinished.connect(
             lambda: s.ledit_update(thz_tab.num_rng_fs_ledit, 
+            "accum_rangelines_thresh", int))
+
+        thz_tab.daq_num_rng_fs_ledit.editingFinished.connect(
+            lambda: s.ledit_update(thz_tab.daq_num_rng_fs_ledit, 
             "daq_num_rangelines", int))
+
         thz_tab.tot_frac_fs_ledit.editingFinished.connect(
             lambda: s.ledit_update(thz_tab.tot_frac_fs_ledit, 
             "fraction_filled_thresh", float))
@@ -832,7 +851,7 @@ class setup_thz_tab_callbacks:
 
         thz_tab.back_surface_plot_rbut.toggled.connect(
             lambda: s.rbut_update(thz_tab.back_surface_plot_rbut, 
-            "front", "peak_selection"))
+            "back", "peak_selection"))
         thz_tab.back_surface_plot_rbut.toggled.connect(
             lambda: s.rbut_update(thz_tab.back_surface_plot_rbut, 
             "back_surface_range", "plot_style"))

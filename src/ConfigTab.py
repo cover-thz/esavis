@@ -186,56 +186,12 @@ class ConfigTab(QScrollArea):
         s.autoload_btn.clicked.connect(s.autoload_btn_clicked)
 
     ###########################################################################
-    #         Central function that grabs GUI configuration parameters        #
-    ###########################################################################
-    def get_gui_config_params(s):
-        """
-        grabs the current set of configuration parameters entered into the 
-        various GUI textboxes and checkboxes etc. and converts them to a 
-        config dictionary which is returned
-        """
-        cfg_dict = {}
-        cfg_dict["el_side_0_start"]    = s.el_s0_strt_ledit.text()
-        cfg_dict["el_side_0_end"]      = s.el_s0_end_ledit.text()
-        cfg_dict["el_side_1_start"]    = s.el_s1_strt_ledit.text()
-        cfg_dict["el_side_1_end"]      = s.el_s1_end_ledit.text()
-
-        side0_state = not s.process_side0_chkb.isChecked()
-        side1_state = not s.process_side1_chkb.isChecked()
-        cfg_dict["disable_el_side0"]  = side0_state
-        cfg_dict["disable_el_side1"]  = side1_state
-
-        cfg_dict["npts_el"]        = s.num_elev_pix_ledit.text()
-        cfg_dict["npts_az"]        = s.num_azi_pix_ledit.text()
-        cfg_dict["fft_len"]        = s.fft_len_ledit.text()
-        cfg_dict["num_noise_pts"]  = s.num_noise_pts_ledit.text()
-
-
-
-        cfg_dict["fs_adc_msps"]    = s.fsamp_freq_ledit.text()
-        cfg_dict["chirp_time_us"]  = s.chirp_time_us_ledit.text()
-
-        ch0_en = s.enable_ch0_chkb.isChecked()
-        ch1_en = s.enable_ch1_chkb.isChecked()
-        cfg_dict["channel_0_en"]  = ch0_en
-        cfg_dict["channel_1_en"]  = ch1_en
-        cfg_dict["el_offset0"]  = s.el_offset0_ledit.text()
-        cfg_dict["el_offset1"]  = s.el_offset1_ledit.text()
-        cfg_dict["center_rangeval"]  = s.center_rangeval_ledit.text()
-
-        cfg_dict["ch0_offset"]  = s.ch0_offset_ledit.text()
-        cfg_dict["ch1_offset"]  = s.ch1_offset_ledit.text()
-        return cfg_dict
-        
-
-
-    ###########################################################################
     #         Central function that sets GUI configuration parameters         #
     ###########################################################################
     def set_gui_config_params(s, cfg_dict):
         """
         takes the passed radar config dictionary and distributes the values 
-        to the relevent GUI objects (the inverse of get_gui_config_params)
+        to the relevent GUI objects 
         """
         s.el_s0_strt_ledit.setText(str(cfg_dict["el_side_0_start"]))
         s.el_s0_end_ledit.setText(str(cfg_dict["el_side_0_end"]))

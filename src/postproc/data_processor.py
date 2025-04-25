@@ -152,18 +152,20 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
 
     # buffer containing data from most recent fileset
     file_buf = OrderedDict()
-    file_buf["initialized"]     = False
     file_buf["rangelines"]      = None
     file_buf["elevation"]       = None
     file_buf["azimuth"]         = None
     file_buf["channels"]        = None
-    file_buf["fs_post_dec"]     = None
-    file_buf["fft_flag"]        = None
-    file_buf["powcalc_flag"]    = None
-    file_buf["dec_val"]         = None
-    file_buf["len_rangeline"]   = None
-    file_buf["data_good"]       = None
-    profiler_enabled            = False
+
+    file_params                     = OrderedDict()
+    file_params["buf_initialized"]  = False
+    file_params["fs_post_dec"]      = None
+    file_params["fft_flag"]         = None
+    file_params["powcalc_flag"]     = None
+    file_params["dec_val"]          = None
+    file_params["len_rangeline"]    = None
+    file_params["data_good"]        = None
+    profiler_enabled                = False
 
     # setup everything 
     #   DAQ socket and sending that configuration
@@ -172,7 +174,7 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
     #   multiprocessing concurrent.futures stuff as desired
 
     while True:
-        print("while loop called")
+        #print("while loop called")
         #####################################################################
         #                      QUERY HANDLING STEPS                         #
         #####################################################################
@@ -281,7 +283,7 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
             # basically indicates the DAQ is not connected, pause a moment 
             # so the processor isn't thrashing around
             if status_flag in ["DAQ_NOT_CONNECTED", "CONN_RESET"]:
-                time.sleep(0.1)
+                time.sleep(0.01)
                 continue
 
             # can gather a lot of metadata here
@@ -293,6 +295,9 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
                 print(status_flag)
                 error_pipe.send(["DAQ STATUS FLAG ERROR", status_flag])
                 continue 
+
+            if num_rangelines == 0:
+                continue
 
             # this is required to resize the numpy arrays since those 
             # arrays are pre-allocated
@@ -316,7 +321,8 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
              new_frame_flag) = proc_obj.postproc_data(rangelines_array, 
                                              az_array, el_array, ch_array, 
                                              turn_flag, reset_in_array, 
-                                             cfg_dict, cfg_flags, dbg_prof)
+                                             cfg_dict, cfg_flags, None, 
+                                             dbg_prof)
                                              
 
             if profiler_enabled:
@@ -335,7 +341,10 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
             if False: # NOTE TEMPORARY
                 if cfg_update:
                     if (("fname_changed" in cfg_flags) or 
-                       (file_buf["initialized"] == False)):
+                       (file_params["buf_initialized"] == False)):
+                        if "fname_list" not in cfg_dict.keys():
+                            error_pipe.send("FNAME_LIST_EMPTY")
+                            continue
 
                         fs_adc = cfg_dict["fs_adc"]
                         fname_list = cfg_dict["fname_list"]
@@ -346,17 +355,18 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
                          data_good) = dff.get_rangelines_from_file(fname_list, 
                                                                    fs_adc)
                 
-                        file_buf["initialized"] = True
                         file_buf["rangelines"]  = rangelines
                         file_buf["elevation"]   = elevation
                         file_buf["azimuth"]     = azimuth
                         file_buf["channels"]    = channels
-                        file_buf["fs_post_dec"] = fs_post_dec
-                        file_buf["fft_flag"]    = fft_flag
-                        file_buf["powcalc_flag"]    = powcalc_flag
-                        file_buf["dec_val"]     =  dec_val
-                        file_buf["len_rangeline"]   = len_rangeline
-                        file_buf["data_good"]   = data_good
+
+                        file_params["initialized"]   = True
+                        file_params["fs_post_dec"]   = fs_post_dec
+                        file_params["fft_flag"]      = fft_flag
+                        file_params["powcalc_flag"]  = powcalc_flag
+                        file_params["dec_val"]       = dec_val
+                        file_params["len_rangeline"] = len_rangeline
+                        file_params["data_good"]     = data_good
 
                     else:
                         # grab the stored data of the most recent file and 
@@ -365,12 +375,12 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
                         el_array            = file_buf["elevation"]
                         az_array            = file_buf["azimuth"]
                         ch_array            = file_buf["channels"]
-                        fs_post_dec         = file_buf["fs_post_dec"]
-                        fft_flag            = file_buf["fft_flag"]
-                        powcalc_flag        = file_buf["powcalc_flag"]
-                        dec_val             = file_buf["dec_val"]
-                        len_rangeline       = file_buf["len_rangeline"]
-                        data_good           = file_buf["data_good"]
+                        fs_post_dec         = file_params["fs_post_dec"]
+                        fft_flag            = file_params["fft_flag"]
+                        powcalc_flag        = file_params["powcalc_flag"]
+                        dec_val             = file_params["dec_val"]
+                        len_rangeline       = file_params["len_rangeline"]
+                        data_good           = file_params["data_good"]
 
                         proc_turnaround = False
                         if not data_good:
@@ -382,7 +392,8 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
                                                  rangelines_array, 
                                                  az_array, el_array, ch_array, 
                                                  turn_flag, reset_in_array, 
-                                                 cfg_dict, cfg_flags, dbg_prof)
+                                                 cfg_dict, cfg_flags, 
+                                                 file_params, dbg_prof)
                                                  
 
 

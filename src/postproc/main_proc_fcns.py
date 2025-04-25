@@ -70,14 +70,10 @@ class CoverProc:
         s.r_grid_az     = np.zeros((s.xlen, s.ylen), dtype=np.float64)
         s.r_grid_el     = np.zeros((s.xlen, s.ylen), dtype=np.float64)
 
-    #def reset_frame(s):
-    #    s.curr_frame_data   = np.zeros((s.xlen, s.ylen), dtype=np.float64)
-    #    s.curr_frame_valids = np.zeros((s.xlen, s.ylen), dtype=bool)
-
     # Main Workhorse Function
     def postproc_data(s, rangelines_array, az_array, el_array, 
                       ch_array, turn_flag, reset_in_array, cfg_dict, 
-                      cfg_flags, dbg_prof=False):
+                      cfg_flags, file_params, dbg_prof=False):
 
         #################################################################
         #        Grab Some Data and Check for Reset Conditions          #
@@ -116,209 +112,224 @@ class CoverProc:
                 reset_proc = True
 
 
-
-        # NOTE TODO DATA IDEALLY SHOULDN'T AFFECT THIS FUNCTION
-        # Work on this later
+        # different sources of certain information for a file.  This is the 
+        # least confusing way to do it for the main operators of this program
         if cfg_dict["data_src"] == "dat_file":
-            pass
+            fft_flag        = file_params["fft_flag"]
+            powcalc_flag    = file_params["powcalc_flag"]
+            fs_post_dec     = file_params["fs_post_dec"]
+            dec_val         = file_params["dec_val"]
+            len_rangeline   = file_params["len_rangeline"]
+            if fft_flag and powcalc_flag:
+                data_format_in = "power_spectrum"
+            elif fft_flag:
+                data_format_in = "fft"
+            else:
+                data_format_in = "time_domain"
 
         # work on this later
         elif cfg_dict["data_src"] == "video_file":
             pass
-        
 
         else: # cfg_dict["data_src"] == "daq"
-
-            # if certain parameters are changed, it messes with everything
-            # and buffers etc. have to be recalculated and all the 
-            # accumulated rangelines get trashed.  This usually occurs when
-            # the user makes a significant change to the system like
-            # changing the rangeline length or number of pixels. 
-            #
-            # changing contrast, threshold, etc. should not trigger this, 
-            if reset_proc:
-                min_el = cfg_dict["min_el"]
-                max_el = cfg_dict["max_el"]
-
-                min_az = cfg_dict["min_az"] 
-                max_az = cfg_dict["max_az"] 
-
-                xlen = cfg_dict["xlen"]
-                ylen = cfg_dict["ylen"]
-
-                (coarse_az_1d, coarse_el_1d, ideal_az_array, 
-                 ideal_el_array) = lpf.calc_coarse_grid(min_el, max_el, 
-                                                    min_az, max_az, 
-                                                    xlen, ylen)
-
-                data_format_in = cfg_dict["data_format_in"]
-
-                # have to reset the grid when making these adjustments
-                s.reset_coarse_grids(coarse_az_1d, coarse_el_1d, 
-                    ideal_az_array, ideal_el_array, xlen, ylen, 
-                    data_format_in)
-                
-                # this 
-                s.clear_preproc_buffer()
-
-            #################################################################
-            #                        Regridding Steps                       #
-            #################################################################
-            el_side_0_start   = cfg_dict["el_side_0_start"]
-            el_side_1_start   = cfg_dict["el_side_1_start"]
-
-            el_side_0_end     = cfg_dict["el_side_0_end"]
-            el_side_1_end     = cfg_dict["el_side_1_end"]
-
-            disable_el_side0    = cfg_dict["disable_el_side0"]
-            disable_el_side1    = cfg_dict["disable_el_side1"]
-
-            ch0_en              = cfg_dict["ch0_en"]
-            ch1_en              = cfg_dict["ch1_en"]
-
-            ch0_offset          = cfg_dict["ch0_offset"]
-            ch1_offset          = cfg_dict["ch1_offset"]
+            data_format_in = cfg_dict["data_format_in"]
+            fs_post_dec    = cfg_dict["fs_post_dec"]
 
 
-            (new_rangelines_grid, new_valid_grid, ideal_az_array, 
-             ideal_el_array, new_az_out, 
-             new_el_out) = lpf.regrid_rangelines(rangelines_array, el_array, 
-                                az_array, ch_array, el_side_0_start, 
-                                el_side_0_end,  el_side_1_start, 
-                                el_side_1_end,  disable_el_side0, 
-                                disable_el_side1,  ch0_en, ch1_en, 
-                                ch0_offset, ch1_offset, s.coarse_az_1d, 
-                                s.coarse_el_1d,  s.xlen, s.ylen, 
-                                dbg_prof)
+        # if certain parameters are changed, it messes with everything
+        # and buffers etc. have to be recalculated and all the 
+        # accumulated rangelines get trashed.  This usually occurs when
+        # the user makes a significant change to the system like
+        # changing the rangeline length or number of pixels. 
+        #
+        # changing contrast, threshold, etc. should not trigger this, 
+        if reset_proc:
+            min_el = cfg_dict["min_el"]
+            max_el = cfg_dict["max_el"]
+
+            min_az = cfg_dict["min_az"] 
+            max_az = cfg_dict["max_az"] 
+
+            xlen = cfg_dict["xlen"]
+            ylen = cfg_dict["ylen"]
+
+            (coarse_az_1d, coarse_el_1d, ideal_az_array, 
+             ideal_el_array) = lpf.calc_coarse_grid(min_el, max_el, 
+                                                min_az, max_az, 
+                                                xlen, ylen)
+
+
+            # have to reset the grid when making these adjustments
+            s.reset_coarse_grids(coarse_az_1d, coarse_el_1d, 
+                ideal_az_array, ideal_el_array, xlen, ylen, 
+                data_format_in)
             
-            num_valids = np.sum(new_valid_grid)
-            if dbg_prof:
-                #print(f"pre update_grid valids: {num_valids}")
-                pass
+            # this 
+            s.clear_preproc_buffer()
 
-            # this compares the passed rangelines grid azimuth and elvation
-            # values and evaluates how "close" they are to the ideal when
-            # compared with the current "rangeline_grid_data"
-            (r_grid_out, valid_grid_out, grid_az_out, 
-             grid_el_out) = lpf.update_grid(new_rangelines_grid, 
-                                new_valid_grid, new_az_out, new_el_out, 
-                                s.r_grid_data, s.r_grid_valids, s.r_grid_az, 
-                                s.r_grid_el, s.ideal_az_array, 
-                                s.ideal_el_array)
+        #################################################################
+        #                        Regridding Steps                       #
+        #################################################################
+        el_side_0_start     = cfg_dict["el_side_0_start"]
+        el_side_1_start     = cfg_dict["el_side_1_start"]
 
-            num_valids = np.sum(valid_grid_out)
-            if dbg_prof:
-                #print(f"post update_grid valids: {num_valids}")
-                pass
+        el_side_0_end       = cfg_dict["el_side_0_end"]
+        el_side_1_end       = cfg_dict["el_side_1_end"]
 
-            s.r_grid_data   = r_grid_out
-            s.r_grid_valids = valid_grid_out
-            s.r_grid_az     = grid_az_out
-            s.r_grid_el     = grid_el_out
+        disable_el_side0    = cfg_dict["disable_el_side0"]
+        disable_el_side1    = cfg_dict["disable_el_side1"]
+
+        ch0_en              = cfg_dict["ch0_en"]
+        ch1_en              = cfg_dict["ch1_en"]
+
+        ch0_offset          = cfg_dict["ch0_offset"]
+        ch1_offset          = cfg_dict["ch1_offset"]
+
+        el_offset0          = cfg_dict["el_offset0"]
+        el_offset1          = cfg_dict["el_offset1"]
+
+        (new_rangelines_grid, new_valid_grid, ideal_az_array, 
+         ideal_el_array, new_az_out, 
+         new_el_out) = lpf.regrid_rangelines(rangelines_array, el_array, 
+                            az_array, ch_array, el_side_0_start, 
+                            el_side_0_end,  el_side_1_start, 
+                            el_side_1_end,  disable_el_side0, 
+                            disable_el_side1,  ch0_en, ch1_en, 
+                            ch0_offset, ch1_offset, el_offset0, el_offset1, 
+                            s.coarse_az_1d, s.coarse_el_1d,  s.xlen, s.ylen, 
+                            dbg_prof)
+        
+        num_valids = np.sum(new_valid_grid)
+        if dbg_prof:
+            #print(f"pre update_grid valids: {num_valids}")
+            pass
+
+        # this compares the passed rangelines grid azimuth and elvation
+        # values and evaluates how "close" they are to the ideal when
+        # compared with the current "rangeline_grid_data"
+        (r_grid_out, valid_grid_out, grid_az_out, 
+         grid_el_out) = lpf.update_grid(new_rangelines_grid, 
+                            new_valid_grid, new_az_out, new_el_out, 
+                            s.r_grid_data, s.r_grid_valids, s.r_grid_az, 
+                            s.r_grid_el, s.ideal_az_array, 
+                            s.ideal_el_array)
+
+        num_valids = np.sum(valid_grid_out)
+        if dbg_prof:
+            #print(f"post update_grid valids: {num_valids}")
+            pass
+
+        s.r_grid_data   = r_grid_out
+        s.r_grid_valids = valid_grid_out
+        s.r_grid_az     = grid_az_out
+        s.r_grid_el     = grid_el_out
 
 
-            # here we perform the checks to see if we've satisfied 
-            # whatever conditions are required to move forward and perform
-            # the remainder of the postprocessing
+        # here we perform the checks to see if we've satisfied 
+        # whatever conditions are required to move forward and perform
+        # the remainder of the postprocessing
 
-            #################################################################
-            #             Check if frame should be processed                #
-            #################################################################
+        #################################################################
+        #             Check if frame should be processed                #
+        #################################################################
 
-            process_frame = False
-            if cfg_dict["frame_style"] == "fraction_col_filled":
-                curr_col_fraction = lpf.check_col_fraction(s.r_grid_valids)
-                if curr_col_fraction >= cfg_dict["fraction_filled_thresh"]:
-                    process_frame = True
-
-            elif cfg_dict["frame_style"] == "fraction_pix_filled":
-                curr_fraction = lpf.check_pix_fraction(s.r_grid_valids)
-                if curr_fraction >= cfg_dict["fraction_filled_thresh"]:
-                    process_frame = True
-
-            elif cfg_dict["frame_style"] == "azimuth_turnaround":
-                if turn_flag == "END_FRAME":
-                    process_frame = True
-
-            elif cfg_dict["frame_style"] == "accum_rangelines":
-                if s.accum_rangelines >= cfg_dict["accum_rangelines_thresh"]:
-                    process_frame = True
-
-            elif cfg_dict["frame_style"] == "always":
+        process_frame = False
+        if cfg_dict["frame_style"] == "fraction_col_filled":
+            curr_col_fraction = lpf.check_col_fraction(s.r_grid_valids)
+            if curr_col_fraction >= cfg_dict["fraction_filled_thresh"]:
                 process_frame = True
 
+        elif cfg_dict["frame_style"] == "fraction_pix_filled":
+            curr_fraction = lpf.check_pix_fraction(s.r_grid_valids)
+            if curr_fraction >= cfg_dict["fraction_filled_thresh"]:
+                process_frame = True
 
-            #################################################################
-            #                         Process frame                         #
-            #################################################################
+        elif cfg_dict["frame_style"] == "azimuth_turnaround":
+            if turn_flag == "END_FRAME":
+                process_frame = True
 
-            if process_frame:
-                # first we perform our spectral conversions
-                data_format_in  = cfg_dict["data_format_in"]
-                fft_len         = cfg_dict["fft_len"]
-                fs_post_dec     = cfg_dict["fs_post_dec"]
-                (coarse_power_grid, 
-                 freq_lut) = lpf.spectra_conv(s.r_grid_data, 
-                                data_format_in, fft_len, fs_post_dec)
+        elif cfg_dict["frame_style"] == "accum_rangelines":
+            if s.accum_rangelines >= cfg_dict["accum_rangelines_thresh"]:
+                process_frame = True
 
-                chirp_span      = cfg_dict["chirp_span"]
-                chirp_time      = cfg_dict["chirp_time"]
-                center_rangeval = cfg_dict["center_rangeval"]
-                range_lut_cm    = lpf.calc_range(freq_lut, chirp_span, 
-                                    chirp_time, center_rangeval)
-
-                threshold_lin   = cfg_dict["threshold_lin"]
-                contrast_lin    = cfg_dict["contrast_lin"]
-                half_peak_width = cfg_dict["half_peak_width"]
-                peak_selection  = cfg_dict["peak_selection"]
-                num_noise_pts   = cfg_dict["num_noise_pts"]
-                noise_start_frac    = cfg_dict["noise_start_frac"]
-                calc_weighted_sum   = cfg_dict["calc_weighted_sum"]
-                min_range       = cfg_dict["min_range"]
-                max_range       = cfg_dict["max_range"]
-                dead_pix_val    = cfg_dict["dead_pix_val"]
+        elif cfg_dict["frame_style"] == "always":
+            process_frame = True
 
 
-                # NOTE TODO: Need to put in code to perform power integration
-                # if "peak_selection" is not "front" or "back".  
-                # also point-cloud if we do that
+        #################################################################
+        #                         Process frame                         #
+        #################################################################
+
+        if process_frame:
+            # first we perform our spectral conversions
+            #data_format_in  = cfg_dict["data_format_in"]
+            fft_len_in    = cfg_dict["fft_len"]
+            (coarse_power_grid, freq_lut, 
+             fft_len) = lpf.spectra_conv(s.r_grid_data, 
+                            data_format_in, fft_len_in, fs_post_dec)
+
+            chirp_span      = cfg_dict["chirp_span"]
+            chirp_time      = cfg_dict["chirp_time"]
+            center_rangeval = cfg_dict["center_rangeval"]
+            range_lut_cm    = lpf.calc_range(freq_lut, chirp_span, 
+                                chirp_time, center_rangeval)
+
+            threshold_lin   = cfg_dict["threshold_lin"]
+            contrast_lin    = cfg_dict["contrast_lin"]
+            half_peak_width = cfg_dict["half_peak_width"]
+            peak_selection  = cfg_dict["peak_selection"]
+            num_noise_pts   = cfg_dict["num_noise_pts"]
+            noise_start_frac    = cfg_dict["noise_start_frac"]
+            calc_weighted_sum   = cfg_dict["calc_weighted_sum"]
+            min_range       = cfg_dict["min_range"]
+            max_range       = cfg_dict["max_range"]
+            dead_pix_val    = cfg_dict["dead_pix_val"]
 
 
-                (pixel_ranges_grid, valid_pixels_grid, 
-                 noise_floor_grid) = lpf.extract_peaks_c(coarse_power_grid, 
-                                        s.r_grid_valids, s.xlen, s.ylen, 
-                                        fft_len, range_lut_cm, 
-                                        threshold_lin, contrast_lin, 
-                                        half_peak_width, peak_selection, 
-                                        num_noise_pts, noise_start_frac, 
-                                        calc_weighted_sum, min_range, 
-                                        max_range, dead_pix_val, dbg_prof)                   
-                if dbg_prof:
-                    num_valids = np.sum(valid_pixels_grid)
-                    print(f"num_valid_pixels: {num_valids}")
-                #pf.plot_pixel_power(coarse_power_grid[10][10].astype(np.float64), range_lut_cm)
-
-                # frame data
-                frame_out = collections.OrderedDict()
-                frame_out["pixel_ranges_grid"]  = pixel_ranges_grid
-                frame_out["valid_pixels_grid"]  = valid_pixels_grid
-                frame_out["noise_floor_grid"]   = noise_floor_grid
+            # NOTE TODO: Need to put in code to perform power integration
+            # if "peak_selection" is not "front" or "back".  
+            # also point-cloud if we do that
 
 
-                # aux data
-                aux_x_ind = cfg_dict["aux_x_ind"]
-                aux_y_ind = cfg_dict["aux_y_ind"]
+            (pixel_ranges_grid, valid_pixels_grid, 
+             noise_floor_grid) = lpf.extract_peaks_c(coarse_power_grid, 
+                                    s.r_grid_valids, s.xlen, s.ylen, 
+                                    fft_len, range_lut_cm, 
+                                    threshold_lin, contrast_lin, 
+                                    half_peak_width, peak_selection, 
+                                    num_noise_pts, noise_start_frac, 
+                                    calc_weighted_sum, min_range, 
+                                    max_range, dead_pix_val, dbg_prof)                   
+            if dbg_prof:
+                num_valids = np.sum(valid_pixels_grid)
+                print(f"num_valid_pixels: {num_valids}")
+            #pf.plot_pixel_power(
+            #    coarse_power_grid[10][10].astype(np.float64), 
+            #    range_lut_cm)
+
+            # frame data
+            frame_out = collections.OrderedDict()
+            frame_out["pixel_ranges_grid"]  = pixel_ranges_grid
+            frame_out["valid_pixels_grid"]  = valid_pixels_grid
+            frame_out["noise_floor_grid"]   = noise_floor_grid
+
+
+            # aux data
+            aux_x_ind = cfg_dict["aux_x_ind"]
+            aux_y_ind = cfg_dict["aux_y_ind"]
+
+            try: # in case you have bad index data, etc.
                 aux_rngline = s.r_grid_data[aux_x_ind][aux_y_ind]
 
-
-                (aux_peak_ranges, aux_peak_powers_lin, aux_noise_floor, 
-                 aux_num_peaks, aux_adj_lin_thresh, aux_adj_lin_contr, 
-                 aux_weight_sum_start, 
-                 aux_weight_sum_end) = lpf.extract_aux_vals(aux_rngline, 
-                    range_lut_cm, threshold_lin, contrast_lin, 
-                    half_peak_width, min_range, max_range, 
-                    num_noise_pts, noise_start_frac, 
-                    calc_weighted_sum)
+                if type(aux_rngline) != type(None):
+                    (aux_peak_ranges, aux_peak_powers_lin, aux_noise_floor, 
+                     aux_num_peaks, aux_adj_lin_thresh, aux_adj_lin_contr, 
+                     aux_weight_sum_start, 
+                     aux_weight_sum_end) = lpf.extract_aux_vals(aux_rngline, 
+                        range_lut_cm, threshold_lin, contrast_lin, 
+                        half_peak_width, min_range, max_range, 
+                        num_noise_pts, noise_start_frac, 
+                        calc_weighted_sum)
 
                 aux_data_out = collections.OrderedDict()
                 aux_data_out["aux_peak_ranges"] = aux_peak_ranges
@@ -330,18 +341,31 @@ class CoverProc:
                 aux_data_out["aux_weight_sum_start"] = aux_weight_sum_start
                 aux_data_out["aux_weight_sum_end"]  = aux_weight_sum_end
 
-                new_frame_flag = True
 
+            except:
+                print("invalid aux_rngline data")
+                aux_data_out = collections.OrderedDict()
+                aux_data_out["aux_peak_ranges"] = None
+                aux_data_out["aux_peak_powers_lin"] = None
+                aux_data_out["aux_noise_floor"]     = None
+                aux_data_out["aux_num_peaks"]       = None
+                aux_data_out["aux_adj_lin_thresh"]  = None
+                aux_data_out["aux_adj_lin_contr"]   = None
+                aux_data_out["aux_weight_sum_start"] = None
+                aux_data_out["aux_weight_sum_end"]  = None
+                
 
-                # clear the preprocessed buffer now that we've processed the 
-                # frame
-                s.clear_preproc_buffer()
+            new_frame_flag = True
 
-            else:
-                frame_out       = None
-                aux_data_out    = None
-                new_frame_flag  = False
+            # clear the preprocessed buffer now that we've processed the 
+            # frame
+            s.clear_preproc_buffer()
 
-            return (frame_out, aux_data_out, new_frame_flag) 
+        else:
+            frame_out       = None
+            aux_data_out    = None
+            new_frame_flag  = False
+
+        return (frame_out, aux_data_out, new_frame_flag) 
 
 
