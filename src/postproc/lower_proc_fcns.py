@@ -22,15 +22,12 @@ import ipdb
 ##############################################################################
 CFUNCS_DIR  = os.path.abspath(os.path.join(os.path.dirname(__file__), 
                 'c_funcs'))
-
 if os.name == "nt":
     c_peak_fcns_lib = ct.CDLL(CFUNCS_DIR + "\\peak_find_fcns.dll")
 elif os.name == "posix":
-
-
+    c_peak_fcns_lib = ct.CDLL(CFUNCS_DIR + "/peak_find_fcns.so")
 else:
     raise Exception("Invalid OS Name")
-
 
 
 extract_single_rangeline_peaks  = c_peak_fcns_lib.extract_single_rangeline_peaks

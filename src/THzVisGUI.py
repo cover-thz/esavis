@@ -17,6 +17,8 @@
 # ADD COLOR SCHEME DROPDOWN MENU
 #
 
+
+
 from PySide6 import QtCore, QtWidgets, QtGui
 from PySide6.QtCore import Qt, QTimer
 import os
@@ -31,6 +33,27 @@ import multiprocessing as mp
 from collections import OrderedDict
 import copy
 import subprocess
+
+
+if __name__ == '__main__':
+    CWD = os.getcwd() 
+    if os.name == "nt":
+        # remake the makefile
+        c_funcs_dir = CWD + "\\postproc\\c_funcs"
+        result = subprocess.run(["make"], cwd=c_funcs_dir)
+
+        CONFIG_DIR  = CWD + "\\config\\"
+        DFLT_DATA_DIR  =   os.getcwd() + "\\data\\"
+    elif os.name == "posix":
+        # remake the makefile
+        c_funcs_dir = CWD + "/postproc/c_funcs"
+        result = subprocess.run(["make"], cwd=c_funcs_dir)
+
+        CONFIG_DIR  = CWD + "/config/"
+        DFLT_DATA_DIR = "/tmp/"
+    else:
+        raise Exception("Invalid OS Name")
+
 #from dataclasses import dataclass, field
 from ConfigTab import ConfigTab
 from THzImageTab import THzImageTab
@@ -590,24 +613,23 @@ class MainWindow(QMainWindow):
 
 
 if __name__ == '__main__':
+    #CWD = os.getcwd() 
+    #if os.name == "nt":
+    #    # remake the makefile
+    #    c_funcs_dir = CWD + "\\postproc\\c_funcs"
+    #    result = subprocess.run(["make"], cwd=c_funcs_dir)
 
-    CWD = os.getcwd() 
-    if os.name == "nt":
-        # remake the makefile
-        c_funcs_dir = CWD + "\\postproc\\c_funcs"
-        result = subprocess.run(["make"], cwd=c_funcs_dir)
+    #    CONFIG_DIR  = CWD + "\\config\\"
+    #    DFLT_DATA_DIR  =   os.getcwd() + "\\data\\"
+    #elif os.name == 'posix':
+    #    # remake the makefile
+    #    c_funcs_dir = CWD + "/postproc/c_funcs"
+    #    result = subprocess.run(["make"], cwd=c_funcs_dir)
 
-        CONFIG_DIR  = CWD + "\\config\\"
-        DFLT_DATA_DIR  =   os.getcwd() + "\\data\\"
-    elif os.name == 'posix':
-        # remake the makefile
-        c_funcs_dir = CWD + "/postproc/c_funcs"
-        result = subprocess.run(["make"], cwd=c_funcs_dir)
-
-        CONFIG_DIR  = CWD + "/config/"
-        DFLT_DATA_DIR = "/tmp/"
-    else:
-        raise Exception("Invalid OS Name")
+    #    CONFIG_DIR  = CWD + "/config/"
+    #    DFLT_DATA_DIR = "/tmp/"
+    #else:
+    #    raise Exception("Invalid OS Name")
 
     CFG_DFLT_FNAME  = "default_cfg.json"
     #PLOT_SETTINGS_DFLT_FNAME    = "plot_settings_default.json"
