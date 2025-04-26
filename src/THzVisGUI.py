@@ -41,22 +41,18 @@ if __name__ == '__main__':
         # remake the makefile
         c_funcs_dir = CWD + "\\postproc\\c_funcs"
         result = subprocess.run(["make"], cwd=c_funcs_dir)
-
-        CONFIG_DIR  = CWD + "\\config\\"
-        DFLT_DATA_DIR  =   os.getcwd() + "\\data\\"
     elif os.name == "posix":
         # remake the makefile
         c_funcs_dir = CWD + "/postproc/c_funcs"
         result = subprocess.run(["make"], cwd=c_funcs_dir)
-
-        CONFIG_DIR  = CWD + "/config/"
-        DFLT_DATA_DIR = "/tmp/"
     else:
         raise Exception("Invalid OS Name")
 
 #from dataclasses import dataclass, field
 from ConfigTab import ConfigTab
 from THzImageTab import THzImageTab
+from DebugTab import DebugTab
+from CameraTab import CameraTab
 import time
 
 # crude but effective way of getting the postprocessing directory in here
@@ -182,6 +178,7 @@ DFLT_CFG_DICT["data_src"]        = "disabled"
 DFLT_CFG_DICT["plot_style"]      = "front_peak_range"
 DFLT_CFG_DICT["peak_selection"]  = "front"
 DFLT_CFG_DICT["fname_list"]  = None
+DFLT_CFG_DICT["paused"]     = False
     
 # These values do not appear in the GUI yet
 # so they are "hard-coded"
@@ -192,10 +189,16 @@ DFLT_CFG_DICT["daq_addr"]  = "localhost"
 
 
 # These are currently hard-coded but need to be propagated to the single-pixel
-# GUIl
+# GUI
 DFLT_CFG_DICT["aux_x_ind"] = 10
 DFLT_CFG_DICT["aux_y_ind"] = 10
+DFLT_CFG_DICT["flags"] = []
 
+
+# NOTE Debug dictionary objects for use with the debug tab
+DFLT_CFG_DICT["dbg_0"] = False
+DFLT_CFG_DICT["dbg_1"] = False
+DFLT_CFG_DICT["dbg_2"] = False
 
 
 ##############################################################################
@@ -227,7 +230,7 @@ class MainWindow(QMainWindow):
     daq_connected = False
 
 
-    def __init__(s, CFG_DFLT_PATH, CONFIG_DIR, proc_pipes):
+    def __init__(s, DFLT_DATA_DIR, CFG_DFLT_PATH, CONFIG_DIR, proc_pipes):
         super().__init__()
 
         # going with a single configuration file rather than two
@@ -238,9 +241,14 @@ class MainWindow(QMainWindow):
         s.last_update_time  = None
         s.lock_pipes = False
 
+        # Config data transfer handshaking flags
+        s.cfg_pipe_count   = 0
+        s.cfg_pipe_maxcount = 3
+        s.update_cfg_flag  = False
+
         # starts out at 2 seconds when the daq is not connected, changes t
-        s.NO_DAQ_PERIOD = 2.5
-        s.DAQ_CONNECTED_PERIOD = 1.0
+        s.NO_DAQ_PERIOD = 1.0
+        s.DAQ_CONNECTED_PERIOD = 0.25
         s.min_update_period    = s.NO_DAQ_PERIOD
 
         # this is used to mark time for how often we're querying the processing
@@ -260,7 +268,22 @@ class MainWindow(QMainWindow):
 
         # Construct the default configuration dictionary
         s.cfg_dict = copy.deepcopy(DFLT_CFG_DICT)
+        s.cfg_dict["default_data_dir"] = DFLT_DATA_DIR
         s.cfg_dict["flags"] = []
+
+        # keys that indicate that a file should be reprocessed:
+        s.reproc_file_keys = ["el_side_0_start","el_side_0_end",
+            "el_side_1_start","el_side_1_end","ylen","xlen","fft_len",
+            "num_noise_pts","noise_start_frac","chirp_span","chirp_time",
+            "dead_pix_val","fs_adc","el_offset0","el_offset1",
+            "center_rangeval","dec_val","ch0_offset","ch1_offset",
+            "disable_el_side0","disable_el_side1","calc_weighted_sum",
+            "ch0_en","ch1_en","data_format_in","turn_hyst","turn_az_margin",
+            "daq_num_rangelines","fraction_filled_thresh","threshold_db",
+            "contrast_db","half_peak_width","min_range","max_range",
+            "min_az","max_az","min_el","max_el","plot_style",
+            "peak_selection","aux_x_ind","aux_y_ind"]
+
 
         # create the tab widget which contains pretty much the remainder of
         # the GUI objects
@@ -269,16 +292,27 @@ class MainWindow(QMainWindow):
                                     s.load_config, 
                                     s.save_config, s.update_config,
                                     s.cfg_dict)
-                                    
 
-        s.main_thz_tab = THzImageTab(CFG_DFLT_PATH, CONFIG_DIR, 
+
+        s.camera_tab   = CameraTab(CFG_DFLT_PATH, CONFIG_DIR, 
                                         s.update_config, 
                                         s.cfg_dict)
-        s.camera_tab   = QWidget() # TODO Placeholder until 
-                                      # I get the camera working
+
+        # unfortunately I needed to give the camera tab's thz image object
+        # to this main tab so the reset plot camera button would work
+        s.main_thz_tab = THzImageTab(CFG_DFLT_PATH, CONFIG_DIR, 
+                                        s.update_config, 
+                                        s.cfg_dict, 
+                                        s.camera_tab) 
+
+
+
 
         s.single_pix_tab  = QWidget() # TODO Placeholder 
 
+        s.debug_tab = DebugTab(CFG_DFLT_PATH, CONFIG_DIR, 
+                                        s.update_config, 
+                                        s.cfg_dict)
 
         # add the tabs to the tab widget 
         s.tab_widget.addTab(s.cfg_tab, "Config")
@@ -286,14 +320,17 @@ class MainWindow(QMainWindow):
         #s.tab_widget.addTab(s.camera_tab, "Camera Overlay")
         s.tab_widget.addTab(s.camera_tab, "Large Viewer")
         s.tab_widget.addTab(s.single_pix_tab, "Single Pixel")
+        s.tab_widget.addTab(s.debug_tab, "Debug")
 
         s.layout.addWidget(s.tab_widget)
 
-        s.init_camera_tab()      # TODO Placeholder
         s.init_single_pix_tab()  # TODO Placeholder
 
         # set the GUI to view the config tab
         s.tab_widget.setCurrentIndex(0)
+
+        #s.tab_widget.currentChanged.connect(s.tab_switch_callback)
+
 
         # check for default postprocessing config and execute configuration 
         # sequence if there is a default postprocessing config
@@ -311,6 +348,20 @@ class MainWindow(QMainWindow):
 
         # setting timer to update 10 times a second)
         s.timer.start(100)
+
+
+    def tab_switch_callback(s, index):
+        # Main THz image
+        if index == 1:
+            thz_image_obj = s.main_thz_tab.thz_image_obj
+            s.camera_tab.remove_thz_image(thz_image_obj)
+            s.main_thz_tab.add_thz_image(thz_image_obj)
+        elif index == 2:
+            thz_image_obj = s.main_thz_tab.thz_image_obj
+            s.main_thz_tab.remove_thz_image(thz_image_obj)
+            s.camera_tab.add_thz_image(thz_image_obj)
+
+        # Large Viewer / CameraTab
 
 
 
@@ -455,6 +506,10 @@ class MainWindow(QMainWindow):
             if cfg_dict["fname_list"] != old_cfg_dict["fname_list"]:
                 s.append_if_absent(cfg_flags, "fname_changed")
 
+            for rf_key in s.reproc_file_keys:
+                if rf_key in cfg_dict_in.keys():
+                    s.append_if_absent(cfg_flags, "reproc_file")
+
 
             if cfg_dict["min_az"] != old_cfg_dict["min_az"]:
                 cfg_flags = s.append_if_absent(cfg_flags, "recalc_coarse_grid")
@@ -491,15 +546,23 @@ class MainWindow(QMainWindow):
             cfg_flags = s.append_if_absent(cfg_flags, "setup_daq")
 
 
+        # now the stuffing of the flags
         if ((cfg_flags_in != None) and (cfg_flags_in != [])):
-            # now the stuffing of the flags
             for flag in cfg_flags_in:
                 cfg_flags = s.append_if_absent(cfg_flags, flag)
 
-            for flag in cfg_dict["flags"]:
-                cfg_flags = s.append_if_absent(cfg_flags, flag)
+        for flag in cfg_dict["flags"]:
+            cfg_flags = s.append_if_absent(cfg_flags, flag)
             
         cfg_dict["flags"] = cfg_flags
+
+
+        # flag that data is currently being reprocessed
+        # only a small lie
+        if s.cfg_dict["data_src"] == "dat_file":
+            if "reproc_file" in cfg_flags:
+                stat_id = "PROC_FILE"
+                s.main_thz_tab.update_data_src_status(stat_id)
 
 
         update = False
@@ -517,13 +580,13 @@ class MainWindow(QMainWindow):
             if ((time.time() - s.last_update_time) > s.min_update_period):
                 update = True
 
+        # instead of actually performing the update here we "mark" it for
+        # update by the timer handler which will perform the actual update
+        # and clear the flags from the dict
         if update:
-            s.last_update_time = time.time()
-            if not s.lock_pipes:
-                s.proc_pipes.cfg_pipe.send(cfg_dict)
+            s.update_cfg_flag = True
 
-            # clear the flags now that the configuration has been sent
-            cfg_dict["flags"] = []
+
 
 
     def frame_update(s, frame_in, new_frame_flag):
@@ -532,6 +595,7 @@ class MainWindow(QMainWindow):
         comes in
         """
         s.main_thz_tab.update_image(frame_in, new_frame_flag)
+        s.camera_tab.update_image(frame_in, new_frame_flag)
 
 
     def aux_update(s, aux_data_in):
@@ -544,8 +608,17 @@ class MainWindow(QMainWindow):
     
     def timer_handler(s):
         """
-        timer event handler
+        timer event handler, handles most of the transfer of data between
+        the GUI and the data_processor
         """
+        if s.cfg_dict["dbg_0"]:
+            _dbg = True
+        else:
+            _dbg = False
+        #if s.dbg_i > 100:
+        #    s.dbg_i = 0
+        #    _dbg = True
+        #    print("entered timer_handler")
         cfg_pipe    = s.proc_pipes.cfg_pipe
         err_pipe    = s.proc_pipes.err_pipe
         data_pipe   = s.proc_pipes.data_pipe
@@ -559,39 +632,62 @@ class MainWindow(QMainWindow):
             # do stuff with the err_val
             print(err_val) # just this for now
 
+        if _dbg:
+            print("finished error pipe handling")
+
         # Main frame data comes in here
         if data_pipe.poll():
-            #print("Frame available")
             data_in     = data_pipe.recv()
             frame_in    = data_in[0]
             aux_data_in = data_in[1]
             
             s.frame_update(frame_in, True)
             s.aux_update(aux_data_in)
+            if s.cfg_dict["data_src"] == "dat_file":
+                stat_id = "FILE_PROC"
+                s.main_thz_tab.update_data_src_status(stat_id)
+
+        if _dbg:
+            print("finished data pipe handling")
+
+        # check the input queries
+        if query_pipe_in.poll():
+            query_in_dict = query_pipe_in.recv()
+            if "DAQ_STATUS" in query_in_dict.keys():
+                s.last_daq_query_time = time.time()
+                if query_in_dict["DAQ_STATUS"] == "CONNECTED":
+                    stat_id = "CONNECTED"
+                    if not s.daq_connected:
+                        print(f"stat_id = {stat_id}")
+                    s.daq_connected = True
+                    s.min_update_period = s.DAQ_CONNECTED_PERIOD
+                    s.main_thz_tab.update_data_src_status(stat_id)
+                else:
+                    stat_id = "NOT_CONNECTED"
+                    if s.daq_connected:
+                        print(f"stat_id = {stat_id}")
+                    s.daq_connected = False
+                    s.min_update_period = s.NO_DAQ_PERIOD
+                    s.main_thz_tab.update_data_src_status(stat_id)
+            elif "CFG_ACK" in query_in_dict.keys():
+                s.cfg_pipe_count -= 1
+                if s.cfg_pipe_count < 0:
+                    s.cfg_pipe_count  = 0
+                    print("Warning: config count went negative")
+
+            elif "FILE_PROCESSING" in query_in_dict.keys():
+                if s.cfg_dict["data_src"] == "dat_file":
+                    stat_id = "PROC_FILE"
+                    s.main_thz_tab.update_data_src_status(stat_id)
+
+            else:
+                print(f"Warning: invalid query keys: {query_in_dict.keys()}")
+                       
+        if _dbg:
+            print("finished query_pipe_in handling")
 
         # check for DAQ connected
         if s.cfg_dict["data_src"] == "daq":
-            if query_pipe_in.poll():
-                query_in_dict = query_pipe_in.recv()
-                if "DAQ_STATUS" in query_in_dict.keys():
-                    s.last_daq_query_time = time.time()
-                    if query_in_dict["DAQ_STATUS"] == "CONNECTED":
-                        stat_id = "CONNECTED"
-                        if not s.daq_connected:
-                            print(f"stat_id = {stat_id}")
-                        s.daq_connected = True
-                        s.min_update_period = s.DAQ_CONNECTED_PERIOD
-                        s.main_thz_tab.update_daq_status(stat_id)
-                    else:
-                        stat_id = "NOT_CONNECTED"
-                        if s.daq_connected:
-                            print(f"stat_id = {stat_id}")
-                        s.daq_connected = False
-                        s.min_update_period = s.NO_DAQ_PERIOD
-                        s.main_thz_tab.update_daq_status(stat_id)
-                else:
-                    print(f"Warning: invalid query keys: {query_in_dict.keys()}")
-                       
             if s.last_daq_query_time == None:
                 query_pipe_out.send(["DAQ_STATUS"])
                 s.last_daq_query_time = time.time()
@@ -599,37 +695,51 @@ class MainWindow(QMainWindow):
                 query_pipe_out.send(["DAQ_STATUS"])
                 s.last_daq_query_time = time.time()
 
-        #def update_daq_status(s, stat_id):
+        if _dbg:
+            print("finished query_pipe_out handling")
 
-        # a little clunky but if there hasn't been an update in a while we
-        # call the update function
+        # NOTE Placeholder
+        # otherwise just trash whatever comes out of the query for now
+
+        # here we perform the actual configuration update and handshaking
+        # 
+        # first check if it's been a while
         if s.last_update_time != None:
             if ((time.time() - s.last_update_time) > s.min_update_period):
-                s.update_config(None, None)
+                s.update_cfg_flag = True
+                s.update_config(None)
                 s.frame_update(None, False)
 
+        if _dbg:
+            print("finished check of min update period handling")
+            print(f"(time.time() - s.last_update_time) = {(time.time() - s.last_update_time)}")
 
 
+        if s.update_cfg_flag and (not s.lock_pipes):
+            # check to see if the data_processor has acklowledged receipt of
+            # the last configuration packet
+            if s.cfg_pipe_count < s.cfg_pipe_maxcount:
+                s.proc_pipes.cfg_pipe.send(s.cfg_dict)
+                s.last_update_time = time.time()
+                s.cfg_dict["flags"] = []
+                s.cfg_pipe_count += 1
+                s.update_cfg_flag = False
+
+
+        if _dbg:
+            print("end of event handler\n")
 
 
 if __name__ == '__main__':
-    #CWD = os.getcwd() 
-    #if os.name == "nt":
-    #    # remake the makefile
-    #    c_funcs_dir = CWD + "\\postproc\\c_funcs"
-    #    result = subprocess.run(["make"], cwd=c_funcs_dir)
-
-    #    CONFIG_DIR  = CWD + "\\config\\"
-    #    DFLT_DATA_DIR  =   os.getcwd() + "\\data\\"
-    #elif os.name == 'posix':
-    #    # remake the makefile
-    #    c_funcs_dir = CWD + "/postproc/c_funcs"
-    #    result = subprocess.run(["make"], cwd=c_funcs_dir)
-
-    #    CONFIG_DIR  = CWD + "/config/"
-    #    DFLT_DATA_DIR = "/tmp/"
-    #else:
-    #    raise Exception("Invalid OS Name")
+    CWD = os.getcwd() 
+    if os.name == "nt":
+        CONFIG_DIR  = CWD + "\\config\\"
+        DFLT_DATA_DIR  =   os.path.dirname(os.getcwd()) + "\\data\\"
+    elif os.name == "posix":
+        CONFIG_DIR  = CWD + "/config/"
+        DFLT_DATA_DIR = "/tmp/"
+    else:
+        raise Exception("Invalid OS Name")
 
     CFG_DFLT_FNAME  = "default_cfg.json"
     #PLOT_SETTINGS_DFLT_FNAME    = "plot_settings_default.json"
@@ -683,7 +793,7 @@ if __name__ == '__main__':
 
     # Defining and showing the main window
     #window = MainWindow(config_file)
-    window = MainWindow(CFG_DFLT_PATH, CONFIG_DIR, proc_pipes)
+    window = MainWindow(DFLT_DATA_DIR, CFG_DFLT_PATH, CONFIG_DIR, proc_pipes)
                 
     window.show()
     sys.exit(app.exec())

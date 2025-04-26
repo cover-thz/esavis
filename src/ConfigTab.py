@@ -135,7 +135,6 @@ class ConfigTab(QScrollArea):
     """
     This is the default tab visible and contains all the main configuration 
     data for the image processing.  
-
     """
 
     # NOTE: cfg_dict is the global configuration dictionary, it is
@@ -327,19 +326,23 @@ class ConfigTab(QScrollArea):
             ""
         )
         if fpath:
+            fpath = fix_data_path(fpath)
             cfg_dict_updates = collections.OrderedDict()
-
+            fname_list = []
             if channel==0:
                 cfg_dict_updates["data0_fpath"] = fpath
+                fname_list.append(fpath)
                 s.curr_loaded0_val_ledit.setText(str(fpath))
             elif channel==1:
                 cfg_dict_updates["data1_fpath"] = fpath
+                fname_list.append(fpath)
                 s.curr_loaded1_val_ledit.setText(str(fpath))
             else:
                 raise Exception("Invalid Channel")
 
+            cfg_dict_updates["fname_list"] = fname_list
             # update the configuration
-            s.update_config(cfg_dict_updates)
+            s.update_config(cfg_dict_updates, ["fname_changed"])
 
 
 
@@ -350,25 +353,29 @@ class ConfigTab(QScrollArea):
         """
         # grab the last modified file from the default data dir
         try: 
-            
             data_dir = s.cfg_dict["default_data_dir"]
             extension = "dat"
             last_mod_fname = get_last_modified_file(data_dir, extension, channel)
             fpath = data_dir + last_mod_fname
 
             if fpath:
+                fpath = fix_data_path(fpath)
                 cfg_dict_updates = collections.OrderedDict()
+                fname_list = []
                 if channel==0:
                     cfg_dict_updates["data0_fpath"] = fpath
+                    fname_list.append(fpath)
                     s.curr_loaded0_val_ledit.setText(str(fpath))
                 elif channel==1:
                     cfg_dict_updates["data1_fpath"] = fpath
+                    fname_list.append(fpath)
                     s.curr_loaded1_val_ledit.setText(str(fpath))
                 else:
                     raise Exception("Invalid Channel")
 
+                cfg_dict_updates["fname_list"] = fname_list
                 # update the configuration
-                s.update_config(cfg_dict_updates)
+                s.update_config(cfg_dict_updates, ["fname_changed"])
 
 
             else:

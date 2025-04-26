@@ -84,7 +84,7 @@ def build_thz_image_tab(thz_img_tab):
     # NOTE: Giving the cfg_dict to THzImageObj but again it does NOT alter it
     # only reads from it
     thz_img_tab.thz_image_obj = tio.THzImageObj(thz_img_tab, 
-        thz_img_tab.cfg_dict)
+        thz_img_tab.cfg_dict, main_image=True)
 
     
     ####################################################################
@@ -121,7 +121,7 @@ def build_thz_image_tab(thz_img_tab):
     src_tab_sublayout_row2 = QHBoxLayout()
     daq_status_lbl = QLabel("DAQ Status: ")
     daq_status_ledit = QLineEdit()
-    daq_status_ledit.setFixedWidth(100)
+    daq_status_ledit.setFixedWidth(120)
     daq_status_ledit.setReadOnly(True)
 
     src_tab_sublayout_row2.addWidget(daq_status_lbl)
@@ -131,7 +131,7 @@ def build_thz_image_tab(thz_img_tab):
     src_tab_sublayout_row3 = QHBoxLayout()
     file_status_lbl = QLabel("File Status: ")
     file_status_ledit = QLineEdit()
-    file_status_ledit.setFixedWidth(100)
+    file_status_ledit.setFixedWidth(120)
     file_status_ledit.setReadOnly(True)
     src_tab_sublayout_row3.addWidget(file_status_lbl)
     src_tab_sublayout_row3.addWidget(file_status_ledit)
@@ -667,6 +667,7 @@ def build_thz_image_tab(thz_img_tab):
     # Frame limits line edits
     #
     frame_limits_layout = QVBoxLayout()
+    frame_pause_btn = QPushButton("Pause Capture")
     frame_limits_lbl = QLabel("Frame Limits")
 
     # fl_sublayout_row1
@@ -699,6 +700,7 @@ def build_thz_image_tab(thz_img_tab):
      
     # Toplevel layout of frame limits
     frame_limits_layout.addWidget(frame_limits_lbl)
+    frame_limits_layout.addWidget(frame_pause_btn)
     frame_limits_layout.addLayout(fl_sublayout_row1)
     frame_limits_layout.addLayout(fl_sublayout_row2)
     frame_limits_layout.addLayout(fl_sublayout_row3)
@@ -707,6 +709,7 @@ def build_thz_image_tab(thz_img_tab):
     # Add member variables
     # (not adding the sublayouts because we probably don't need them)
     thz_img_tab.frame_limits_lbl    = frame_limits_lbl
+    thz_img_tab.frame_pause_btn     = frame_pause_btn
     thz_img_tab.az_min_lim_lbl      = az_min_lim_lbl
     thz_img_tab.az_min_lim_ledit    = az_min_lim_ledit
     thz_img_tab.az_max_lim_lbl      = az_max_lim_lbl
@@ -824,9 +827,17 @@ class setup_thz_tab_callbacks:
         thz_tab.file_src_rbut.toggled.connect(
             lambda: s.rbut_update(thz_tab.file_src_rbut, 
             "dat_file", "data_src"))
+
+        thz_tab.file_src_rbut.toggled.connect(
+            lambda: thz_tab.update_data_src_status("PROC_FILE"))
+
         thz_tab.daq_src_rbut.toggled.connect(
             lambda: s.rbut_update(thz_tab.daq_src_rbut, 
             "daq", "data_src"))
+
+        thz_tab.daq_src_rbut.toggled.connect(
+            lambda: thz_tab.update_data_src_status("NOT_CONNECTED"))
+
 
         thz_tab.front_peak_rbut.toggled.connect(
             lambda: s.rbut_update(thz_tab.front_peak_rbut, 

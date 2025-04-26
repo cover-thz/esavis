@@ -102,13 +102,15 @@ class THzImageTab(QWidget):
     # not to be modified outside of the MainWindow, it is only provided
     # to be read
     def __init__(s, CFG_DFLT_PATH, CONFIG_DIR, 
-                 update_config, cfg_dict):
+                 update_config, cfg_dict, camera_tab):
         super().__init__()
 
         
         s.CFG_DFLT_PATH  = CFG_DFLT_PATH
         s.CONFIG_DIR     = CONFIG_DIR
+        s.update_config  = update_config
         s.cfg_dict       = cfg_dict
+        s.camera_tab     = camera_tab
 
         # builds up all the widgets and layout adds them to s
         bti.build_thz_image_tab(s)
@@ -123,21 +125,31 @@ class THzImageTab(QWidget):
         #
         # Connect the lineEdit(textbox) and slider together
         s.thresh_slider.valueChanged.connect(s.update_thresh_ledit)
+        #s.thresh_slider.sliderReleased.connect(lambda: s.update_thresh_ledit(
+        #    s.thresh_slider.value()))
         s.thresh_ledit.editingFinished.connect(s.update_thresh_slider)
 
         # Connect the lineEdit(textbox) and slider together
         s.contr_slider.valueChanged.connect(s.update_contr_ledit)
+        #s.contr_slider.sliderReleased.connect(lambda: s.update_contr_ledit(
+        #    s.contr_slider.value()))
         s.contr_ledit.editingFinished.connect(s.update_contr_slider)
 
         # Connect the lineEdit(textbox) and slider together
         s.pkwdth_slider.valueChanged.connect(s.update_pkwdth_ledit)
+        #s.pkwdth_slider.sliderReleased.connect(lambda: s.update_pkwdth_ledit(
+        #    s.pkwdth_slider.value()))
         s.pkwdth_ledit.textChanged.connect(s.update_pkwdth_slider)
 
         # Connect the lineEdits(textboxes) and sliders together
         s.rc_slider_min.valueChanged.connect(s.update_rc_min_ledit)
+        #s.rc_slider_min.sliderReleased.connect(lambda: s.update_rc_min_ledit(
+        #    s.rc_slider_min.value()))
         s.rc_ledit_min.editingFinished.connect(s.update_rc_min_slider)
 
         s.rc_slider_max.valueChanged.connect(s.update_rc_max_ledit)
+        #s.rc_slider_max.sliderReleased.connect(lambda: s.update_rc_max_ledit(
+        #    s.rc_slider_max.value()))
         s.rc_ledit_max.editingFinished.connect(s.update_rc_max_slider)
 
         # Connect the lineEdits(textboxes) and sliders together
@@ -161,9 +173,11 @@ class THzImageTab(QWidget):
         s.ld_save_image_chng_dir_btn.clicked.connect(
             s.ld_save_image_chng_dir_btn_clicked)
 
-
         s.reset_camera_btn.clicked.connect(
             s.reset_camera_btn_clicked)
+
+        s.frame_pause_btn.clicked.connect(
+            s.frame_pause_btn_clicked)
 
 
     def set_gui_config_params(s, cfg_dict):
@@ -287,6 +301,21 @@ class THzImageTab(QWidget):
         """
         with open(cfg_path, 'w') as file:
             json.dump(cfg_dict, file)
+
+    def frame_pause_btn_clicked(s):
+        if not s.cfg_dict["paused"]:
+            new_cfg_dict = OrderedDict()
+            new_cfg_dict["paused"] = True
+            #s.update_config(new_cfg_dict)
+            s.update_config(new_cfg_dict, ["force_update"])
+            s.frame_pause_btn.setText("Resume Capture")
+        else:
+            new_cfg_dict = OrderedDict()
+            new_cfg_dict["paused"] = False
+            #s.update_config(new_cfg_dict)
+            s.update_config(new_cfg_dict, ["force_update"])
+            s.frame_pause_btn.setText("Pause Capture")
+
 
 
     #def update_thresh_slider(s):
@@ -426,18 +455,45 @@ class THzImageTab(QWidget):
         Resets the camera position for the 3D plots
         """
         s.update_image(None, False,reset_camera=True)
+        s.camera_tab.update_image(None, False,reset_camera=True)
 
 
 
-    def update_daq_status(s, stat_id):
-        if stat_id == "NOT_CONNECTED":
-            style_options = "background-color: yellow; color: black"
+
+    def update_data_src_status(s, stat_id):
+        #print(f"got here with {stat_id}")
+        if s.cfg_dict["data_src"] == "daq":
+            style_options = "background-color: gray; color: white"
+            s.file_status_ledit.setStyleSheet(style_options)
+            s.file_status_ledit.setText("INACTIVE")
+
+            if stat_id == "NOT_CONNECTED":
+                style_options = "background-color: yellow; color: black"
+                s.daq_status_ledit.setStyleSheet(style_options)
+                s.daq_status_ledit.setText("CONNECTING...")
+            elif stat_id == "CONNECTED":
+                style_options = "background-color: green; color: white"
+                s.daq_status_ledit.setStyleSheet(style_options)
+                s.daq_status_ledit.setText("CONNECTED")
+        elif s.cfg_dict["data_src"] == "dat_file":
+            style_options = "background-color: gray; color: white"
             s.daq_status_ledit.setStyleSheet(style_options)
-            s.daq_status_ledit.setText("CONNECTING...")
-        elif stat_id == "CONNECTED":
-            style_options = "background-color: green; color: black"
-            s.daq_status_ledit.setStyleSheet(style_options)
-            s.daq_status_ledit.setText("CONNECTED")
+            s.daq_status_ledit.setText("INACTIVE")
+
+            if stat_id == "PROC_FILE":
+                style_options = "background-color: yellow; color: black"
+                s.file_status_ledit.setStyleSheet(style_options)
+                s.file_status_ledit.setText("PROCESSING FILE...")
+            elif stat_id == "FILE_PROC":
+                style_options = "background-color: green; color: white"
+                s.file_status_ledit.setStyleSheet(style_options)
+                s.file_status_ledit.setText("FILE PROCESSED")
+
+
+
+        else:
+            print("Warning: unknown data_src value")
+
 
 
 

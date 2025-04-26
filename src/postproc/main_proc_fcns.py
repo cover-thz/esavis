@@ -255,6 +255,11 @@ class CoverProc:
         elif cfg_dict["frame_style"] == "always":
             process_frame = True
 
+        # overrides everything and just flags the frame for processing if
+        # the source is a dat file
+        if cfg_dict["data_src"] == "dat_file":
+            process_frame = True
+
 
         #################################################################
         #                         Process frame                         #

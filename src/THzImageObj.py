@@ -71,17 +71,18 @@ class THzImageObj(QHBoxLayout):
     pixel_ranges_grid = None
     valid_pixels_grid = None
     
-    def __init__(s, thz_image_tab, cfg_dict):
+    def __init__(s, thz_image_tab, cfg_dict, main_image=False):
         super().__init__()
         #super().__init__(background="transparent")
 
         # we're actually going to stack the plot widgets on top
         # of one another and make only one of them visible at a time
         s.thz_image_stack = QStackedWidget()
+        s.main_image = main_image
 
         s.thz_image_tab   = thz_image_tab
         s.thz_mesh_obj    = THzMeshImage(thz_image_tab)
-        s.thz_surface_obj =  THzSurfaceObj(thz_image_tab)
+        s.thz_surface_obj = THzSurfaceObj(thz_image_tab)
 
         s.thz_image_stack.addWidget(s.thz_mesh_obj)
         s.thz_image_stack.addWidget(s.thz_surface_obj)
@@ -219,7 +220,8 @@ class THzImageObj(QHBoxLayout):
                 
                 # set the color scale textboxes to the autoscaled values
                 # when autoscale color is enabled
-                s.thz_image_tab.update_autocolors(color_min, color_max)
+                if s.main_image:
+                    s.thz_image_tab.update_autocolors(color_min, color_max)
 
             plot_style = cfg_dict["plot_style"]
             if plot_style in ["front_peak_range", "back_peak_range", 
