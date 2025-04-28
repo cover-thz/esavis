@@ -143,9 +143,20 @@ class DebugTab(QWidget):
         s.type_bool_rbut    = type_bool_rbut
 
 
+        # ROW 4
+        enable_profiler_chkb  = QCheckBox()
+        enable_profiler_chkb.setText("Enable Profiler:")
+        enable_profiler_chkb.stateChanged.connect(
+        enable_profiler_chkb.stateChanged.connect(s.enable_profiler_update())
+
+        # member vars
+        s.enable_profiler_chkb = enable_profiler_chkb
+
+
         top_layout.addLayout(row_1)
         top_layout.addLayout(row_2)
         top_layout.addLayout(row_3)
+        top_layout.addWidget(enable_profiler_chkb)
 
         s.row_1  = row_1
         s.row_2  = row_2
@@ -183,6 +194,14 @@ class DebugTab(QWidget):
                 value = False
         s.cfg_dict[key] = value
         print(f"Wrote value: {value}, to key: {key}")
+
+
+    def enable_profiler_update(s):
+        if s.enable_profiler_chkb.isChecked():
+            flag = "enable_profiler"
+        else:
+            flag = "disable_profiler"
+        s.update_config(None, [flag])
 
 
 

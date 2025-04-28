@@ -240,6 +240,10 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
             # easy way to turn on and off profiling of the code
             if "enable_profiler" in cfg_flags:
                 profiler_enabled = True
+            
+            if "disable_profiler" in cfg_flags:
+                profiler_enabled = False
+
 
         else: # no updated config values
             cfg_flags = []
