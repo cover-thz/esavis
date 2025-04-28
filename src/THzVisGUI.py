@@ -545,6 +545,10 @@ class MainWindow(QMainWindow):
         if cfg_dict["data_src"] == "daq":
             cfg_flags = s.append_if_absent(cfg_flags, "setup_daq")
 
+        if cfg_dict["profiler"] == True:
+            cfg_flags = s.append_if_absent(cfg_flags, "enable_profiler")
+        else:
+            cfg_flags = s.append_if_absent(cfg_flags, "disable_profiler")
 
         # now the stuffing of the flags
         if ((cfg_flags_in != None) and (cfg_flags_in != [])):

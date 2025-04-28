@@ -197,10 +197,11 @@ class DebugTab(QWidget):
 
     def enable_profiler_update(s):
         if s.enable_profiler_chkb.isChecked():
-            flag = "enable_profiler"
+            prof_en = True
         else:
-            flag = "disable_profiler"
-        s.update_config(None, [flag])
-
-
+            prof_en = False
+        key = "profiler"
+        new_cfg_dict = OrderedDict()
+        new_cfg_dict[key] = prof_en
+        s.update_config(new_cfg_dict)
 
