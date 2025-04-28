@@ -196,6 +196,7 @@ class DebugTab(QWidget):
 
 
     def enable_profiler_update(s):
+        print("CLICKED PROFILER CHECKBOX!")
         if s.enable_profiler_chkb.isChecked():
             prof_en = True
         else:
