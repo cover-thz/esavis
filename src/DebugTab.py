@@ -149,7 +149,7 @@ class DebugTab(QWidget):
 
         # member vars
         s.enable_profiler_chkb = enable_profiler_chkb
-        enable_profiler_chkb.stateChanged.connect(s.enable_profiler_update())
+        s.enable_profiler_chkb.stateChanged.connect(s.enable_profiler_update())
 
 
         top_layout.addLayout(row_1)
