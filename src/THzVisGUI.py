@@ -199,6 +199,7 @@ DFLT_CFG_DICT["flags"] = []
 DFLT_CFG_DICT["dbg_0"] = False
 DFLT_CFG_DICT["dbg_1"] = False
 DFLT_CFG_DICT["dbg_2"] = False
+DFLT_CFG_DICT["profiler"] = False
 
 
 ##############################################################################
