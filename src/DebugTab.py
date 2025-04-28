@@ -146,11 +146,10 @@ class DebugTab(QWidget):
         # ROW 4
         enable_profiler_chkb  = QCheckBox()
         enable_profiler_chkb.setText("Enable Profiler:")
-        enable_profiler_chkb.stateChanged.connect(
-        enable_profiler_chkb.stateChanged.connect(s.enable_profiler_update())
 
         # member vars
         s.enable_profiler_chkb = enable_profiler_chkb
+        enable_profiler_chkb.stateChanged.connect(s.enable_profiler_update())
 
 
         top_layout.addLayout(row_1)
