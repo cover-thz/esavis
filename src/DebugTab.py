@@ -149,7 +149,7 @@ class DebugTab(QWidget):
 
         # member vars
         s.enable_profiler_chkb = enable_profiler_chkb
-        s.enable_profiler_chkb.stateChanged.connect(s.enable_profiler_update())
+        s.enable_profiler_chkb.stateChanged.connect(s.enable_profiler_update)
 
 
         top_layout.addLayout(row_1)
@@ -196,7 +196,6 @@ class DebugTab(QWidget):
 
 
     def enable_profiler_update(s):
-        print("CLICKED PROFILER CHECKBOX!")
         if s.enable_profiler_chkb.isChecked():
             prof_en = True
         else:
