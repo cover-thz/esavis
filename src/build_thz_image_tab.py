@@ -121,7 +121,7 @@ def build_thz_image_tab(thz_img_tab):
     src_tab_sublayout_row2 = QHBoxLayout()
     daq_status_lbl = QLabel("DAQ Status: ")
     daq_status_ledit = QLineEdit()
-    daq_status_ledit.setFixedWidth(120)
+    daq_status_ledit.setFixedWidth(170)
     daq_status_ledit.setReadOnly(True)
 
     src_tab_sublayout_row2.addWidget(daq_status_lbl)
@@ -131,7 +131,7 @@ def build_thz_image_tab(thz_img_tab):
     src_tab_sublayout_row3 = QHBoxLayout()
     file_status_lbl = QLabel("File Status: ")
     file_status_ledit = QLineEdit()
-    file_status_ledit.setFixedWidth(120)
+    file_status_ledit.setFixedWidth(170)
     file_status_ledit.setReadOnly(True)
     src_tab_sublayout_row3.addWidget(file_status_lbl)
     src_tab_sublayout_row3.addWidget(file_status_ledit)
