@@ -287,7 +287,7 @@ def pulse_az_el_adj(el_val_in, az_val_in, channel_val_in,
         el_val_out = el_val_in - elev_side_1_start + el_offset1
     else: 
         el_mirror_side  = None
-        #el_val_out = el_val_in
+        el_val_out = el_val_in
         valid_rangeline = False
 
 
