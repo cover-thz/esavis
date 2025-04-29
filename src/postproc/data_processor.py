@@ -266,6 +266,10 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
             turn_hyst = cfg_dict["turn_hyst"]
             min_az          = cfg_dict["min_az"] + cfg_dict["turn_az_margin"]
             max_az          = cfg_dict["max_az"] - cfg_dict["turn_az_margin"]
+            ch0_offset      = cfg_dict["ch0_offset"]
+            ch1_offset      = cfg_dict["ch1_offset"]
+
+
 
 
             # this directs get_daq_data() to stop looking for rangelines after
@@ -282,8 +286,8 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
             el_array, ch_array, num_rangelines, turn_flag, reset_in_array,
             status_flag) = radar.get_daq_data(daq_num_rangelines, 
                                               turnaround_mode, turn_hyst,
-                                              min_az, max_az,
-                                              daq_timeout)
+                                              min_az, max_az, ch0_offset, 
+                                              ch1_offset, daq_timeout)
 
 
             # basically indicates the DAQ is not connected, pause a moment 

@@ -243,8 +243,8 @@ class SimpRadar:
 
     # main workhorse function
     def get_daq_data(s, num_rangelines, turnaround_mode, turn_hyst, min_az, 
-                     max_az, timeout=3):
-                     
+                     max_az, ch0_offset, ch1_offset, timeout=3):
+                                              
         start_time = time.time()
         
         if not turnaround_mode:
@@ -344,20 +344,25 @@ class SimpRadar:
                     # Note: nonzero turn_hyst will produce "wobble" at frame
                     # edges
                     if turnaround_mode:
+                        if channel_val == 0:
+                            az_val_adj = az_val + ch0_offset
+                        else:
+                            az_val_adj = az_val + ch1_offset
+
                         if s.state == "RESET":
                             turn_flag = "RESET"
-                            if az_val < (min_az - turn_hyst):
+                            if az_val_adj < (min_az - turn_hyst):
                                 s.state = "TURNING_MIN"
-                            elif az_val > (max_az + turn_hyst):
+                            elif az_val_adj > (max_az + turn_hyst):
                                 s.state = "TURNING_MAX"
                             else:
-                                az_val = "WAITING_FOR_TURN"
+                                az_val_adj = "WAITING_FOR_TURN"
 
                         elif s.state == "WAITING_FOR_TURN":
                             turn_flag = "RESET"
-                            if az_val < (min_az - turn_hyst):
+                            if az_val_adj < (min_az - turn_hyst):
                                 s.state = "TURNING_MIN"
-                            elif az_val > (max_az + turn_hyst):
+                            elif az_val_adj > (max_az + turn_hyst):
                                 s.state = "TURNING_MAX"
 
                             # else: s.state stays the same
@@ -365,26 +370,26 @@ class SimpRadar:
                         elif s.state == "TURNING_MIN":
                             turn_flag = "RESET"
                             # start of frame
-                            if az_val > (min_az + turn_hyst):
+                            if az_val_adj > (min_az + turn_hyst):
                                 s.state = "RUNNING_TO_MAX"
                                 turn_flag = "START_FRAME"
 
                         elif s.state == "TURNING_MAX":
                             turn_flag = "RESET"
                             # start of frame
-                            if az_val < (max_az - turn_hyst):
+                            if az_val_adj < (max_az - turn_hyst):
                                 s.state = "RUNNING_TO_MIN"
                                 turn_flag = "START_FRAME"
 
                         elif s.state == "RUNNING_TO_MAX":
                             turn_flag = "RUNNING"
-                            if az_val > (max_az + turn_hyst):
+                            if az_val_adj > (max_az + turn_hyst):
                                 s.state = "TURNING_MAX"
                                 turn_flag = "END_FRAME"
 
                         elif s.state == "RUNNING_TO_MIN":
                             turn_flag = "RUNNING"
-                            if az_val < (min_az - turn_hyst):
+                            if az_val_adj < (min_az - turn_hyst):
                                 s.state = "TURNING_MIN"
                                 turn_flag = "END_FRAME"
 
