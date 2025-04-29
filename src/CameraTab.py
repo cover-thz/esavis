@@ -112,7 +112,7 @@ class CameraTab(QWidget):
         # only has to do one thing
         s.main_layout = QHBoxLayout()
 
-        s.thz_image_obj = tio.THzImageObj
+        #s.thz_image_obj = tio.THzImageObj
         s.thz_image_obj = tio.THzImageObj(s, s.cfg_dict)
             
         s.main_layout.addLayout(s.thz_image_obj) 

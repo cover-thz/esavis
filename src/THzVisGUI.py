@@ -53,6 +53,7 @@ from ConfigTab import ConfigTab
 from THzImageTab import THzImageTab
 from DebugTab import DebugTab
 from CameraTab import CameraTab
+from SingPixTab import SingPixTab
 import time
 
 # crude but effective way of getting the postprocessing directory in here
@@ -243,14 +244,14 @@ class MainWindow(QMainWindow):
         s.lock_pipes = False
 
         # Config data transfer handshaking flags
-        s.cfg_pipe_count   = 0
+        s.cfg_pipe_count    = 0
         s.cfg_pipe_maxcount = 3
-        s.update_cfg_flag  = False
+        s.update_cfg_flag   = False
 
         # starts out at 2 seconds when the daq is not connected, changes t
-        s.NO_DAQ_PERIOD = 1.0
-        s.DAQ_CONNECTED_PERIOD = 0.25
-        s.min_update_period    = s.NO_DAQ_PERIOD
+        s.NO_DAQ_PERIOD         = 1.0
+        s.DAQ_CONNECTED_PERIOD  = 0.25
+        s.min_update_period     = s.NO_DAQ_PERIOD
 
         # this is used to mark time for how often we're querying the processing
         # core to see if the DAQ is connected
@@ -285,7 +286,6 @@ class MainWindow(QMainWindow):
             "min_az","max_az","min_el","max_el","plot_style",
             "peak_selection","aux_x_ind","aux_y_ind"]
 
-
         # create the tab widget which contains pretty much the remainder of
         # the GUI objects
         s.tab_widget = QTabWidget()
@@ -294,22 +294,24 @@ class MainWindow(QMainWindow):
                                     s.save_config, s.update_config,
                                     s.cfg_dict)
 
-
         s.camera_tab   = CameraTab(CFG_DFLT_PATH, CONFIG_DIR, 
-                                        s.update_config, 
-                                        s.cfg_dict)
+                                        s.update_config, s.cfg_dict)
 
-        # unfortunately I needed to give the camera tab's thz image object
-        # to this main tab so the reset plot camera button would work
+        s.sing_pix_tab = SingPixTab(CFG_DFLT_PATH, CONFIG_DIR, 
+                                        s.update_config, s.cfg_dict)
+                                        
+
+        # unfortunately I needed to give the camera tab and the 
+        # single_pixel object to this main tab so the reset plot camera 
+        # button would work
         s.main_thz_tab = THzImageTab(CFG_DFLT_PATH, CONFIG_DIR, 
-                                        s.update_config, 
-                                        s.cfg_dict, 
-                                        s.camera_tab) 
+                                        s.update_config, s.cfg_dict, 
+                                        s.camera_tab, s.sing_pix_tab) 
+                                        
 
 
 
 
-        s.single_pix_tab  = QWidget() # TODO Placeholder 
 
         s.debug_tab = DebugTab(CFG_DFLT_PATH, CONFIG_DIR, 
                                         s.update_config, 
@@ -320,12 +322,11 @@ class MainWindow(QMainWindow):
         s.tab_widget.addTab(s.main_thz_tab, "Main THz Image")
         #s.tab_widget.addTab(s.camera_tab, "Camera Overlay")
         s.tab_widget.addTab(s.camera_tab, "Large Viewer")
-        s.tab_widget.addTab(s.single_pix_tab, "Single Pixel")
+        s.tab_widget.addTab(s.sing_pix_tab, "Single Pixel")
         s.tab_widget.addTab(s.debug_tab, "Debug")
 
         s.layout.addWidget(s.tab_widget)
 
-        s.init_single_pix_tab()  # TODO Placeholder
 
         # set the GUI to view the config tab
         s.tab_widget.setCurrentIndex(0)
@@ -398,16 +399,6 @@ class MainWindow(QMainWindow):
         """
         layout = QVBoxLayout(s.camera_tab)
         label = QLabel("Camera Overlay goes here")
-        layout.addWidget(label)
-
-
-    def init_single_pix_tab(s):
-        """
-        This is just a placeholder for Tab 4 until I actually create GUI 
-        content for the single pixel tab
-        """
-        layout = QVBoxLayout(s.single_pix_tab)
-        label = QLabel("Single Pixel goes here")
         layout.addWidget(label)
 
 
