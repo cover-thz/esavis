@@ -17,6 +17,7 @@ from math import nan
 #import signal
 import copy
 import numpy as np
+import math
 import pyqtgraph as pg
 import pyqtgraph.opengl as gl
 import matplotlib
@@ -68,7 +69,7 @@ class THzImageObj(QHBoxLayout):
     az_grid_2d      = None
     el_grid_2d      = None
 
-    pixel_ranges_grid = None
+    pixel_grid = None
     valid_pixels_grid = None
     
     def __init__(s, thz_image_tab, cfg_dict, main_image=False):
@@ -184,27 +185,27 @@ class THzImageObj(QHBoxLayout):
         cfg_dict = s.cfg_dict 
 
         if new_frame_flag:
-            s.pixel_ranges_grid   = frame_data["pixel_ranges_grid"]
+            s.pixel_grid   = frame_data["pixel_grid"]
             s.valid_pixels_grid   = frame_data["valid_pixels_grid"]
             #noise_floor_grid    = frame_data["noise_floor_grid"]
 
             # first step is to check if the coarse grids need updating
-            # we have to use the pixel_ranges_grid shape to infer xlen and
+            # we have to use the pixel_grid shape to infer xlen and
             # ylen because the cfg_dict values are "ahead" of the current
             # frame
-            (new_xlen, new_ylen) = s.pixel_ranges_grid.shape
+            (new_xlen, new_ylen) = s.pixel_grid.shape
             if s.check_frame_params(new_xlen, new_ylen):
                 s.calc_coarse_grids(new_xlen, new_ylen)
                 print("recalculated grids")
 
             # construct a version with nans for ease of use
-            s.pixel_ranges_grid_nans = copy.deepcopy(
-                    frame_data["pixel_ranges_grid"])
+            s.pixel_grid_nans = copy.deepcopy(
+                    frame_data["pixel_grid"])
                 
-            s.pixel_ranges_grid_nans[~s.valid_pixels_grid] = np.nan
+            s.pixel_grid_nans[~s.valid_pixels_grid] = np.nan
         
         # only continue if there is a real frame stored in the class
-        if type(s.pixel_ranges_grid) != type(None):
+        if type(s.pixel_grid) != type(None):
             # Now figure out the color scale limits
             autocolor = cfg_dict["autoscale_color"]
             cmap_str  = cfg_dict["colormap"]
@@ -212,41 +213,46 @@ class THzImageObj(QHBoxLayout):
                 color_min = cfg_dict["color_scale_min"]
                 color_max = cfg_dict["color_scale_max"]
             else:
-                flat_img = s.pixel_ranges_grid_nans.flatten()
+                flat_img = s.pixel_grid_nans.flatten()
                 color_min = np.nanmin(flat_img)
                 color_max = np.nanmax(flat_img)
+
+
                 #print(f"color_min = {color_min}")
                 #print(f"color_max = {color_max}")
                 
                 # set the color scale textboxes to the autoscaled values
                 # when autoscale color is enabled
+
                 if s.main_image:
                     s.thz_image_tab.update_autocolors(color_min, color_max)
 
-            plot_style = cfg_dict["plot_style"]
-            if plot_style in ["front_peak_range", "back_peak_range", 
-                              "integ_power_plot", "num_avgs_plot"]:
-                s.thz_image_stack.setCurrentIndex(0)
-                s.thz_mesh_obj.update_plot(s.az_grid_2d, s.el_grid_2d, 
-                        s.pixel_ranges_grid, cmap_str, color_min, color_max, 
-                        reset_camera, set_trace_val)
-                                              
+            # only proceed if the image is not entirely nans
+            if not math.isnan(color_min):
+                plot_style = cfg_dict["plot_style"]
+                if plot_style in ["front_peak_range", "back_peak_range", 
+                                  "integ_power_plot", "num_avgs_plot"]:
+                    s.thz_image_stack.setCurrentIndex(0)
+                    s.thz_mesh_obj.update_plot(s.az_grid_2d, s.el_grid_2d, 
+                            s.pixel_grid, cmap_str, color_min, color_max, 
+                            reset_camera, set_trace_val)
+                                                  
 
-            elif plot_style in ["front_surface_range", "back_surface_range"]:
-                s.thz_image_stack.setCurrentIndex(1)
-                s.thz_surface_obj.update_plot(s.az_grid_1d_cm, s.el_grid_1d_cm, 
-                        s.pixel_ranges_grid_nans, cmap_str, 
-                        color_min, color_max, reset_camera, set_trace_val)
-                        
+                elif plot_style in ["front_surface_range", "back_surface_range"]:
+                    s.thz_image_stack.setCurrentIndex(1)
+                    s.thz_surface_obj.update_plot(s.az_grid_1d_cm, s.el_grid_1d_cm, 
+                            s.pixel_grid_nans, cmap_str, 
+                            color_min, color_max, reset_camera, set_trace_val)
+                            
 
-            else:
-                except_str = "unsupported or invalid plot style: {plot_style}"
-                raise Exception(except_str)
+                else:
+                    except_str = f"unsupported or invalid plot style: {plot_style}"
+                    raise Exception(except_str)
 
-            # I'll need to fix this to show the surface plot colormap
-            cmap = pg.colormap.getFromMatplotlib(cmap_str) 
-            s.color_bar.setColorMap(cmap)
-            s.color_bar.setLevels((color_min, color_max))
+                # I'll need to fix this to show the surface plot colormap
+                cmap = pg.colormap.getFromMatplotlib(cmap_str) 
+                s.color_bar.setColorMap(cmap)
+                s.color_bar.setLevels((color_min, color_max))
 
 
 
@@ -341,11 +347,17 @@ class THzMeshImage(pg.PlotWidget):
         # main color mesh image
         s.color_mesh = pg.PColorMeshItem()
         s.color_mesh.setColorMap(pg.colormap.getFromMatplotlib("jet_r"))
+        s.plot_item = s.getPlotItem()
+        s.view_box = s.plot_item.getViewBox()
         s.addItem(s.color_mesh)
 
+        # NOTE unfinished
+        s.scene().sigMouseClicked.connect(s.mouse_click_event)
+
+
         s.setTitle("THz Image")
-        s.getPlotItem().invertX(True)
-        s.getPlotItem().invertY(True)
+        s.plot_item.invertX(True)
+        s.plot_item.invertY(True)
 
 
     def set_levels(s, min_val, max_val):
@@ -359,6 +371,9 @@ class THzMeshImage(pg.PlotWidget):
         s.color_mesh.setData(az_grid_2d, el_grid_2d, image, autoLevels=False)
         cmap = pg.colormap.getFromMatplotlib(cmap_str) 
         s.color_mesh.setColorMap(cmap)
+
+    def mouse_click_event(s, event):
+        pass
 
 
     #def make_grids_2d(s, x_grid, y_grid):

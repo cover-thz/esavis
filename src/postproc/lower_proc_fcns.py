@@ -16,6 +16,7 @@ import ipdb
 import time
 import os
 import ipdb
+import copy
 
 
 # C function imports 
@@ -178,6 +179,45 @@ def calc_coarse_rangelines_grid(coarse_az_array, coarse_el_array,
 
 ##############################################################################
 ##############################################################################
+
+def calc_integ_pwr(coarse_power_grid, valid_grid, range_lut_cm, dead_pix_val, 
+                   min_range, max_range):
+    """
+    coarse_power_grid.shape = (num_az_pix, num_el_pix, rangeline_len)
+    valid_grid.shape = (num_az_pix, num_el_pix)
+    range_lut_cm.shape = (rangeline_len)
+    
+    Inefficiently implemented, but unlikely to be a bottleneck and is
+    especially not a bottleneck for real-time processing
+
+    """
+    # find the valid indices
+    range_mask = (range_lut_cm >= min_range) & (range_lut_cm <= max_range)
+    coarse_power_grid_masked = coarse_power_grid[:,:,range_mask]
+    integ_power_grid_int1 = 10*np.log10(coarse_power_grid_masked.sum(axis=2))
+
+    # update valid grid based on any weird values experienced here
+    valid_grid_out = copy.deepcopy(valid_grid)
+    new_invalids = np.where(integ_power_grid_int1 == -np.inf)
+    valid_grid_out[new_invalids] = False
+
+    new_invalids = np.where(integ_power_grid_int1 == np.inf)
+    valid_grid_out[new_invalids] = False
+
+    new_invalids = np.where(integ_power_grid_int1 == np.nan)
+    valid_grid_out[new_invalids] = False
+          
+
+    integ_power_grid = np.empty(coarse_power_grid.shape[:-1])
+    integ_power_grid.fill(dead_pix_val)
+    integ_power_grid[valid_grid_out] = integ_power_grid_int1[valid_grid_out]
+
+    return (integ_power_grid, valid_grid_out)
+
+
+##############################################################################
+##############################################################################
+
 
 def calc_range(freq_lut, chirp_span, chirp_time, center_rangeval):
     """

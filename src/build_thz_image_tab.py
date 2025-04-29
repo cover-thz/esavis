@@ -876,10 +876,10 @@ class setup_thz_tab_callbacks:
 
         thz_tab.integ_pwr_rbut.toggled.connect(
             lambda: s.rbut_update(thz_tab.integ_pwr_rbut, 
-            "integ_pwr_plot", "peak_selection"))
+            "integ_power_plot", "peak_selection"))
         thz_tab.integ_pwr_rbut.toggled.connect(
             lambda: s.rbut_update(thz_tab.integ_pwr_rbut, 
-            "integ_pwr_plot", "plot_style"))
+            "integ_power_plot", "plot_style"))
 
         thz_tab.point_cloud_rbut.toggled.connect(
             lambda: s.rbut_update(thz_tab.point_cloud_rbut, 

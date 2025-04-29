@@ -290,31 +290,36 @@ class CoverProc:
             max_range       = cfg_dict["max_range"]
             dead_pix_val    = cfg_dict["dead_pix_val"]
 
+            plot_style = cfg_dict["plot_style"]
 
-            # NOTE TODO: Need to put in code to perform power integration
-            # if "peak_selection" is not "front" or "back".  
-            # also point-cloud if we do that
+            # NOTE TODO: Need to put in code to perform point cloud if we 
+            # do that
 
+            # only calculating integrated power 
+            if plot_style == "integ_power_plot":
+               (pixel_grid, 
+                valid_pixels_grid) =  lpf.calc_integ_pwr(coarse_power_grid, 
+                                   s.r_grid_valids, range_lut_cm, 
+                                   dead_pix_val, min_range, max_range)
+               noise_floor_grid = np.zeros(pixel_grid.shape)
 
-            (pixel_ranges_grid, valid_pixels_grid, 
-             noise_floor_grid) = lpf.extract_peaks_c(coarse_power_grid, 
-                                    s.r_grid_valids, s.xlen, s.ylen, 
-                                    fft_len, range_lut_cm, 
-                                    threshold_lin, contrast_lin, 
-                                    half_peak_width, peak_selection, 
-                                    num_noise_pts, noise_start_frac, 
-                                    calc_weighted_sum, min_range, 
-                                    max_range, dead_pix_val, dbg_prof)                   
+            else:
+                (pixel_grid, valid_pixels_grid, 
+                 noise_floor_grid) = lpf.extract_peaks_c(coarse_power_grid, 
+                                        s.r_grid_valids, s.xlen, s.ylen, 
+                                        fft_len, range_lut_cm, 
+                                        threshold_lin, contrast_lin, 
+                                        half_peak_width, peak_selection, 
+                                        num_noise_pts, noise_start_frac, 
+                                        calc_weighted_sum, min_range, 
+                                        max_range, dead_pix_val, dbg_prof)                   
             if dbg_prof:
                 num_valids = np.sum(valid_pixels_grid)
                 print(f"num_valid_pixels: {num_valids}")
-            #pf.plot_pixel_power(
-            #    coarse_power_grid[10][10].astype(np.float64), 
-            #    range_lut_cm)
 
             # frame data
             frame_out = collections.OrderedDict()
-            frame_out["pixel_ranges_grid"]  = pixel_ranges_grid
+            frame_out["pixel_grid"]  = pixel_grid
             frame_out["valid_pixels_grid"]  = valid_pixels_grid
             frame_out["noise_floor_grid"]   = noise_floor_grid
 
