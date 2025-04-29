@@ -54,7 +54,7 @@ class AuxPlotObj(FigureCanvas):
         s.plt_axes = s.plt_fig.add_subplot(111)
         super().__init__(s.plt_fig)
 
-        s.plt_fig.title("TITLE THINGS!")
+        #s.plt_fig.title("TITLE THINGS!")
         
 
 
