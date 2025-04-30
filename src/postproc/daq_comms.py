@@ -188,6 +188,7 @@ class SimpRadar:
     def init_connection(s):
         try:
             s.daq_sock.connect(s.addr)
+
         except IOError as e:
             s.daq_connected = False
             s.daq_sock.close()
@@ -196,6 +197,12 @@ class SimpRadar:
             #print(e)
             return False
 
+        except Exception as e:
+            s.daq_connected = False
+            s.daq_sock.close()
+            print(e)
+            return False
+   
         s.daq_connected = True
         print("Connected")
 
@@ -243,7 +250,7 @@ class SimpRadar:
 
     # main workhorse function
     def get_daq_data(s, num_rangelines, turnaround_mode, turn_hyst, min_az, 
-                     max_az, ch0_offset, ch1_offset, timeout=3):
+                     max_az, ch0_offset, ch1_offset, timeout=3, debug=False):
                                               
         start_time = time.time()
         
@@ -265,8 +272,36 @@ class SimpRadar:
         # index of the rangeline.  Also doubles as number of rangelines 
         # captureed
         i = 0 
+        
+        # debug time vals
+        tot_dur             = 0
+        tot_daq_sock_dur    = 0
+        tot_datagrab_dur    = 0
+        tot_other_dur       = 0
+        tot_misc_dur        = 0
+        if debug:
+            loop_start = time.process_time_ns()
+            daq_sock_start = loop_start
+            data_grab_start = loop_start
+            other_time_start = loop_start
+            loop_end = loop_start
         while True:
+            if debug:
+                tot_inc             = (loop_end - loop_start)
+                tot_daq_sock_inc    = (data_grab_start - daq_sock_start)
+                tot_datagrab_inc    = (other_time_start - data_grab_start)
+                tot_other_inc       = (loop_end - other_time_start)
+                tot_misc_inc        = (tot_inc - tot_daq_sock_inc - 
+                                        tot_datagrab_inc - tot_other_inc)
 
+                tot_dur             += tot_inc
+                tot_daq_sock_dur    += tot_daq_sock_inc
+                tot_datagrab_dur    += tot_datagrab_inc
+                tot_other_dur       += tot_other_inc
+                tot_misc_dur        += tot_misc_inc
+
+                # NOTE time accounting goes here
+                loop_start = time.process_time_ns()
             if not s.daq_connected:
                 turn_flag = "DISABLED"
                 status_flag = "DAQ_NOT_CONNECTED"
@@ -282,6 +317,8 @@ class SimpRadar:
                 status_flag = "TIMEOUT"
                 break
 
+            if debug:
+                daq_sock_start = time.process_time_ns()
             try:
                 (radar_data, data_valid) = s.daq_sock.receive_message()
             except ConnectionResetError:
@@ -290,8 +327,15 @@ class SimpRadar:
                 turn_flag = "DISABLED"
                 break
 
+            if debug:
+                data_grab_start = time.process_time_ns()
+
             # check for returning none
             if data_valid == False:
+                if debug:
+                    other_time_start = time.process_time_ns()
+                    loop_end = time.process_time_ns()
+                    print("daq_comms: data_valid == False")
                 continue
 
             else:
@@ -322,13 +366,17 @@ class SimpRadar:
                         "big",
                         signed=False,)
 
+                    if debug:
+                        other_time_start = time.process_time_ns()
 
                     # setup the buffers now because you don't know the 
                     # length of the rangeline until now
                     if not buffer_setup:
                         len_rangeline = len(rangeline)
+                        #rangelines_array = np.zeros((num_rangelines, 
+                        #    len_rangeline), dtype=np.complex128)
                         rangelines_array = np.zeros((num_rangelines, 
-                            len_rangeline), dtype=np.complex128)
+                            len_rangeline), dtype=np.complex64)
                         az_array = np.zeros((num_rangelines))
                         el_array = np.zeros((num_rangelines))
                         ch_array = np.zeros((num_rangelines))
@@ -426,12 +474,24 @@ class SimpRadar:
                         ch_array[i] = channel_val
                         i += 1
 
-
-                        
                 else:
+                    if debug:
+                        other_time_start = time.process_time_ns()
                     print("Warning: Received non-plot command data")
-                    continue
 
+                if debug:
+                    loop_end = time.process_time_ns()
+
+        if debug:
+            if i != 0:
+                print("---------------DURATIONS PER RANGELINE ACQ ------------")
+                print(f"Total number of rangelines: {i}")
+                print(f"tot_dur: {tot_dur/1e3/i:.4f} us")
+                print(f"tot_daq_sock_dur: {tot_daq_sock_dur/1e3/i:.4f} us")
+                print(f"tot_datagrab_dur: {tot_datagrab_dur/1e3/i:.4f} us")
+                print(f"tot_other_dur: {tot_other_dur/1e3/i:.4f} us")
+                print(f"tot_misc_dur: {tot_misc_dur/1e3/i:.5f} us")
+                print("-------------------------------------------------------\n")
         return (rangelines_array, az_array, el_array, ch_array, 
                 i, turn_flag, reset_in_array, status_flag)
 

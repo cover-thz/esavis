@@ -201,6 +201,8 @@ DFLT_CFG_DICT["dbg_0"] = False
 DFLT_CFG_DICT["dbg_1"] = False
 DFLT_CFG_DICT["dbg_2"] = False
 DFLT_CFG_DICT["profiler"] = False
+#DFLT_CFG_DICT["daq_debug"] = False
+DFLT_CFG_DICT["daq_debug"] = True
 
 
 ##############################################################################
@@ -245,12 +247,12 @@ class MainWindow(QMainWindow):
 
         # Config data transfer handshaking flags
         s.cfg_pipe_count    = 0
-        s.cfg_pipe_maxcount = 3
+        s.cfg_pipe_maxcount = 1
         s.update_cfg_flag   = False
 
         # starts out at 2 seconds when the daq is not connected, changes t
-        s.NO_DAQ_PERIOD         = 1.0
-        s.DAQ_CONNECTED_PERIOD  = 0.25
+        s.NO_DAQ_PERIOD         = 3.0
+        s.DAQ_CONNECTED_PERIOD  = 0.1
         s.min_update_period     = s.NO_DAQ_PERIOD
 
         # this is used to mark time for how often we're querying the processing
@@ -571,10 +573,6 @@ class MainWindow(QMainWindow):
 
         elif "force_update" in cfg_dict["flags"]:
             update = True
-
-        else:
-            if ((time.time() - s.last_update_time) > s.min_update_period):
-                update = True
 
         # instead of actually performing the update here we "mark" it for
         # update by the timer handler which will perform the actual update

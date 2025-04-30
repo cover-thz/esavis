@@ -167,6 +167,7 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
     file_params["data_good"]        = None
     profiler_enabled                = False
 
+    update_id = 0 # temporary
     # setup everything 
     #   DAQ socket and sending that configuration
     #   xml thing.  Abstract away as much as possible
@@ -174,7 +175,7 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
     #   multiprocessing concurrent.futures stuff as desired
 
     while True:
-        #print("while loop called")
+        new_frame_flag = False
         #####################################################################
         #                      QUERY HANDLING STEPS                         #
         #####################################################################
@@ -191,7 +192,6 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
         if send_status:
             query_out_pipe.send(query_out_dict)
 
-        new_frame_flag = False
         # do a status check of everything, the DAQ connection in particular
         # but anything that could periodically change asynchronously
 
@@ -203,6 +203,8 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
         if (cfg_obj_pipe.poll()):
             new_cfg_vals = cfg_obj_pipe.recv()
             query_out_dict = OrderedDict()
+            # the value at "CFG_ACK" doesn't matter, the presence of the key 
+            # is the "ack"
             query_out_dict["CFG_ACK"] = None
             query_out_pipe.send(query_out_dict)
 
@@ -210,32 +212,44 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
             for keyval in new_cfg_vals.keys():
                 cfg_dict[keyval] = new_cfg_vals[keyval]
 
-                cfg_update = True
                 # ultimately we'll want to not do an update on any change
                 # but for now just always update
-                #if keyval in update_keys:
-                #    cfg_update = True
-                #else:
-                #    cfg_update = False
+                cfg_update = True
         
             # all new cfg_obj_pipe values have a flags dict
             # and we check the flags to see what we have to do 
             cfg_flags = new_cfg_vals["flags"]
             if "close_process" in cfg_flags:
                 radar.disconnect()
+                print("data_processor shutting down....")
                 break
 
-            if ("setup_daq" in cfg_flags) or ("update_daq_ch" in cfg_flags):
-                ch0_en = cfg_dict["ch0_en"]
-                ch1_en = cfg_dict["ch1_en"]
+            #####################
+            # DAQ SETUP STEPS
+            #####################
+            # only do DAQ operations if the DAQ is the data source
+            if cfg_dict["data_src"] == "daq":
+                # if the system is paused, disconnect from the DAQ
+                # this appears to be the cleanest way to deal with pausing
+                if cfg_dict["paused"] == True:
+                    radar.disconnect()
 
-                if not radar.daq_connected:
-                    addr   = cfg_dict["daq_addr"]
-                    conn_success = radar.setup_comms(addr, ch0_en, ch1_en)
-                    #if not conn_success:
-                    #    error_pipe.send(["DAQ_CONN_FAILED"])
-                else:
-                    radar.set_en_channels(ch0_en, ch1_en)
+                elif ("setup_daq" in cfg_flags) or ("update_daq_ch" in cfg_flags):
+                    ch0_en = cfg_dict["ch0_en"]
+                    ch1_en = cfg_dict["ch1_en"]
+
+                    if not radar.daq_connected:
+                        addr   = cfg_dict["daq_addr"]
+                        conn_success = radar.setup_comms(addr, ch0_en, ch1_en)
+                        #if not conn_success:
+                        #    error_pipe.send(["DAQ_CONN_FAILED"])
+                    else:
+                        radar.set_en_channels(ch0_en, ch1_en)
+
+
+            # disable the DAQ if it's not in use
+            else: 
+                radar.disconnect()
 
             # easy way to turn on and off profiling of the code
             if "enable_profiler" in cfg_flags:
@@ -268,9 +282,12 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
             max_az          = cfg_dict["max_az"] - cfg_dict["turn_az_margin"]
             ch0_offset      = cfg_dict["ch0_offset"]
             ch1_offset      = cfg_dict["ch1_offset"]
-
-
-
+            daq_debug       = cfg_dict["daq_debug"]
+            if type(daq_debug) == str:
+                if daq_debug.strip().lower() == "true":
+                    daq_debug = True
+                else:
+                    daq_debug = False
 
             # this directs get_daq_data() to stop looking for rangelines after
             # a turnaround is detected and return immediately
@@ -287,7 +304,8 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
             status_flag) = radar.get_daq_data(daq_num_rangelines, 
                                               turnaround_mode, turn_hyst,
                                               min_az, max_az, ch0_offset, 
-                                              ch1_offset, daq_timeout)
+                                              ch1_offset, daq_timeout, 
+                                              daq_debug)
 
 
             # basically indicates the DAQ is not connected, pause a moment 
@@ -297,9 +315,7 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
                 continue
 
             # can gather a lot of metadata here
-
             # turnaround_inds not used right now
-
 
             if status_flag not in ["OK", "TIMEOUT"]:
                 print(status_flag)
@@ -307,11 +323,6 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
                 continue 
 
             if num_rangelines == 0:
-                continue
-
-            # If we're paused we want to grab the rangelines but effectively 
-            # do nothing with them
-            if cfg_dict["paused"] == True:
                 continue
 
             # this is required to resize the numpy arrays since those 
@@ -329,7 +340,6 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
                 print(f"        daq rangelines acq: {num_rangelines}")
 
 
-
             if profiler_enabled:
                 start_time = time.time()
             (frame_out, aux_data_out, 
@@ -337,8 +347,8 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
                                              az_array, el_array, ch_array, 
                                              turn_flag, reset_in_array, 
                                              cfg_dict, cfg_flags, None, 
-                                             dbg_prof)
-                                             
+                                             update_id, dbg_prof)
+                                            
 
             if profiler_enabled:
                 end_time = time.time()
@@ -351,7 +361,6 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
         elif cfg_dict["data_src"] == "disabled":
             pass
 
-        # NOTE DAT FILE DATA SOURCE UNTESTED
         else: # cfg_dict["data_src"] == "dat_file":
             if cfg_dict["paused"] == True:
                 continue
@@ -425,12 +434,13 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
                                      az_array, el_array, ch_array, 
                                      turn_flag, reset_in_array, 
                                      cfg_dict, cfg_flags, 
-                                     file_params, dbg_prof)
+                                     file_params, update_id, dbg_prof)
                 #print(f"file processed with new_frame_flag = {new_frame_flag}")
                                          
         # send frame
         if new_frame_flag:
             data_out_pipe.send([frame_out, aux_data_out])
+
 
 
 

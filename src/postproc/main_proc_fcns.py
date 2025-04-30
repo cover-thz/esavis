@@ -71,9 +71,51 @@ class CoverProc:
         s.r_grid_el     = np.zeros((s.xlen, s.ylen), dtype=np.float64)
 
     # Main Workhorse Function
+    """
+    rangelines_array
+        vector of rangelines, first dimension is rangeline "index", second
+        dimension is the bin within the rangeline.  Can be time-domain, freq,
+        or power-spectrum
+
+    az_array
+        vector of azimuth values for azimuth values corresponding to each
+        rangeline in rangelines array
+
+    el_array
+        vector of elevation values for elevation values corresponding to each
+        rangeline in rangelines array
+
+    ch_array
+        vector of channel values for channel values corresponding to each
+        rangeline in rangelines array
+
+    turn_flag
+        turnaround flag from the daq_comms indicating if an azimuth 
+        turnaround has occurred
+
+    reset_in_array
+        this indicates there was a reset condition in the array of rangelines
+        see daq_comms.py for details
+    
+    cfg_dict
+        the configuration dictionary
+
+    cfg_flags
+        the configuration flags
+
+    file_params
+        file parameters as they may differ from the corresponding values in 
+        the configuration dictionary (as parameters in the file will take
+        precedence over parameters in the GUI)
+
+    update_id
+        a number sent along with each cfg_dict update that indicates which
+        set of updates this frame corresponds to.
+    """
+
     def postproc_data(s, rangelines_array, az_array, el_array, 
                       ch_array, turn_flag, reset_in_array, cfg_dict, 
-                      cfg_flags, file_params, dbg_prof=False):
+                      cfg_flags, file_params, update_id, dbg_prof=False):
 
         #################################################################
         #        Grab Some Data and Check for Reset Conditions          #
@@ -322,6 +364,7 @@ class CoverProc:
             frame_out["pixel_grid"]  = pixel_grid
             frame_out["valid_pixels_grid"]  = valid_pixels_grid
             frame_out["noise_floor_grid"]   = noise_floor_grid
+            frame_out["update_id"]          = update_id
 
 
             # aux data
