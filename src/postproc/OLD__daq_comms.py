@@ -55,8 +55,62 @@ class DAQSocket:
         self.sock.settimeout(0.25)
         self.data_buffer = bytearray()
 
+        # buffer variables
+        self.MAX_BUF_SIZE = 16384
+        self.buf_init = False
+        self.curr_buf = None
+        self.next_buf = None
+        self.curr_buf_bytes = 0
+        self.buf_ind = 0
+
+
     def close(self):
         self.sock.close()
+
+
+    def read_from_buf(self, length):
+        # initialize the buffer
+        if not self.buf_init:
+            self.curr_buf = self.sock.recv(self.MAX_BUF_SIZE)
+            self.curr_buf_bytes = len(self.curr_buf)
+            self.buf_init = True
+
+        # the straighforward grab
+        if length <= self.curr_buf_bytes:
+            data_out = self.curr_buf[self.buf_ind:self.buf_ind+length]
+            self.buf_ind = self.buf_ind + length
+            self.curr_buf_bytes = self.curr_buf_bytes - length
+            return data_out
+
+        # need to read more bytes from the socket 
+        if length > self.curr_buf_bytes:
+            self.next_buf = self.sock.recv(self.MAX_BUF_SIZE)
+            self.next_buf_bytes = len(self.next_buf)
+
+            # not enough bytes, hopefully a rare occurrence
+            if length > (self.curr_buf_bytes + self.next_buf_bytes):
+                print("Warning: LOW DATA RATE OR BUFFER PROBLEM")
+                self.next_buf += self.sock.recv(self.MAX_BUF_SIZE)
+                self.next_buf_bytes = len(self.next_buf)
+
+            # if it happens again we abort
+            if length > (self.curr_buf_bytes + self.next_buf_bytes):
+                print("Warning: TOO FEW BYTES")
+                return None
+
+            
+            # grab everything left in the current buffer
+            data_out = self.curr_buf[self.buf_ind:]
+            excess_bytes = length - self.curr_buf_bytes
+
+            # grab the remaining necessary from the next buffer
+            data_out += self.next_buf[:excess_bytes]
+            self.curr_buf_bytes = self.next_buf_bytes - excess_bytes
+            self.buf_ind = excess_bytes
+            self.curr_buf = self.next_buf
+            return data_out
+                   
+
 
     def recv_full(self, length):
         data = bytearray()
@@ -67,7 +121,9 @@ class DAQSocket:
                     self.data_buffer = self.data_buffer[length:]
                 if len(data) == length:
                     break
-                data += self.sock.recv(length-len(data))
+
+                data += self.read_from_buf(length-len(data))
+                #data += self.sock.recv(length-len(data))
             except socket.timeout:
                 self.data_buffer += data
                 return None
@@ -124,8 +180,8 @@ class DAQSocket:
     def send_message(self, message: TLVMessage):
         self.sock.send(DAQSocket.pack_message(message))
 
-    def recv(self, length):
-        return self.sock.recv(length)
+    #def recv(self, length):
+    #    return self.sock.recv(length)
 
 #############################################################################
 #############################################################################
@@ -160,6 +216,7 @@ class SimpRadar:
     en_channels         = None 
     daq_connected       = False
     rangeline_buffer    = None
+    state               = "RESET"
 
     def __init__(s):
         s.daq_sock = DAQSocket()
@@ -187,14 +244,21 @@ class SimpRadar:
     def init_connection(s):
         try:
             s.daq_sock.connect(s.addr)
+
         except IOError as e:
             s.daq_connected = False
             s.daq_sock.close()
-            print("Failed to connect to DAQ socket")
+            #print("Failed to connect to DAQ socket")
             #s.warning_made.emit(["Failed to connect to DAQ socket"])
-            print(e)
+            #print(e)
             return False
 
+        except Exception as e:
+            s.daq_connected = False
+            s.daq_sock.close()
+            print(e)
+            return False
+   
         s.daq_connected = True
         print("Connected")
 
@@ -215,14 +279,15 @@ class SimpRadar:
     def send_trace_config(s):
         # need to have trace_config.xml in the same directory as the 
         # postprocessing code
+        current_dir = os.path.dirname(os.path.abspath(__file__))
         if os.name == "nt":
             #REPO_TOP_DIR = os.path.dirname(os.getcwd())
-            trace_cfg_fname = "trace_config.xml"
+            trace_cfg_fpath = current_dir + "\\trace_config.xml"
         else:
-            trace_cfg_fname = "trace_config.xml"
+            trace_cfg_fpath = current_dir + "/trace_config.xml"
 
         trace_template = ""
-        with open(trace_cfg_fname, "r", encoding="utf-8") as tc:
+        with open(trace_cfg_fpath, "r", encoding="utf-8") as tc:
             trace_template = tc.read()
         traces = []
         for channel in s.en_channels:
@@ -240,8 +305,15 @@ class SimpRadar:
 
 
     # main workhorse function
-    def get_daq_data(s, num_rangelines, ret_on_turnaround, timeout=3):
+    def get_daq_data(s, num_rangelines, turnaround_mode, turn_hyst, min_az, 
+                     max_az, ch0_offset, ch1_offset, timeout=3, debug=False):
+                                              
         start_time = time.time()
+        
+        if not turnaround_mode:
+            s.state = "RESET"
+            turn_flag = "DISABLED"
+
 
         buffer_setup = False
         status_flag = "OK"
@@ -249,16 +321,45 @@ class SimpRadar:
         az_array = None
         el_array = None
         ch_array = None
-        turnaround_inds = []
         prev_az = None
         az_diff_pos = None
+        reset_in_array = False
 
         # index of the rangeline.  Also doubles as number of rangelines 
         # captureed
         i = 0 
+        
+        # debug time vals
+        tot_dur             = 0
+        tot_daq_sock_dur    = 0
+        tot_datagrab_dur    = 0
+        tot_other_dur       = 0
+        tot_misc_dur        = 0
+        if debug:
+            loop_start = time.time_ns()
+            daq_sock_start = loop_start
+            data_grab_start = loop_start
+            other_time_start = loop_start
+            loop_end = loop_start
         while True:
+            if debug:
+                tot_inc             = (loop_end - loop_start)
+                tot_daq_sock_inc    = (data_grab_start - daq_sock_start)
+                tot_datagrab_inc    = (other_time_start - data_grab_start)
+                tot_other_inc       = (loop_end - other_time_start)
+                tot_misc_inc        = (tot_inc - tot_daq_sock_inc - 
+                                        tot_datagrab_inc - tot_other_inc)
 
+                tot_dur             += tot_inc
+                tot_daq_sock_dur    += tot_daq_sock_inc
+                tot_datagrab_dur    += tot_datagrab_inc
+                tot_other_dur       += tot_other_inc
+                tot_misc_dur        += tot_misc_inc
+
+                # NOTE time accounting goes here
+                loop_start = time.time_ns()
             if not s.daq_connected:
+                turn_flag = "DISABLED"
                 status_flag = "DAQ_NOT_CONNECTED"
                 break
 
@@ -268,17 +369,29 @@ class SimpRadar:
 
             # this is if there's a timeout
             if time.time() - start_time > timeout:
+                turn_flag = "DISABLED" 
                 status_flag = "TIMEOUT"
                 break
 
+            if debug:
+                daq_sock_start = time.time_ns()
             try:
                 (radar_data, data_valid) = s.daq_sock.receive_message()
             except ConnectionResetError:
+                s.daq_connected = False
                 status_flag = "CONN_RESET"
+                turn_flag = "DISABLED"
                 break
+
+            if debug:
+                data_grab_start = time.time_ns()
 
             # check for returning none
             if data_valid == False:
+                if debug:
+                    other_time_start = time.time_ns()
+                    loop_end = time.time_ns()
+                    print("daq_comms: data_valid == False")
                 continue
 
             else:
@@ -309,38 +422,17 @@ class SimpRadar:
                         "big",
                         signed=False,)
 
-                    # setup turnaround detection
-                    if prev_az == None:
-                        prev_az = az_val
-                    else:
-                        diff = az_val - prev_az
-                        # is az_diff initialised yet?
-                        if az_diff_pos == None:
-                            if diff > 0:
-                                az_diff_pos = True
-                            elif diff < 0:
-                                az_diff_pos = False
-                            else: 
-                                # wait for an actual difference
-                                az_diff_pos = None
-                        else:
-                            diff_dir = bool(diff > 0)
-                            if diff_dir != az_diff_pos:
-                                #ipdb.set_trace()
-                                turnaround_inds.append(i)
-                                if ret_on_turnaround:
-                                    print("TURNAROUND")
-                                    print(f"    az_val   = {az_val}")
-                                    print(f"    prev_az  = {prev_az}")
-                                    status_flag = "TURNAROUND"
-                                    break
+                    if debug:
+                        other_time_start = time.time_ns()
 
                     # setup the buffers now because you don't know the 
                     # length of the rangeline until now
                     if not buffer_setup:
                         len_rangeline = len(rangeline)
+                        #rangelines_array = np.zeros((num_rangelines, 
+                        #    len_rangeline), dtype=np.complex128)
                         rangelines_array = np.zeros((num_rangelines, 
-                            len_rangeline), dtype=np.complex128)
+                            len_rangeline), dtype=np.complex64)
                         az_array = np.zeros((num_rangelines))
                         el_array = np.zeros((num_rangelines))
                         ch_array = np.zeros((num_rangelines))
@@ -348,19 +440,116 @@ class SimpRadar:
 
                     if len(rangeline) != len_rangeline:
                         status_flag = "RANGELINE_LEN_CHANGE"
+                        s.state = "RESET"
                         break
-                    rangelines_array[i] = rangeline
-                    az_array[i] = az_val
-                    el_array[i] = el_val
-                    ch_array[i] = channel_val
-                    i += 1
-                        
-                else:
-                    print("Warning: Received non-plot command data")
-                    continue
 
+
+                    # state machine
+                    # Note: nonzero turn_hyst will produce "wobble" at frame
+                    # edges
+                    if turnaround_mode:
+                        if channel_val == 0:
+                            az_val_adj = az_val + ch0_offset
+                        else:
+                            az_val_adj = az_val + ch1_offset
+
+                        if s.state == "RESET":
+                            turn_flag = "RESET"
+                            if az_val_adj < (min_az - turn_hyst):
+                                s.state = "TURNING_MIN"
+                            elif az_val_adj > (max_az + turn_hyst):
+                                s.state = "TURNING_MAX"
+                            else:
+                                az_val_adj = "WAITING_FOR_TURN"
+
+                        elif s.state == "WAITING_FOR_TURN":
+                            turn_flag = "RESET"
+                            if az_val_adj < (min_az - turn_hyst):
+                                s.state = "TURNING_MIN"
+                            elif az_val_adj > (max_az + turn_hyst):
+                                s.state = "TURNING_MAX"
+
+                            # else: s.state stays the same
+
+                        elif s.state == "TURNING_MIN":
+                            turn_flag = "RESET"
+                            # start of frame
+                            if az_val_adj > (min_az + turn_hyst):
+                                s.state = "RUNNING_TO_MAX"
+                                turn_flag = "START_FRAME"
+
+                        elif s.state == "TURNING_MAX":
+                            turn_flag = "RESET"
+                            # start of frame
+                            if az_val_adj < (max_az - turn_hyst):
+                                s.state = "RUNNING_TO_MIN"
+                                turn_flag = "START_FRAME"
+
+                        elif s.state == "RUNNING_TO_MAX":
+                            turn_flag = "RUNNING"
+                            if az_val_adj > (max_az + turn_hyst):
+                                s.state = "TURNING_MAX"
+                                turn_flag = "END_FRAME"
+
+                        elif s.state == "RUNNING_TO_MIN":
+                            turn_flag = "RUNNING"
+                            if az_val_adj < (min_az - turn_hyst):
+                                s.state = "TURNING_MIN"
+                                turn_flag = "END_FRAME"
+
+                        else:
+                            raise Exception("Invalid SimpRadar State")
+                        
+
+                        # Now we perform the appropriate updates based on 
+                        # state
+
+
+                        # this is to ensure the processing reset prior to 
+                        # grabbing the first data sample 
+                        if turn_flag in ["RESET", "START_FRAME"]:
+                            reset_in_array = True
+
+                        # only add values to the array in valid azimuth ranges
+                        if turn_flag in ["RUNNING", "START_FRAME", "END_FRAME"]:
+                            rangelines_array[i] = rangeline
+                            az_array[i] = az_val
+                            el_array[i] = el_val
+                            ch_array[i] = channel_val
+                            i += 1
+
+                        if turn_flag == "END_FRAME":
+                            #status_flag = "TURNAROUND"
+                            s.state = "RESET"
+                            break
+
+                    else: # turnaround mode not enabled
+                        rangelines_array[i] = rangeline
+                        az_array[i] = az_val
+                        el_array[i] = el_val
+                        ch_array[i] = channel_val
+                        i += 1
+
+                else:
+                    if debug:
+                        other_time_start = time.time_ns()
+                    print("Warning: Received non-plot command data")
+
+                if debug:
+                    loop_end = time.time_ns()
+
+        if debug:
+            if i != 0:
+                print("---------------DURATIONS PER RANGELINE ACQ ------------")
+                print(f"Total number of rangelines: {i}")
+                print(f"tot_dur: {tot_dur/1e3/i:.4f} us")
+                print(f"tot_daq_sock_dur: {tot_daq_sock_dur/1e3/i:.4f} us")
+                print(f"tot_datagrab_dur: {tot_datagrab_dur/1e3/i:.4f} us")
+                print(f"tot_other_dur: {tot_other_dur/1e3/i:.4f} us")
+                print(f"tot_misc_dur: {tot_misc_dur/1e3/i:.5f} us")
+                print("-------------------------------------------------------\n")
         return (rangelines_array, az_array, el_array, ch_array, 
-                i, turnaround_inds, status_flag)
+                i, turn_flag, reset_in_array, status_flag)
 
 
 

@@ -435,7 +435,7 @@ def regrid_rangelines(rangelines_in, el_array_in, az_array_in, channels_in,
 
     """
     if dbg_prof:
-        regrid_start = time.time()
+        regrid_start = time.time_ns()
 
     # first make initial adjustments to the rangelines el and az 
     # encoder values etc.
@@ -458,8 +458,9 @@ def regrid_rangelines(rangelines_in, el_array_in, az_array_in, channels_in,
                             ideal_el_array.shape[0]), dtype=bool)
 
     if dbg_prof:
-        time_1 = time.time()
-        print(f"    regrid functions set 1 duration: {time_1-regrid_start:.4f}")
+        time_1 = time.time_ns()
+        dur_ms = float(time_1-regrid_start) / 1e6
+        print(f"    regrid functions set 1 duration: {dur_ms:.4f} ms")
 
     npts_az = len(ideal_az_array)
     npts_el = len(ideal_el_array)
@@ -470,8 +471,9 @@ def regrid_rangelines(rangelines_in, el_array_in, az_array_in, channels_in,
         coarse_valid_grid, coarse_rangelines_grid, npts_az, npts_el)
     
     if dbg_prof:
-        time_2 = time.time()
-        print(f"    regrid functions set 2 duration: {time_2-time_1:.4f}")
+        time_2 = time.time_ns()
+        dur_ms = float(time_2-time_1) / 1e6
+        print(f"    regrid functions set 2 duration: {dur_ms:.4f} ms")
 
     return (coarse_rangelines_grid, coarse_valid_grid, 
             ideal_az_array, ideal_el_array, real_az_out, real_el_out)
@@ -769,7 +771,7 @@ def extract_peaks_c(coarse_power_grid_in, coarse_valid_grid_in, xlen_in,
     ###########################################################################
     ###########################################################################
     if dbg_prof:
-        cfunc_start = time.time()
+        cfunc_start = time.time_ns()
     # call the C functions
     ret_val = extract_all_rangeline_peaks(power_array, valid_array, arr_len, 
         rng_len, range_lut_cm, threshold_lin, contrast_lin, half_peak_width, 
@@ -777,9 +779,9 @@ def extract_peaks_c(coarse_power_grid_in, coarse_valid_grid_in, xlen_in,
         calc_weighted_sum, back_peak_bool_in, peak_ranges_array, 
         peak_powers_lin_array, noise_floor_array, num_peaks_array, 
         sel_ranges_array_out) 
-    cfunc_stop = time.time()
+    cfunc_stop = time.time_ns()
     if dbg_prof:
-        cfcn_time_ms = (cfunc_stop - cfunc_start) * 1000
+        cfcn_time_ms = float(cfunc_stop - cfunc_start) / 1e6
         print(f"*******C function only duration: {cfcn_time_ms:.4f} ms")
     ###########################################################################
     ###########################################################################

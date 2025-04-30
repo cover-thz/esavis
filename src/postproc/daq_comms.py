@@ -20,7 +20,9 @@ import uuid
 import socket
 import time
 import os
+import daq_acq_core as dac
 import ipdb
+from collections import OrderedDict
 from tlv import (
     TLV,
     TLVMessage,
@@ -156,16 +158,55 @@ class DAQSocket:
 # as simplified interface class for the radar when dealing with the DAQ
 class SimpRadar:
     addr                = None
-    daq_sock            = None
+    #daq_sock            = None
     en_channels         = None 
     daq_connected       = False
     rangeline_buffer    = None
     state               = "RESET"
 
     def __init__(s):
-        s.daq_sock = DAQSocket()
-        s.tot_rangelines = 0
-        s.en_channels = []
+        #s.daq_sock = DAQSocket()
+
+        # construct the aquisition process NOTE NEW STUFF!
+        data_queue    = mp.Queue(maxsize=100000)
+        (acq_cdh_pipe_in, cdh_pipe_out)  = mp.Pipe(duplex=False)
+        (cdh_pipe_in, acq_cdh_pipe_out)  = mp.Pipe(duplex=False)
+
+        s.acq_obj = mp.Process(target=dac.main_acq_loop, args=(acq_cdh_pipe_in, 
+            acq_cdh_pipe_out, data_queue,))
+        s.acq_obj.start()
+        s.tot_rangelines    = 0
+        s.en_channels       = []
+        s.cdh_msg_id        = 0
+        s.acq_timeout       = 3.0
+
+
+    # sends a value to the acq_obj using the cdh pipe and waits for a response
+    # from the acq_obj
+    def ack_cdh_handshake_trans(s, key, value_out):
+        new_dict_out        = OrderedDict()
+        msg_id_out          = s.cdh_msg_id
+        new_dict_out[key]   = (msg_id_out, value_out)
+        s.cdh_msg_id       += 1
+        s.cdh_pipe_out.send(new_dict_out)
+        start = time.time()
+        while True:
+            if s.cdh_pipe_in.poll():
+                new_dict_in = cdh_pipe_in.recv()
+                if key in new_dict_in.keys():
+                    (msg_id_in, value_in) = new_dict_in[key]
+                    # verify that the response is directed to the same message
+                    # and not just the same message type
+                    if msg_id_in == msg_id_out:
+                        response = value_in
+                        break
+
+            if time.time() - start > s.acq_timeout:
+                print("Warning: ack_cdh_handshake_trans() timeout")
+                response = None
+                break
+        return response
+
 
     def setup_comms(s, addr, ch0_en, ch1_en):
         s.addr = addr
@@ -186,66 +227,33 @@ class SimpRadar:
 
 
     def init_connection(s):
-        try:
-            s.daq_sock.connect(s.addr)
-
-        except IOError as e:
+        status = s.ack_cdh_handshake_trans("INIT_CONN", (s.addr, s.en_channels))
+        if status:
+            s.daq_connected = True
+            print("Connected")
+            return True
+        else:
             s.daq_connected = False
-            s.daq_sock.close()
-            #print("Failed to connect to DAQ socket")
-            #s.warning_made.emit(["Failed to connect to DAQ socket"])
-            #print(e)
             return False
-
-        except Exception as e:
-            s.daq_connected = False
-            s.daq_sock.close()
-            print(e)
-            return False
-   
-        s.daq_connected = True
-        print("Connected")
-
-        # receive configs (and do nothing with them)
-        s.daq_sock.receive_message()
-        s.send_trace_config()
-        return True
 
 
     def disconnect(s):
         if s.daq_connected:
-            s.daq_sock.close()
+            #s.daq_sock.close()
+            ack = s.ack_cdh_handshake_trans("DISCONNECT", None)
             s.daq_connected = False
 
 
     # need to call this at the beginning and whenever we change the number of 
     # channels.  I think.
     def send_trace_config(s):
-        # need to have trace_config.xml in the same directory as the 
-        # postprocessing code
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        if os.name == "nt":
-            #REPO_TOP_DIR = os.path.dirname(os.getcwd())
-            trace_cfg_fpath = current_dir + "\\trace_config.xml"
-        else:
-            trace_cfg_fpath = current_dir + "/trace_config.xml"
+        ack = s.ack_cdh_handshake_trans("SEND_TRACE", s.en_channels)
 
-        trace_template = ""
-        with open(trace_cfg_fpath, "r", encoding="utf-8") as tc:
-            trace_template = tc.read()
-        traces = []
-        for channel in s.en_channels:
-            traces.append(trace_template.replace("{{channel}}", str(channel)))
-        full_config = "<configs>\n{{traces}}\n</configs>\x00"
-        full_config = full_config.replace("{{traces}}", "\n".join(traces))
-        trace_tlv = TLV(
-            TLVPlotTag.CONFIGSXML_STRING,
-            TLVType.CHAR_ARRAY,
-            bytes(full_config, "utf-8"),
-        )
 
-        trace_message = TLVMessage(TLVPlotCmd.SEND_TRACE_CONFIG, [trace_tlv])
-        s.daq_sock.send_message(trace_message)
+    def __del__(s):
+        s.acq_obj.join() # might need to close the pipes brutally in order
+                         # for this to work
+
 
 
     # main workhorse function
@@ -280,7 +288,7 @@ class SimpRadar:
         tot_other_dur       = 0
         tot_misc_dur        = 0
         if debug:
-            loop_start = time.process_time_ns()
+            loop_start = time.time_ns()
             daq_sock_start = loop_start
             data_grab_start = loop_start
             other_time_start = loop_start
@@ -300,8 +308,7 @@ class SimpRadar:
                 tot_other_dur       += tot_other_inc
                 tot_misc_dur        += tot_misc_inc
 
-                # NOTE time accounting goes here
-                loop_start = time.process_time_ns()
+                loop_start = time.time_ns()
             if not s.daq_connected:
                 turn_flag = "DISABLED"
                 status_flag = "DAQ_NOT_CONNECTED"
@@ -318,7 +325,7 @@ class SimpRadar:
                 break
 
             if debug:
-                daq_sock_start = time.process_time_ns()
+                daq_sock_start = time.time_ns()
             try:
                 (radar_data, data_valid) = s.daq_sock.receive_message()
             except ConnectionResetError:
@@ -328,13 +335,13 @@ class SimpRadar:
                 break
 
             if debug:
-                data_grab_start = time.process_time_ns()
+                data_grab_start = time.time_ns()
 
             # check for returning none
             if data_valid == False:
                 if debug:
-                    other_time_start = time.process_time_ns()
-                    loop_end = time.process_time_ns()
+                    other_time_start = time.time_ns()
+                    loop_end = time.time_ns()
                     print("daq_comms: data_valid == False")
                 continue
 
@@ -367,7 +374,7 @@ class SimpRadar:
                         signed=False,)
 
                     if debug:
-                        other_time_start = time.process_time_ns()
+                        other_time_start = time.time_ns()
 
                     # setup the buffers now because you don't know the 
                     # length of the rangeline until now
@@ -476,11 +483,11 @@ class SimpRadar:
 
                 else:
                     if debug:
-                        other_time_start = time.process_time_ns()
+                        other_time_start = time.time_ns()
                     print("Warning: Received non-plot command data")
 
                 if debug:
-                    loop_end = time.process_time_ns()
+                    loop_end = time.time_ns()
 
         if debug:
             if i != 0:

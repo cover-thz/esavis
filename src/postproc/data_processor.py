@@ -14,7 +14,8 @@
 
 import multiprocessing as mp
 from collections import OrderedDict
-import daq_comms as dc
+#import daq_comms as dc
+import OLD__daq_comms as dc
 import main_proc_fcns as mpf
 import dat_file_fcns as dff
 import time
@@ -254,9 +255,11 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
             # easy way to turn on and off profiling of the code
             if "enable_profiler" in cfg_flags:
                 profiler_enabled = True
+                dbg_prof = True
             
             if "disable_profiler" in cfg_flags:
                 profiler_enabled = False
+                dbg_prof = False
 
 
         else: # no updated config values
