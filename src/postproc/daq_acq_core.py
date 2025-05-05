@@ -54,7 +54,9 @@ class DAQSocket:
         self.data_buffer = bytearray()
 
         # buffer variables
-        self.MAX_BUF_SIZE = 8192
+        #self.MAX_BUF_SIZE = 65536
+        self.MAX_BUF_SIZE = 1048576 
+        self.sock_accesses = 0
         self.buf_init = False
         self.curr_buf = None
         self.next_buf = None
@@ -62,51 +64,53 @@ class DAQSocket:
         self.buf_ind = 0
 
     def close(self):
+        self.buf_init = False
         self.sock.close()
 
 
     def read_from_buf(self, length):
-        # initialize the ping buffer
+        # initialize the buffer
         if not self.buf_init:
-            self.curr_buf = self.sock.recv(self.MAX_BUF_SIZE)
-            self.curr_buf_ping = True
+            #self.curr_buf = self.sock.recv(self.MAX_BUF_SIZE)
+            self.curr_buf = self.recv_alias(self.MAX_BUF_SIZE)
             self.curr_buf_bytes = len(self.curr_buf)
+            self.buf_init = True
 
-        else:
-            # the straighforward grab
-            if length <= self.curr_buf_bytes:
-                data_out = self.curr_buf[self.buf_ind:self.buf_ind+length]
-                self.buf_ind = self.buf_ind + length
-                self.curr_buf_bytes = self.curr_buf_bytes - length
-                return data_out
+        # the straighforward grab
+        if length <= self.curr_buf_bytes:
+            data_out = self.curr_buf[self.buf_ind:self.buf_ind+length]
+            self.buf_ind = self.buf_ind + length
+            self.curr_buf_bytes = self.curr_buf_bytes - length
+            return data_out
 
-            # need to read more bytes from the socket 
-            if length > self.curr_buf_bytes:
-                self.next_buf = self.sock.recv(self.MAX_BUF_SIZE)
+        # need to read more bytes from the socket 
+        if length > self.curr_buf_bytes:
+            #self.next_buf = self.sock.recv(self.MAX_BUF_SIZE)
+            self.next_buf = self.recv_alias(self.MAX_BUF_SIZE)
+            self.next_buf_bytes = len(self.next_buf)
+
+            # not enough bytes, hopefully a rare occurrence
+            if length > (self.curr_buf_bytes + self.next_buf_bytes):
+                print("Warning: LOW DATA RATE OR BUFFER PROBLEM")
+                #self.next_buf += self.sock.recv(self.MAX_BUF_SIZE)
+                self.next_buf += self.recv_alias(self.MAX_BUF_SIZE)
                 self.next_buf_bytes = len(self.next_buf)
 
-                # not enough bytes, hopefully a rare occurrence
-                if length > (self.curr_buf_bytes + self.next_buf_bytes):
-                    print("Warning: LOW DATA RATE OR BUFFER PROBLEM")
-                    self.next_buf += self.sock.recv(self.MAX_BUF_SIZE)
-                    self.next_buf_bytes = len(self.next_buf)
+            # if it happens again we abort
+            if length > (self.curr_buf_bytes + self.next_buf_bytes):
+                print("Warning: TOO FEW BYTES")
+                return None
+            
+            # grab everything left in the current buffer
+            data_out = self.curr_buf[self.buf_ind:]
+            excess_bytes = length - self.curr_buf_bytes
 
-                # if it happens again we abort
-                if length > (self.curr_buf_bytes + self.next_buf_bytes):
-                    print("Warning: TOO FEW BYTES")
-                    return None
-
-                
-                # grab everything left in the current buffer
-                data_out = self.curr_buf[self.buf_ind:]
-                excess_bytes = length - self.curr_buf_bytes
-
-                # grab the remaining necessary from the next buffer
-                data_out += self.next_buf[:excess_bytes]
-                self.curr_buf_bytes = self.next_buf_bytes - excess_bytes
-                self.buf_ind = excess_bytes
-                self.curr_buf = self.next_buf
-                return data_out
+            # grab the remaining necessary from the next buffer
+            data_out += self.next_buf[:excess_bytes]
+            self.curr_buf_bytes = self.next_buf_bytes - excess_bytes
+            self.buf_ind = excess_bytes
+            self.curr_buf = self.next_buf
+            return data_out
                    
                 
     def recv_full(self, length):
@@ -118,7 +122,8 @@ class DAQSocket:
                     self.data_buffer = self.data_buffer[length:]
                 if len(data) == length:
                     break
-                data += self.sock.recv(length-len(data))
+                data += self.read_from_buf(length-len(data))
+                #data += self.sock.recv(length-len(data))
             except socket.timeout:
                 self.data_buffer += data
                 return None
@@ -175,8 +180,15 @@ class DAQSocket:
     def send_message(self, message: TLVMessage):
         self.sock.send(DAQSocket.pack_message(message))
 
-    def recv(self, length):
-        return self.sock.recv(length)
+    # so I can track accesses to the socket better
+    def recv_alias(self, length):
+        vals = self.sock.recv(length)
+        #self.sock_accesses += 1
+        #if vals != self.MAX_BUF_SIZE:
+        #    print(f"sock accessed only grabbed {len(vals)} vals")
+        #if self.sock_accesses % 1000 == 0:
+        #    print(f"numb sock_accesses = {self.sock_accesses}")
+        return vals
 
 
     ##########################################################################
@@ -211,7 +223,7 @@ class DAQSocket:
 
     def init_connection(s, addr, en_channels):
         try:
-            s.connect(s.addr)
+            s.connect(addr)
         
         except IOError as e:
             #s.daq_connected = False
@@ -252,20 +264,29 @@ be changed often
 """
 
 def main_acq_loop(cdh_pipe_in, cdh_pipe_out, data_queue):
-    CHUNKSIZE = 1000
+    CHUNK_SIZE = 10000 
+    chunk_count = 0
     daq_sock = DAQSocket()
-
+    daq_connected = False
+    tot_rangelines = 0
+    acq_msg_id = 0
+    buffer_setup = False
+    az_val_prev = None
+    i = 0
 
     # setup buffers
     
-
+    loop_cntr = 0
+    dbg_prev_chunk_time = None
+    dbg_prev_chunk_count = 0
     while True:
+        loop_cntr += 1
         #####################################################################
         #                       CDH HANDLING STEPS                          #
         #####################################################################
         while cdh_pipe_in.poll():
-            command_in = query_in_pipe.recv()
-            command_keys = command_ind.keys()
+            command_in = cdh_pipe_in.recv()
+            command_keys = command_in.keys()
 
             if "INIT_CONN" in command_keys:
                 (msg_id, (addr, en_channels)) = command_in["INIT_CONN"] 
@@ -273,6 +294,10 @@ def main_acq_loop(cdh_pipe_in, cdh_pipe_out, data_queue):
                 new_dict_out = OrderedDict()
                 new_dict_out["INIT_CONN"] = (msg_id, status)
                 cdh_pipe_out.send(new_dict_out)
+                if status:
+                    daq_connected = True
+                else:
+                    daq_connected = False
 
 
             elif "DISCONNECT" in command_keys:
@@ -281,6 +306,8 @@ def main_acq_loop(cdh_pipe_in, cdh_pipe_out, data_queue):
                 new_dict_out = OrderedDict()
                 new_dict_out["DISCONNECT"] = (msg_id, None)
                 cdh_pipe_out.send(new_dict_out)
+                daq_connected = False
+
 
 
             elif "SEND_TRACE" in command_keys:
@@ -289,6 +316,14 @@ def main_acq_loop(cdh_pipe_in, cdh_pipe_out, data_queue):
                 new_dict_out = OrderedDict()
                 new_dict_out["SEND_TRACE"] = (msg_id, status)
                 cdh_pipe_out.send(new_dict_out)
+
+            elif "CLOSE_PROCESS" in command_keys:
+                (msg_id, _) = command_in["CLOSE_PROCESS"] 
+                daq_sock.close()
+                new_dict_out = OrderedDict()
+                new_dict_out["CLOSE_PROCESS"] = (msg_id, None)
+                cdh_pipe_out.send(new_dict_out)
+                daq_connected = False
 
 
             else:
@@ -299,76 +334,158 @@ def main_acq_loop(cdh_pipe_in, cdh_pipe_out, data_queue):
         #                  MAIN RANGELINE ACQUISITION                       #
         #####################################################################
 
-        try:
-            (radar_data, data_valid) = s.daq_sock.receive_message()
-        except ConnectionResetError:
-            s.daq_connected = False
-            status_flag = "CONN_RESET"
-            turn_flag = "DISABLED"
-            break
+        if daq_connected:
+            try:
+                (radar_data, data_valid) = daq_sock.receive_message()
+            except ConnectionResetError:
+                new_dict_out = OrderedDict()
+                new_dict_out["STATUS"] = (acq_msg_id, "CONN_RESET")
+                cdh_pipe_out.send(new_dict_out)
+                acq_msg_id += 1
+                daq_connected = False
+                buffer_setup = False
+                i = 0
 
-        if debug:
-            data_grab_start = time.time_ns()
+            # check for returning none
+            if data_valid == False:
+                continue
 
-        # check for returning none
-        if data_valid == False:
-            if debug:
-                other_time_start = time.time_ns()
-                loop_end = time.time_ns()
-                print("daq_comms: data_valid == False")
-            continue
+            else:
+                if radar_data.message_type == TLVPlotCmd.SEND_TRACE_DATA:
+                    tot_rangelines += 1
+                    az_val = float(
+                        from_14_bit(
+                            radar_data.get_by_tag(
+                                TLVTracePCIeHTGZRF80002Tag.AZIMUTH_MOTOR_UINT
+                            ).data,
+                            True,))
+                    
+                    el_val = float(
+                        from_14_bit(
+                            radar_data.get_by_tag(
+                                TLVTracePCIeHTGZRF80002Tag.ELEVATION_MOTOR_UINT
+                            ).data,
+                            False,))
 
-        else:
-            if radar_data.message_type == TLVPlotCmd.SEND_TRACE_DATA:
-                s.tot_rangelines += 1
-                az_val = float(
-                    from_14_bit(
+                    rangeline = np.frombuffer(
+                        radar_data.get_by_tag(TLVPlotTag.DATA_DOUBLE).data, 
+                            dtype=np.complex64)
+
+
+                    channel_val = int.from_bytes(
                         radar_data.get_by_tag(
-                            TLVTracePCIeHTGZRF80002Tag.AZIMUTH_MOTOR_UINT
-                        ).data,
-                        True,))
-                
-                el_val = float(
-                    from_14_bit(
-                        radar_data.get_by_tag(
-                            TLVTracePCIeHTGZRF80002Tag.ELEVATION_MOTOR_UINT
-                        ).data,
-                        False,))
-
-                rangeline = np.frombuffer(
-                    radar_data.get_by_tag(TLVPlotTag.DATA_DOUBLE).data, 
-                        dtype=np.complex64)
+                            TLVTracePCIeHTGZRF80002Tag.CHANNEL_UINT).data,
+                        "big",
+                        signed=False,)
 
 
-                channel_val = int.from_bytes(
-                    radar_data.get_by_tag(
-                        TLVTracePCIeHTGZRF80002Tag.CHANNEL_UINT).data,
-                    "big",
-                    signed=False,)
+                    # setup the buffers now because you don't know the 
+                    # length of the rangeline until now
+                    if not buffer_setup:
+                        print("BUFFER SETUP CHANGED!")
+                        len_rangeline = len(rangeline)
+                        rangelines_array = np.empty((CHUNK_SIZE, 
+                            len_rangeline), dtype=np.complex64)
+                        az_array = np.empty((CHUNK_SIZE))
+                        el_array = np.empty((CHUNK_SIZE))
+                        ch_array = np.empty((CHUNK_SIZE))
+                        buffer_setup = True
 
-                if debug:
-                    other_time_start = time.time_ns()
+                    # if the length of the rangeline changes, immediately 
+                    # trash whatever's in the current buffers 
+                    if len(rangeline) != len_rangeline:
+                        status_flag = "RANGELINE_LEN_CHANGE"
+                        buffer_setup = False
+                        i = 0
+                        continue
 
-                # setup the buffers now because you don't know the 
-                # length of the rangeline until now
-                if not buffer_setup:
-                    len_rangeline = len(rangeline)
-                    #rangelines_array = np.zeros((num_rangelines, 
-                    #    len_rangeline), dtype=np.complex128)
-                    rangelines_array = np.zeros((num_rangelines, 
-                        len_rangeline), dtype=np.complex64)
-                    az_array = np.zeros((num_rangelines))
-                    el_array = np.zeros((num_rangelines))
-                    ch_array = np.zeros((num_rangelines))
-                    buffer_setup = True
+                    # store grabbed values to the buffer
+                    rangelines_array[i] = rangeline
+                    az_array[i] = az_val
+                    el_array[i] = el_val
+                    ch_array[i] = channel_val
+                    i += 1
 
-                if len(rangeline) != len_rangeline:
-                    status_flag = "RANGELINE_LEN_CHANGE"
-                    s.state = "RESET"
-                    break
+                    # DEBUG
+                    if az_val_prev == None:
+                        pass
 
-    
+                    else:
+                        az_diff = (az_val - az_val_prev)
+                        abs_diff = np.abs(az_diff)
+                        if abs_diff > 5:
+                            print(f"ACQ->az_diff = {az_diff}")
+                    az_val_prev = az_val
+
+                else:
+                    print("Warning: Received non-plot command data")
 
 
+            # condition to transfer a chunk to the queue
+            if i == CHUNK_SIZE:
+                while True:
+                    if data_queue.full():
+                        print("data_queue Full!")
+                        time.sleep(0.05)
+                    else:
+                        break
+                # I am having some weird stuff happen and copying these arrays
+                # fixed it.
+                # I suspect that the queue.put() function isn't completed 
+                # before those arrays start getting modified by the next 
+                # set of data coming in
+                # Might make more sense to have a ping-pong buffer system
+                # going on here
+                rng_arr_cpy = None
+                az_arr_cpy  = None
+                el_arr_cpy  = None
+                ch_arr_cpy  = None
+
+                #rng_arr_cpy = copy.deepcopy(rangelines_array)
+                #az_arr_cpy  = copy.deepcopy(az_array)
+                #el_arr_cpy  = copy.deepcopy(el_array)
+                #ch_arr_cpy  = copy.deepcopy(ch_array)
+
+                rng_arr_cpy = rangelines_array
+                az_arr_cpy  = az_array
+                el_arr_cpy  = el_array
+                ch_arr_cpy  = ch_array
+
+                rangelines_array = None
+                az_array = None
+                el_array = None
+                ch_array = None
+
+                #data_queue.put((rangelines_array, az_array, el_array, 
+                #    ch_array, chunk_count))
+                data_queue.put((rng_arr_cpy, az_arr_cpy, el_arr_cpy, 
+                    ch_arr_cpy, chunk_count))
+
+                rangelines_array = np.empty((CHUNK_SIZE, 
+                    len_rangeline), dtype=np.complex64)
+                az_array = np.empty((CHUNK_SIZE))
+                el_array = np.empty((CHUNK_SIZE))
+                ch_array = np.empty((CHUNK_SIZE))
+
+
+                chunk_count += 1
+                i = 0
+                if (chunk_count % 10) == 0:
+                    dbg_curr_chunk_time = time.time()
+                    if dbg_prev_chunk_time == None:
+                        pass
+                    else:
+                        chunk_rangelines = ((chunk_count - 
+                            dbg_prev_chunk_count) * CHUNK_SIZE)
+                        chunk_time_diff  = dbg_curr_chunk_time - dbg_prev_chunk_time
+                        rng_per_sec      = chunk_rangelines / chunk_time_diff
+                        print(f"rangelines per second: {rng_per_sec}")
+                    dbg_prev_chunk_time  = dbg_curr_chunk_time
+                    dbg_prev_chunk_count = chunk_count
+
+
+
+        else: # daq not connected
+            time.sleep(0.05)
 
 

@@ -23,117 +23,6 @@ import os
 import daq_acq_core as dac
 import ipdb
 from collections import OrderedDict
-from tlv import (
-    TLV,
-    TLVMessage,
-    TLVPlotCmd,
-    TLVPlotTag,
-    TLVTracePCIeHTGZRF80002Tag,
-    TLVType,
-)
-
-delimiter = bytes([0xAA, 0x99, 0x55, 0x66])
-
-
-
-def from_14_bit(data: bytes, signed: bool):
-    new_data = bytearray(data)
-    if data[2] & 0x20 != 0 and signed:
-        new_data[2] = data[2] | 0xC0
-        new_data[0] = 0xFF
-        new_data[1] = 0xFF
-    return int.from_bytes(new_data, "big", signed=signed)
-
-
-#############################################################################
-#############################################################################
-class DAQSocket:
-    def __init__(self):
-        self.sock = None
-
-    def connect(self, addr):
-        self.sock = socket.socket()
-        self.sock.connect((addr, 10001))
-        self.sock.settimeout(0.25)
-        self.data_buffer = bytearray()
-
-    def close(self):
-        self.sock.close()
-
-    def recv_full(self, length):
-        data = bytearray()
-        while len(data) < length:
-            try:
-                if len(self.data_buffer) > 0:
-                    data = self.data_buffer[:length]
-                    self.data_buffer = self.data_buffer[length:]
-                if len(data) == length:
-                    break
-                data += self.sock.recv(length-len(data))
-            except socket.timeout:
-                self.data_buffer += data
-                return None
-        return bytes(data)
-
-    def receive_message(self):
-        length = self.recv_full(4)
-
-        # if a timeout occurred getting the data, we just wait til the next
-        # loop iteration
-        if length == None:
-            return (None, False)
-
-        packet_size = int.from_bytes(length, "big", signed=False)
-
-        data = self.recv_full(packet_size)
-
-        # for a timeout, we return the valid length value back to the buffer 
-        # so on the next iteration we pull that from the buffer 
-        if data == None:
-            self.data_buffer += length
-            return (None, False)
-
-        recv_delimiter = self.recv_full(4)
-        # for a timeout here we have to return both "data" and "length" values
-        # to the buffer
-        if recv_delimiter == None:
-            self.data_buffer += data 
-            self.data_buffer += length
-            return (None, False)
-
-        if recv_delimiter != delimiter:
-            file_name = uuid.uuid4().hex + ".bin"
-            with open(file_name, "wb") as dump_file:
-                dump_file.write(length)
-                dump_file.write(data)
-                dump_file.write(recv_delimiter)
-            except_str  = f"Packet end delimiter ({str(recv_delimiter)}) "
-            except_str += f"was not equal to {str(delimiter)}. Full packet "
-            except_str += f"dumped to {file_name}"
-            raise RuntimeError(except_str)
-
-        return (TLVMessage.decode(data), True)
-    
-    @staticmethod
-    def pack_message(message: TLVMessage):
-        encoded = message.encode()
-        length = len(encoded)
-        full_message = (length.to_bytes(4, "big", signed=False) + 
-                        message.encode() + delimiter)
-        
-        return full_message
-
-    def send_message(self, message: TLVMessage):
-        self.sock.send(DAQSocket.pack_message(message))
-
-    def recv(self, length):
-        return self.sock.recv(length)
-
-#############################################################################
-#############################################################################
-
-
-
 
 # NOTE TODO NOTE TODO 
 # NOTE TODO NOTE TODO 
@@ -166,19 +55,45 @@ class SimpRadar:
 
     def __init__(s):
         #s.daq_sock = DAQSocket()
-
-        # construct the aquisition process NOTE NEW STUFF!
-        data_queue    = mp.Queue(maxsize=100000)
-        (acq_cdh_pipe_in, cdh_pipe_out)  = mp.Pipe(duplex=False)
-        (cdh_pipe_in, acq_cdh_pipe_out)  = mp.Pipe(duplex=False)
-
-        s.acq_obj = mp.Process(target=dac.main_acq_loop, args=(acq_cdh_pipe_in, 
-            acq_cdh_pipe_out, data_queue,))
-        s.acq_obj.start()
         s.tot_rangelines    = 0
         s.en_channels       = []
         s.cdh_msg_id        = 0
         s.acq_timeout       = 3.0
+
+        # buffer of radar data samples
+        s.rangeline_buffer = None
+        s.az_buffer = None
+        s.el_buffer = None
+        s.ch_buffer = None
+        s.num_buf_samples = 0
+        s.buf_ind = 0
+        s.dbg_chunk_0 = None
+        s.dbg_chunk_1 = None
+        s.dbg_chunk_2 = None
+        s.az_val_prev = None
+
+
+        s.constr_acq_proc()
+        s.prev_chunk_count = -1
+    
+    # construct the aquisition process 
+    def constr_acq_proc(s):
+        data_queue    = mp.Queue(maxsize=100000)
+        (acq_cdh_pipe_in, cdh_pipe_out)  = mp.Pipe(duplex=False)
+        (cdh_pipe_in, acq_cdh_pipe_out)  = mp.Pipe(duplex=False)
+        s.acq_obj = mp.Process(target=dac.main_acq_loop, args=(acq_cdh_pipe_in, 
+            acq_cdh_pipe_out, data_queue,))
+        s.cdh_pipe_in       = cdh_pipe_in
+        s.cdh_pipe_out      = cdh_pipe_out
+        s.data_queue        = data_queue
+        s.acq_obj.start()
+
+
+    # close down the acquisition process
+    def end_acq_proc(s):
+        s.acq_obj.terminate()
+        s.acq_obj.join() 
+
 
 
     # sends a value to the acq_obj using the cdh pipe and waits for a response
@@ -186,15 +101,17 @@ class SimpRadar:
     def ack_cdh_handshake_trans(s, key, value_out):
         new_dict_out        = OrderedDict()
         msg_id_out          = s.cdh_msg_id
+        print(f"handshake trans: {key}, {value_out}, {msg_id_out}")
         new_dict_out[key]   = (msg_id_out, value_out)
         s.cdh_msg_id       += 1
         s.cdh_pipe_out.send(new_dict_out)
         start = time.time()
         while True:
             if s.cdh_pipe_in.poll():
-                new_dict_in = cdh_pipe_in.recv()
+                new_dict_in = s.cdh_pipe_in.recv()
                 if key in new_dict_in.keys():
                     (msg_id_in, value_in) = new_dict_in[key]
+                    print(f"handshake reply: {key}, {msg_id_in}, {value_in}")
                     # verify that the response is directed to the same message
                     # and not just the same message type
                     if msg_id_in == msg_id_out:
@@ -216,14 +133,27 @@ class SimpRadar:
 
 
     def set_en_channels(s, ch0_en, ch1_en, send_trace=True):
-        en_channels = []
-        if ch0_en:
-            en_channels.append(0)
-        if ch1_en:
-            en_channels.append(1)
-        s.en_channels = copy.copy(en_channels)
-        if send_trace:
-            s.send_trace_config()
+        if 0 in s.en_channels:
+            ch0_en_prev = True
+        else:
+            ch0_en_prev = False
+
+        if 1 in s.en_channels:
+            ch1_en_prev = True
+        else:
+            ch1_en_prev = False
+
+        if (ch0_en == ch0_en_prev) and (ch1_en == ch1_en_prev):
+            pass
+        else:
+            en_channels = []
+            if ch0_en:
+                en_channels.append(0)
+            if ch1_en:
+                en_channels.append(1)
+            s.en_channels = copy.copy(en_channels)
+            if send_trace:
+                s.send_trace_config()
 
 
     def init_connection(s):
@@ -242,7 +172,7 @@ class SimpRadar:
             #s.daq_sock.close()
             ack = s.ack_cdh_handshake_trans("DISCONNECT", None)
             s.daq_connected = False
-
+    
 
     # need to call this at the beginning and whenever we change the number of 
     # channels.  I think.
@@ -250,13 +180,59 @@ class SimpRadar:
         ack = s.ack_cdh_handshake_trans("SEND_TRACE", s.en_channels)
 
 
-    def __del__(s):
-        s.acq_obj.join() # might need to close the pipes brutally in order
+    def get_sample(s):
+        try:
+            if s.num_buf_samples == 0:
+                if s.data_queue.empty():
+                    #print("queue empty")
+                    time.sleep(0.01)
+                    return (None, None, None, None, False)
+                else:
+                    (rangelines_array_in, az_array_in, el_array_in, 
+                        ch_array_in, chunk_count) = s.data_queue.get(timeout=5)
+                    count_diff = chunk_count - s.prev_chunk_count
+                    if count_diff != 1:
+                        print(f"chunk_count diff: {count_diff}")
+                        print(f"chunk_count = {chunk_count}\n")
+                    s.prev_chunk_count = chunk_count
+
+                    s.rangeline_buffer = rangelines_array_in
+                    s.az_buffer = az_array_in
+                    s.el_buffer = el_array_in
+                    s.ch_buffer = ch_array_in
+                    s.num_buf_samples = len(s.rangeline_buffer)
+                    s.buf_ind = 0
+                    #if s.num_buf_samples != 500:
+                    #    print(f"num_buf_samples = {s.num_buf_samples}")
+
+
+            # now we actually return the sample
+            rangeline   = s.rangeline_buffer[s.buf_ind]
+            az_val      = s.az_buffer[s.buf_ind]
+            el_val      = s.el_buffer[s.buf_ind]
+            channel_val = s.ch_buffer[s.buf_ind]
+            s.num_buf_samples -= 1
+            s.buf_ind += 1
+
+        except Exception as e:
+            ipdb.set_trace()
+
+        return (rangeline, az_val, el_val, channel_val, True)
+
+
+
+
+    #def __del__(s):
+    #    s.acq_obj.join() # might need to close the pipes brutally in order
                          # for this to work
 
 
 
     # main workhorse function
+    # NOTE currently a little hacky since I wanted to minimize the number
+    # of changes, but the method by which reangelines are iterated through
+    # to detect turnaround is inefficient now that we grab many rangelines
+    # at once
     def get_daq_data(s, num_rangelines, turnaround_mode, turn_hyst, min_az, 
                      max_az, ch0_offset, ch1_offset, timeout=3, debug=False):
                                               
@@ -267,15 +243,15 @@ class SimpRadar:
             turn_flag = "DISABLED"
 
 
-        buffer_setup = False
+        temp_buffer_setup = False
         status_flag = "OK"
         rangelines_array = None
         az_array = None
         el_array = None
         ch_array = None
         prev_az = None
-        az_diff_pos = None
         reset_in_array = False
+        az_val_prev = None
 
         # index of the rangeline.  Also doubles as number of rangelines 
         # captureed
@@ -283,27 +259,24 @@ class SimpRadar:
         
         # debug time vals
         tot_dur             = 0
-        tot_daq_sock_dur    = 0
         tot_datagrab_dur    = 0
         tot_other_dur       = 0
         tot_misc_dur        = 0
         if debug:
-            loop_start = time.time_ns()
-            daq_sock_start = loop_start
-            data_grab_start = loop_start
-            other_time_start = loop_start
-            loop_end = loop_start
+            loop_start          = time.time_ns()
+            data_grab_start     = loop_start
+            other_time_start    = loop_start
+            loop_end            = loop_start
         while True:
             if debug:
                 tot_inc             = (loop_end - loop_start)
-                tot_daq_sock_inc    = (data_grab_start - daq_sock_start)
                 tot_datagrab_inc    = (other_time_start - data_grab_start)
                 tot_other_inc       = (loop_end - other_time_start)
-                tot_misc_inc        = (tot_inc - tot_daq_sock_inc - 
-                                        tot_datagrab_inc - tot_other_inc)
+                tot_misc_inc        = (tot_inc - tot_datagrab_inc - 
+                                       tot_other_inc)
+                                        
 
                 tot_dur             += tot_inc
-                tot_daq_sock_dur    += tot_daq_sock_inc
                 tot_datagrab_dur    += tot_datagrab_inc
                 tot_other_dur       += tot_other_inc
                 tot_misc_dur        += tot_misc_inc
@@ -314,8 +287,12 @@ class SimpRadar:
                 status_flag = "DAQ_NOT_CONNECTED"
                 break
 
-            if buffer_setup:
+            # there's a sort of "inner" buffer local only to this loop
+            # this is an inefficient way of doing it, but allowed me to make
+            # a faster update to the code
+            if temp_buffer_setup:
                 if i == num_rangelines:
+                    print("num_rangelines reached")
                     break
 
             # this is if there's a timeout
@@ -324,177 +301,163 @@ class SimpRadar:
                 status_flag = "TIMEOUT"
                 break
 
-            if debug:
-                daq_sock_start = time.time_ns()
-            try:
-                (radar_data, data_valid) = s.daq_sock.receive_message()
-            except ConnectionResetError:
-                s.daq_connected = False
-                status_flag = "CONN_RESET"
-                turn_flag = "DISABLED"
-                break
+            # check for status from the core
+            if s.cdh_pipe_in.poll():
+                cdh_dict_in = s.cdh_pipe_in.recv()
+                if "STATUS" in cdh_dict_in:
+                    if cdh_dict_in["STATUS"] == "CONN_RESET":
+                        s.daq_connected = False
+                        status_flag = "CONN_RESET"
+                        turn_flag = "DISABLED"
+                        break
 
+
+            ##################################################################
+            ########################## CORE SAMPLE GRAB ######################
+            ##################################################################
             if debug:
                 data_grab_start = time.time_ns()
+
+            (rangeline, az_val, el_val, 
+             channel_val, data_valid) = s.get_sample()
+
+            if debug:
+                other_time_start = time.time_ns()
 
             # check for returning none
             if data_valid == False:
                 if debug:
-                    other_time_start = time.time_ns()
                     loop_end = time.time_ns()
-                    print("daq_comms: data_valid == False")
+                    #print("daq_comms: data_valid == False")
                 continue
 
-            else:
-                if radar_data.message_type == TLVPlotCmd.SEND_TRACE_DATA:
-                    s.tot_rangelines += 1
-                    az_val = float(
-                        from_14_bit(
-                            radar_data.get_by_tag(
-                                TLVTracePCIeHTGZRF80002Tag.AZIMUTH_MOTOR_UINT
-                            ).data,
-                            True,))
-                    
-                    el_val = float(
-                        from_14_bit(
-                            radar_data.get_by_tag(
-                                TLVTracePCIeHTGZRF80002Tag.ELEVATION_MOTOR_UINT
-                            ).data,
-                            False,))
-
-                    rangeline = np.frombuffer(
-                        radar_data.get_by_tag(TLVPlotTag.DATA_DOUBLE).data, 
-                            dtype=np.complex64)
+            # DEBUG
+            #if az_val_prev == None:
+            #    pass
+            #else:
+            #    az_diff = (az_val - az_val_prev)
+            #    abs_diff = np.abs(az_diff)
+            #    if abs_diff > 5:
+            #        pass
+                    #print(f"az_diff = {az_diff}")
+            #az_val_prev = az_val
 
 
-                    channel_val = int.from_bytes(
-                        radar_data.get_by_tag(
-                            TLVTracePCIeHTGZRF80002Tag.CHANNEL_UINT).data,
-                        "big",
-                        signed=False,)
 
-                    if debug:
-                        other_time_start = time.time_ns()
+            # setup the buffers now because you don't know the 
+            # length of the rangeline until now
+            if not temp_buffer_setup:
+                len_rangeline = len(rangeline)
+                #rangelines_array = np.zeros((num_rangelines, 
+                #    len_rangeline), dtype=np.complex128)
+                rangelines_array = np.zeros((num_rangelines, 
+                    len_rangeline), dtype=np.complex64)
+                az_array = np.zeros((num_rangelines))
+                el_array = np.zeros((num_rangelines))
+                ch_array = np.zeros((num_rangelines))
+                temp_buffer_setup = True
 
-                    # setup the buffers now because you don't know the 
-                    # length of the rangeline until now
-                    if not buffer_setup:
-                        len_rangeline = len(rangeline)
-                        #rangelines_array = np.zeros((num_rangelines, 
-                        #    len_rangeline), dtype=np.complex128)
-                        rangelines_array = np.zeros((num_rangelines, 
-                            len_rangeline), dtype=np.complex64)
-                        az_array = np.zeros((num_rangelines))
-                        el_array = np.zeros((num_rangelines))
-                        ch_array = np.zeros((num_rangelines))
-                        buffer_setup = True
-
-                    if len(rangeline) != len_rangeline:
-                        status_flag = "RANGELINE_LEN_CHANGE"
-                        s.state = "RESET"
-                        break
+            if len(rangeline) != len_rangeline:
+                status_flag = "RANGELINE_LEN_CHANGE"
+                s.state = "RESET"
+                break
 
 
-                    # state machine
-                    # Note: nonzero turn_hyst will produce "wobble" at frame
-                    # edges
-                    if turnaround_mode:
-                        if channel_val == 0:
-                            az_val_adj = az_val + ch0_offset
-                        else:
-                            az_val_adj = az_val + ch1_offset
+            # state machine
+            # Note: nonzero turn_hyst will produce "wobble" at frame
+            # edges
+            if turnaround_mode:
+                if channel_val == 0:
+                    az_val_adj = az_val + ch0_offset
+                else:
+                    az_val_adj = az_val + ch1_offset
 
-                        if s.state == "RESET":
-                            turn_flag = "RESET"
-                            if az_val_adj < (min_az - turn_hyst):
-                                s.state = "TURNING_MIN"
-                            elif az_val_adj > (max_az + turn_hyst):
-                                s.state = "TURNING_MAX"
-                            else:
-                                az_val_adj = "WAITING_FOR_TURN"
+                if s.state == "RESET":
+                    turn_flag = "RESET"
+                    if az_val_adj < (min_az - turn_hyst):
+                        s.state = "TURNING_MIN"
+                    elif az_val_adj > (max_az + turn_hyst):
+                        s.state = "TURNING_MAX"
+                    else:
+                        az_val_adj = "WAITING_FOR_TURN"
 
-                        elif s.state == "WAITING_FOR_TURN":
-                            turn_flag = "RESET"
-                            if az_val_adj < (min_az - turn_hyst):
-                                s.state = "TURNING_MIN"
-                            elif az_val_adj > (max_az + turn_hyst):
-                                s.state = "TURNING_MAX"
+                elif s.state == "WAITING_FOR_TURN":
+                    turn_flag = "RESET"
+                    if az_val_adj < (min_az - turn_hyst):
+                        s.state = "TURNING_MIN"
+                    elif az_val_adj > (max_az + turn_hyst):
+                        s.state = "TURNING_MAX"
 
-                            # else: s.state stays the same
+                    # else: s.state stays the same
 
-                        elif s.state == "TURNING_MIN":
-                            turn_flag = "RESET"
-                            # start of frame
-                            if az_val_adj > (min_az + turn_hyst):
-                                s.state = "RUNNING_TO_MAX"
-                                turn_flag = "START_FRAME"
+                elif s.state == "TURNING_MIN":
+                    turn_flag = "RESET"
+                    # start of frame
+                    if az_val_adj > (min_az + turn_hyst):
+                        s.state = "RUNNING_TO_MAX"
+                        turn_flag = "START_FRAME"
 
-                        elif s.state == "TURNING_MAX":
-                            turn_flag = "RESET"
-                            # start of frame
-                            if az_val_adj < (max_az - turn_hyst):
-                                s.state = "RUNNING_TO_MIN"
-                                turn_flag = "START_FRAME"
+                elif s.state == "TURNING_MAX":
+                    turn_flag = "RESET"
+                    # start of frame
+                    if az_val_adj < (max_az - turn_hyst):
+                        s.state = "RUNNING_TO_MIN"
+                        turn_flag = "START_FRAME"
 
-                        elif s.state == "RUNNING_TO_MAX":
-                            turn_flag = "RUNNING"
-                            if az_val_adj > (max_az + turn_hyst):
-                                s.state = "TURNING_MAX"
-                                turn_flag = "END_FRAME"
+                elif s.state == "RUNNING_TO_MAX":
+                    turn_flag = "RUNNING"
+                    if az_val_adj > (max_az + turn_hyst):
+                        s.state = "TURNING_MAX"
+                        turn_flag = "END_FRAME"
 
-                        elif s.state == "RUNNING_TO_MIN":
-                            turn_flag = "RUNNING"
-                            if az_val_adj < (min_az - turn_hyst):
-                                s.state = "TURNING_MIN"
-                                turn_flag = "END_FRAME"
-
-                        else:
-                            raise Exception("Invalid SimpRadar State")
-                        
-
-                        # Now we perform the appropriate updates based on 
-                        # state
-
-
-                        # this is to ensure the processing reset prior to 
-                        # grabbing the first data sample 
-                        if turn_flag in ["RESET", "START_FRAME"]:
-                            reset_in_array = True
-
-                        # only add values to the array in valid azimuth ranges
-                        if turn_flag in ["RUNNING", "START_FRAME", "END_FRAME"]:
-                            rangelines_array[i] = rangeline
-                            az_array[i] = az_val
-                            el_array[i] = el_val
-                            ch_array[i] = channel_val
-                            i += 1
-
-                        if turn_flag == "END_FRAME":
-                            #status_flag = "TURNAROUND"
-                            s.state = "RESET"
-                            break
-
-                    else: # turnaround mode not enabled
-                        rangelines_array[i] = rangeline
-                        az_array[i] = az_val
-                        el_array[i] = el_val
-                        ch_array[i] = channel_val
-                        i += 1
+                elif s.state == "RUNNING_TO_MIN":
+                    turn_flag = "RUNNING"
+                    if az_val_adj < (min_az - turn_hyst):
+                        s.state = "TURNING_MIN"
+                        turn_flag = "END_FRAME"
 
                 else:
-                    if debug:
-                        other_time_start = time.time_ns()
-                    print("Warning: Received non-plot command data")
+                    raise Exception("Invalid SimpRadar State")
+                
 
-                if debug:
-                    loop_end = time.time_ns()
+                # Now we perform the appropriate updates based on 
+                # state
+
+
+                # this is to ensure the processing reset prior to 
+                # grabbing the first data sample 
+                if turn_flag in ["RESET", "START_FRAME"]:
+                    reset_in_array = True
+
+                # only add values to the array in valid azimuth ranges
+                if turn_flag in ["RUNNING", "START_FRAME", "END_FRAME"]:
+                    rangelines_array[i] = rangeline
+                    az_array[i] = az_val
+                    el_array[i] = el_val
+                    ch_array[i] = channel_val
+                    i += 1
+
+                if turn_flag == "END_FRAME":
+                    #status_flag = "TURNAROUND"
+                    s.state = "RESET"
+                    break
+
+            else: # turnaround mode not enabled
+                rangelines_array[i] = rangeline
+                az_array[i] = az_val
+                el_array[i] = el_val
+                ch_array[i] = channel_val
+                i += 1
+
+            if debug:
+                loop_end = time.time_ns()
 
         if debug:
             if i != 0:
                 print("---------------DURATIONS PER RANGELINE ACQ ------------")
                 print(f"Total number of rangelines: {i}")
                 print(f"tot_dur: {tot_dur/1e3/i:.4f} us")
-                print(f"tot_daq_sock_dur: {tot_daq_sock_dur/1e3/i:.4f} us")
+                #print(f"tot_daq_sock_dur: {tot_daq_sock_dur/1e3/i:.4f} us")
                 print(f"tot_datagrab_dur: {tot_datagrab_dur/1e3/i:.4f} us")
                 print(f"tot_other_dur: {tot_other_dur/1e3/i:.4f} us")
                 print(f"tot_misc_dur: {tot_misc_dur/1e3/i:.5f} us")

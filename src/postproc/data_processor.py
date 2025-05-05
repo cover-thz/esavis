@@ -14,8 +14,8 @@
 
 import multiprocessing as mp
 from collections import OrderedDict
-#import daq_comms as dc
-import OLD__daq_comms as dc
+import daq_comms as dc
+#import OLD__daq_comms as dc
 import main_proc_fcns as mpf
 import dat_file_fcns as dff
 import time
@@ -222,6 +222,7 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
             cfg_flags = new_cfg_vals["flags"]
             if "close_process" in cfg_flags:
                 radar.disconnect()
+                radar.end_acq_proc()
                 print("data_processor shutting down....")
                 break
 
@@ -301,6 +302,7 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
 
             if profiler_enabled:
                 daq_acq_start = time.time()
+
             # this step actually grabs the rangelines from the DAQ
             (rangelines_array, az_array, 
             el_array, ch_array, num_rangelines, turn_flag, reset_in_array,

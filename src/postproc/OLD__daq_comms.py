@@ -56,7 +56,9 @@ class DAQSocket:
         self.data_buffer = bytearray()
 
         # buffer variables
-        self.MAX_BUF_SIZE = 16384
+        self.MAX_BUF_SIZE = 65536
+        #self.MAX_BUF_SIZE = 1048576 
+        self.sock_accesses = 0
         self.buf_init = False
         self.curr_buf = None
         self.next_buf = None
@@ -67,11 +69,11 @@ class DAQSocket:
     def close(self):
         self.sock.close()
 
-
     def read_from_buf(self, length):
         # initialize the buffer
         if not self.buf_init:
-            self.curr_buf = self.sock.recv(self.MAX_BUF_SIZE)
+            #self.curr_buf = self.sock.recv(self.MAX_BUF_SIZE)
+            self.curr_buf = self.recv_alias(self.MAX_BUF_SIZE)
             self.curr_buf_bytes = len(self.curr_buf)
             self.buf_init = True
 
@@ -84,13 +86,15 @@ class DAQSocket:
 
         # need to read more bytes from the socket 
         if length > self.curr_buf_bytes:
-            self.next_buf = self.sock.recv(self.MAX_BUF_SIZE)
+            #self.next_buf = self.sock.recv(self.MAX_BUF_SIZE)
+            self.next_buf = self.recv_alias(self.MAX_BUF_SIZE)
             self.next_buf_bytes = len(self.next_buf)
 
             # not enough bytes, hopefully a rare occurrence
             if length > (self.curr_buf_bytes + self.next_buf_bytes):
                 print("Warning: LOW DATA RATE OR BUFFER PROBLEM")
-                self.next_buf += self.sock.recv(self.MAX_BUF_SIZE)
+                #self.next_buf += self.sock.recv(self.MAX_BUF_SIZE)
+                self.next_buf += self.recv_alias(self.MAX_BUF_SIZE)
                 self.next_buf_bytes = len(self.next_buf)
 
             # if it happens again we abort
@@ -180,8 +184,15 @@ class DAQSocket:
     def send_message(self, message: TLVMessage):
         self.sock.send(DAQSocket.pack_message(message))
 
-    #def recv(self, length):
-    #    return self.sock.recv(length)
+    # so I can track accesses to the socket better
+    def recv_alias(self, length):
+        vals = self.sock.recv(length)
+        #self.sock_accesses += 1
+        #if vals != self.MAX_BUF_SIZE:
+        #    print(f"sock accessed only grabbed {len(vals)} vals")
+        #if self.sock_accesses % 1000 == 0:
+        #    print(f"numb sock_accesses = {self.sock_accesses}")
+        return vals
 
 #############################################################################
 #############################################################################
