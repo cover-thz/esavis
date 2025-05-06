@@ -421,31 +421,52 @@ class THzImageTab(QWidget):
     # NOTE TODO need to add saving of surface plots functionality
     # NOTE TODO THIS NEEDS MAJOR WORK NOW THAT WE HAVE DAQ CAPABILITIES 
     def ld_save_image_autosave_btn_clicked(s):
-        
-        #if s.cfg_dict["data_src"] == "dat_file"
-        #frame_style = s.cfg_dict["frame_style"]
-        plot_style = s.cfg_dict["plot_style"]
-        data_fpath_0 = s.cfg_dict["data_fpath_0"]
-        data_fpath_1 = s.cfg_dict["data_fpath_1"]
+        if s.cfg_dict["data_src"] == "dat_file":
+            #frame_style = s.cfg_dict["frame_style"]
+            plot_style = s.cfg_dict["plot_style"]
+            data_fpath_0 = s.cfg_dict["data_fpath_0"]
+            data_fpath_1 = s.cfg_dict["data_fpath_1"]
 
-        # use the pixel 0 filename to generate the image file if pixel 0 is 
-        # in the dataset
-        if data_fpath_0 != None:
-            data_fpath = conv_fpath_to_unix(data_fpath_0)
+            # use the pixel 0 filename to generate the image file if pixel 0 is 
+            # in the dataset
+            if data_fpath_0 != None:
+                data_fpath = conv_fpath_to_unix(data_fpath_0)
 
-        # use the pixel 1 filename to generate the image file if pixel 0 is 
-        # not in the dataset
-        elif data_fpath_1 != None:
-            data_fpath = conv_fpath_to_unix(data_fpath_1)
-        fname = data_fpath.split("/")[-1]
-        fprefix = fname[0:16]
-        DFLT_DATA_DIR_unix = conv_fpath_to_unix(s.cfg_dict["default_data_dir"]) 
-        fpath = DFLT_DATA_DIR_unix + fprefix + plot_style + ".png"
-        s.thz_image_obj.save_cur_image(fpath, fprefix)
+            # use the pixel 1 filename to generate the image file if pixel 0 is 
+            # not in the dataset
+            elif data_fpath_1 != None:
+                data_fpath = conv_fpath_to_unix(data_fpath_1)
+            fname = data_fpath.split("/")[-1]
+            fprefix = fname[0:16]
+            DFLT_DATA_DIR_unix = conv_fpath_to_unix(s.cfg_dict["default_data_dir"]) 
+            fpath = DFLT_DATA_DIR_unix + fprefix + image_desc + plot_style + ".png"
+            s.thz_image_obj.save_cur_image(fpath, fprefix)
 
-        msgbox = QMessageBox()
-        msgbox.setText("The Image has been Saved!")
-        msgbox.exec()
+            msgbox = QMessageBox()
+            msgbox.setText("The Image has been Saved!")
+            msgbox.exec()
+
+        elif s.cfg_dict["data_src"] == "daq":
+            plot_style = s.cfg_dict["plot_style"]
+            image_desc = s.ld_save_image_desc_ledit.text()
+
+            DFLT_DATA_DIR_unix = conv_fpath_to_unix(s.cfg_dict["default_data_dir"]) 
+            fpath = DFLT_DATA_DIR_unix + image_desc + "_" + plot_style + ".png"
+            s.thz_image_obj.save_cur_image(fpath, image_desc)
+
+            msgbox = QMessageBox()
+            msgbox.setText("The Image has been Saved!")
+            msgbox.exec()
+
+
+        else:
+            msgbox = QMessageBox()
+            msgbox.setText("Invalid data source for image saving")
+            msgbox.exec()
+
+
+
+
         
 
     def ld_save_image_chng_dir_btn_clicked(s):

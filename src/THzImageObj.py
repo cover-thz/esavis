@@ -284,8 +284,8 @@ class THzImageObj(QHBoxLayout):
             color_min = np.nanmin(flat_img)
             color_max = np.nanmax(flat_img)
 
-        plot_style = postproc_config_dict["plot_style"]
-        cmap_str   = postproc_config_dict["colormap"]
+        plot_style = cfg_dict["plot_style"]
+        cmap_str   = cfg_dict["colormap"]
 
 
         fig, ax = plt.subplots()
@@ -324,7 +324,7 @@ class THzImageObj(QHBoxLayout):
         print(f"fpath = {fpath}")
         fig.savefig(fpath)
 
-        fig.close()
+        plt.close(fig)
         #if plot_style in ["front_peak_range", "back_peak_range", 
         #"integ_power_plot", "num_avgs_plot"]:
 
