@@ -204,6 +204,7 @@ DFLT_CFG_DICT["dbg_2"] = False
 DFLT_CFG_DICT["profiler"] = False
 #DFLT_CFG_DICT["daq_debug"] = False
 DFLT_CFG_DICT["daq_debug"] = True
+DFLT_CFG_DICT["acq_dbg"] = False
 
 
 ##############################################################################

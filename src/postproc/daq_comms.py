@@ -71,7 +71,7 @@ class SimpRadar:
         s.dbg_chunk_1 = None
         s.dbg_chunk_2 = None
         s.az_val_prev = None
-
+        s.acq_dbg_flag = False
 
         s.constr_acq_proc()
         s.prev_chunk_count = -1
@@ -79,12 +79,19 @@ class SimpRadar:
     # construct the aquisition process 
     def constr_acq_proc(s):
         data_queue    = mp.Queue(maxsize=100000)
-        (acq_cdh_pipe_in, cdh_pipe_out)  = mp.Pipe(duplex=False)
-        (cdh_pipe_in, acq_cdh_pipe_out)  = mp.Pipe(duplex=False)
-        s.acq_obj = mp.Process(target=dac.main_acq_loop, args=(acq_cdh_pipe_in, 
-            acq_cdh_pipe_out, data_queue,))
-        s.cdh_pipe_in       = cdh_pipe_in
-        s.cdh_pipe_out      = cdh_pipe_out
+        cdh_queue_tx = mp.Queue(maxsize=1000)
+        cdh_queue_rx = mp.Queue(maxsize=1000)
+
+        #(acq_cdh_pipe_in, cdh_pipe_out)  = mp.Pipe(duplex=False)
+        #(cdh_pipe_in, acq_cdh_pipe_out)  = mp.Pipe(duplex=False)
+        #s.acq_obj = mp.Process(target=dac.main_acq_loop, args=(acq_cdh_pipe_in, 
+        #    acq_cdh_pipe_out, data_queue,))
+        s.acq_obj = mp.Process(target=dac.main_acq_loop, args=(cdh_queue_tx, 
+            cdh_queue_rx, data_queue,))
+        #s.cdh_pipe_in       = cdh_pipe_in
+        #s.cdh_pipe_out      = cdh_pipe_out
+        s.cdh_queue_tx      = cdh_queue_tx
+        s.cdh_queue_rx      = cdh_queue_rx
         s.data_queue        = data_queue
         s.acq_obj.start()
 
@@ -93,6 +100,12 @@ class SimpRadar:
     def end_acq_proc(s):
         s.acq_obj.terminate()
         s.acq_obj.join() 
+
+
+    def en_acq_dbg(s, en_val):
+        if s.acq_dbg_flag != en_val:
+            _ = s.ack_cdh_handshake_trans("ACQ_DBG", en_val)
+            s.acq_dbg_flag = en_val
 
 
 
@@ -104,11 +117,14 @@ class SimpRadar:
         print(f"handshake trans: {key}, {value_out}, {msg_id_out}")
         new_dict_out[key]   = (msg_id_out, value_out)
         s.cdh_msg_id       += 1
-        s.cdh_pipe_out.send(new_dict_out)
+        #s.cdh_pipe_out.send(new_dict_out)
+        s.cdh_queue_tx.put(new_dict_out)
         start = time.time()
         while True:
-            if s.cdh_pipe_in.poll():
-                new_dict_in = s.cdh_pipe_in.recv()
+            #if s.cdh_pipe_in.poll():
+            if not s.cdh_queue_rx.empty():
+                #new_dict_in = s.cdh_pipe_in.recv()
+                new_dict_in = s.cdh_queue_rx.get()
                 if key in new_dict_in.keys():
                     (msg_id_in, value_in) = new_dict_in[key]
                     print(f"handshake reply: {key}, {msg_id_in}, {value_in}")
@@ -302,8 +318,10 @@ class SimpRadar:
                 break
 
             # check for status from the core
-            if s.cdh_pipe_in.poll():
-                cdh_dict_in = s.cdh_pipe_in.recv()
+            #if s.cdh_pipe_in.poll():
+            if not s.cdh_queue_rx.empty():
+                #cdh_dict_in = s.cdh_pipe_in.recv()
+                cdh_dict_in = s.cdh_queue_rx.get()
                 if "STATUS" in cdh_dict_in:
                     if cdh_dict_in["STATUS"] == "CONN_RESET":
                         s.daq_connected = False
@@ -419,7 +437,6 @@ class SimpRadar:
                 else:
                     raise Exception("Invalid SimpRadar State")
                 
-
                 # Now we perform the appropriate updates based on 
                 # state
 

@@ -248,6 +248,11 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
                     else:
                         radar.set_en_channels(ch0_en, ch1_en)
 
+                if cfg_dict["acq_dbg"] == True:
+                    radar.en_acq_dbg(True)
+                else:
+                    radar.en_acq_dbg(False)
+
 
             # disable the DAQ if it's not in use
             else: 

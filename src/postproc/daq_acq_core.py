@@ -72,7 +72,11 @@ class DAQSocket:
         # initialize the buffer
         if not self.buf_init:
             #self.curr_buf = self.sock.recv(self.MAX_BUF_SIZE)
-            self.curr_buf = self.recv_alias(self.MAX_BUF_SIZE)
+            vals = self.recv_alias(self.MAX_BUF_SIZE)
+            if vals == None:
+                return None
+            else:
+                self.curr_buf = vals
             self.curr_buf_bytes = len(self.curr_buf)
             self.buf_init = True
 
@@ -86,14 +90,24 @@ class DAQSocket:
         # need to read more bytes from the socket 
         if length > self.curr_buf_bytes:
             #self.next_buf = self.sock.recv(self.MAX_BUF_SIZE)
-            self.next_buf = self.recv_alias(self.MAX_BUF_SIZE)
+            vals = self.recv_alias(self.MAX_BUF_SIZE)
+            if vals == None:
+                return None
+            else:
+                self.next_buf = vals
+            #self.next_buf = self.recv_alias(self.MAX_BUF_SIZE)
             self.next_buf_bytes = len(self.next_buf)
 
             # not enough bytes, hopefully a rare occurrence
             if length > (self.curr_buf_bytes + self.next_buf_bytes):
                 print("Warning: LOW DATA RATE OR BUFFER PROBLEM")
                 #self.next_buf += self.sock.recv(self.MAX_BUF_SIZE)
-                self.next_buf += self.recv_alias(self.MAX_BUF_SIZE)
+                #self.next_buf += self.recv_alias(self.MAX_BUF_SIZE)
+                vals = self.recv_alias(self.MAX_BUF_SIZE)
+                if vals == None:
+                    return None
+                else:
+                    self.next_buf = vals
                 self.next_buf_bytes = len(self.next_buf)
 
             # if it happens again we abort
@@ -111,6 +125,17 @@ class DAQSocket:
             self.buf_ind = excess_bytes
             self.curr_buf = self.next_buf
             return data_out
+
+    # if we get something that derails the acquisition process we want to 
+    # return the bytes we grabbed from the buffer back to the buffer
+    # this is designed to happen infrequently as it requires messing with
+    # the size of teh buffer in order to be done cleanly which theoretically
+    # is a very slow thing and this file is a speed bottleneck for the code
+    def return_to_buf(self, vals):
+        self.curr_buf = self.curr_buf[self.buf_ind:]
+        self.curr_buf = vals + self.curr_buf
+        self.buf_ind  = 0
+        self.curr_buf_bytes += len(vals)
                    
                 
     def recv_full(self, length):
@@ -129,8 +154,27 @@ class DAQSocket:
                 return None
         return bytes(data)
 
+
+    #def recv_full(self, length):
+    #    data = bytearray()
+    #    while len(data) < length:
+    #        try:
+    #            if len(self.data_buffer) > 0:
+    #                data = self.data_buffer[:length]
+    #                self.data_buffer = self.data_buffer[length:]
+    #            if len(data) == length:
+    #                break
+    #            data += self.read_from_buf(length-len(data))
+    #            #data += self.sock.recv(length-len(data))
+    #        except socket.timeout:
+    #            self.data_buffer += data
+    #            return None
+    #    return bytes(data)
+
+
     def receive_message(self):
-        length = self.recv_full(4)
+        #length = self.recv_full(4)
+        length = self.read_from_buf(4)
 
         # if a timeout occurred getting the data, we just wait til the next
         # loop iteration
@@ -138,21 +182,25 @@ class DAQSocket:
             return (None, False)
 
         packet_size = int.from_bytes(length, "big", signed=False)
-
-        data = self.recv_full(packet_size)
+        #data = self.recv_full(packet_size)
+        data = self.read_from_buf(packet_size)
 
         # for a timeout, we return the valid length value back to the buffer 
         # so on the next iteration we pull that from the buffer 
         if data == None:
-            self.data_buffer += length
+            #self.data_buffer += length
+            self.return_to_buf(length)
             return (None, False)
 
-        recv_delimiter = self.recv_full(4)
+        #recv_delimiter = self.recv_full(4)
+        recv_delimiter = self.read_from_buf(4)
         # for a timeout here we have to return both "data" and "length" values
         # to the buffer
         if recv_delimiter == None:
-            self.data_buffer += data 
-            self.data_buffer += length
+            #self.data_buffer += data 
+            #self.data_buffer += length
+            self.return_to_buf(data)
+            self.return_to_buf(length)
             return (None, False)
 
         if recv_delimiter != delimiter:
@@ -182,7 +230,11 @@ class DAQSocket:
 
     # so I can track accesses to the socket better
     def recv_alias(self, length):
-        vals = self.sock.recv(length)
+        try:
+            vals = self.sock.recv(length)
+        except socket.timeout:
+            return None
+
         #self.sock_accesses += 1
         #if vals != self.MAX_BUF_SIZE:
         #    print(f"sock accessed only grabbed {len(vals)} vals")
@@ -263,7 +315,8 @@ be changed often
 
 """
 
-def main_acq_loop(cdh_pipe_in, cdh_pipe_out, data_queue):
+#def main_acq_loop(cdh_pipe_in, cdh_pipe_out, data_queue):
+def main_acq_loop(cdh_queue_in, cdh_queue_out, data_queue):
     CHUNK_SIZE = 10000 
     chunk_count = 0
     daq_sock = DAQSocket()
@@ -274,73 +327,193 @@ def main_acq_loop(cdh_pipe_in, cdh_pipe_out, data_queue):
     az_val_prev = None
     i = 0
 
-    # setup buffers
-    
-    loop_cntr = 0
+    # debug switch that enables various messages
+    # and other debug variables
+    acq_debug = False
+    loop_start_ns = time.perf_counter_ns()
+    time_div_0_ns = loop_start_ns
+    time_div_1_ns = loop_start_ns
+    time_div_2_ns = loop_start_ns
+    time_div_3_ns = loop_start_ns
+    time_div_4_ns = loop_start_ns
+    time_div_5_ns = loop_start_ns
+    time_div_6_ns = loop_start_ns
+    time_div_7_ns = loop_start_ns
+    time_div_chunk_0 = loop_start_ns
+    time_div_chunk_1 = loop_start_ns
+    loop_end_ns   = loop_start_ns
+
+
+    slice_0_ns_dur = 0
+    slice_1_ns_dur = 0
+    slice_2_ns_dur = 0
+    slice_3_ns_dur = 0
+    slice_4_ns_dur = 0
+    slice_5_ns_dur = 0
+    slice_6_ns_dur = 0
+    slice_7_ns_dur = 0
+    slice_8_ns_dur = 0
+
+
+    slice_0_tot_us_dur = 0
+    slice_1_tot_us_dur = 0
+    slice_2_tot_us_dur = 0
+    slice_3_tot_us_dur = 0
+    slice_4_tot_us_dur = 0
+    slice_5_tot_us_dur = 0
+    slice_6_tot_us_dur = 0
+    slice_7_tot_us_dur = 0
+    slice_8_tot_us_dur = 0
+
+
+    chunk_dur_ns = 0
+    chunk_dur_tot_us = 0
+
+    cdh_loop_cntr = 0
+    dbg_loop_cntr = 0
     dbg_prev_chunk_time = None
     dbg_prev_chunk_count = 0
     while True:
-        loop_cntr += 1
+        cdh_loop_cntr += 1
+        #print(f"cdh_loop_cntr: {cdh_loop_cntr}")
+        #####################################################################
+        #                DEBUG TIME DURATION HANDLING STEPS                 #
+        #####################################################################
+
+        if acq_debug:
+            slice_0_ns_dur = time_div_0_ns - loop_start_ns
+            slice_1_ns_dur = time_div_1_ns - time_div_0_ns
+            slice_2_ns_dur = time_div_2_ns - time_div_1_ns
+            slice_3_ns_dur = time_div_3_ns - time_div_2_ns
+            slice_4_ns_dur = time_div_4_ns - time_div_3_ns
+            slice_5_ns_dur = time_div_5_ns - time_div_4_ns
+            slice_6_ns_dur = time_div_6_ns - time_div_5_ns
+            slice_7_ns_dur = time_div_7_ns - time_div_6_ns
+            slice_8_ns_dur = loop_end_ns   - time_div_7_ns
+
+            slice_0_tot_us_dur += slice_0_ns_dur/1e3
+            slice_1_tot_us_dur += slice_1_ns_dur/1e3
+            slice_2_tot_us_dur += slice_2_ns_dur/1e3
+            slice_3_tot_us_dur += slice_3_ns_dur/1e3
+            slice_4_tot_us_dur += slice_4_ns_dur/1e3
+            slice_5_tot_us_dur += slice_5_ns_dur/1e3
+            slice_6_tot_us_dur += slice_6_ns_dur/1e3
+            slice_7_tot_us_dur += slice_7_ns_dur/1e3
+            slice_8_tot_us_dur += slice_8_ns_dur/1e3
+
+            dbg_loop_cntr += 1
+
+            if dbg_loop_cntr % 20000 == 0:
+                print(f"dbg_loop_cntr: {dbg_loop_cntr} loops")
+                print(f"slice_0 avg dur: {slice_0_tot_us_dur/dbg_loop_cntr:.4f} us")
+                print(f"slice_1 avg dur: {slice_1_tot_us_dur/dbg_loop_cntr:.4f} us")
+                print(f"slice_2 avg dur: {slice_2_tot_us_dur/dbg_loop_cntr:.4f} us")
+                print(f"slice_3 avg dur: {slice_3_tot_us_dur/dbg_loop_cntr:.4f} us")
+                print(f"slice_4 avg dur: {slice_4_tot_us_dur/dbg_loop_cntr:.4f} us")
+                print(f"slice_5 avg dur: {slice_5_tot_us_dur/dbg_loop_cntr:.4f} us")
+                print(f"slice_6 avg dur: {slice_6_tot_us_dur/dbg_loop_cntr:.4f} us")
+                print(f"slice_7 avg dur: {slice_7_tot_us_dur/dbg_loop_cntr:.4f} us")
+                print(f"slice_8 avg dur: {slice_8_tot_us_dur/dbg_loop_cntr:.4f} us\n")
+
+
+        loop_start_ns = time.perf_counter_ns()
+        time_div_0_ns = loop_start_ns
+        time_div_1_ns = loop_start_ns
+        time_div_2_ns = loop_start_ns
+        time_div_3_ns = loop_start_ns
+        time_div_4_ns = loop_start_ns
+        time_div_5_ns = loop_start_ns
+        time_div_6_ns = loop_start_ns
+        time_div_7_ns = loop_start_ns
+        time_div_chunk_0 = loop_start_ns
+        time_div_chunk_1 = loop_start_ns
+        loop_end_ns   = loop_start_ns
+
         #####################################################################
         #                       CDH HANDLING STEPS                          #
         #####################################################################
-        while cdh_pipe_in.poll():
-            command_in = cdh_pipe_in.recv()
-            command_keys = command_in.keys()
+        loop_start_ns = time.perf_counter_ns()
 
-            if "INIT_CONN" in command_keys:
-                (msg_id, (addr, en_channels)) = command_in["INIT_CONN"] 
-                status = daq_sock.init_connection(addr, en_channels)
-                new_dict_out = OrderedDict()
-                new_dict_out["INIT_CONN"] = (msg_id, status)
-                cdh_pipe_out.send(new_dict_out)
-                if status:
-                    daq_connected = True
-                else:
+        # only check once every chunk, see if that speeds things up
+        if ((i == CHUNK_SIZE-1) or ((not daq_connected) and 
+                (cdh_loop_cntr >= 50)) or (daq_connected and 
+                cdh_loop_cntr >= 100000)):
+            cdh_loop_cntr = 0
+            #while cdh_pipe_in.poll():
+            while not cdh_queue_in.empty():
+                print("CDH VALUE")
+                #command_in = cdh_pipe_in.recv()
+                command_in = cdh_queue_in.get()
+                command_keys = command_in.keys()
+
+                if "INIT_CONN" in command_keys:
+                    (msg_id, (addr, en_channels)) = command_in["INIT_CONN"] 
+                    status = daq_sock.init_connection(addr, en_channels)
+                    new_dict_out = OrderedDict()
+                    new_dict_out["INIT_CONN"] = (msg_id, status)
+                    #cdh_pipe_out.send(new_dict_out)
+                    cdh_queue_out.put(new_dict_out)
+
+                    if status:
+                        daq_connected = True
+                    else:
+                        daq_connected = False
+
+                elif "DISCONNECT" in command_keys:
+                    (msg_id, _) = command_in["DISCONNECT"] 
+                    daq_sock.close()
+                    new_dict_out = OrderedDict()
+                    new_dict_out["DISCONNECT"] = (msg_id, None)
+                    #cdh_pipe_out.send(new_dict_out)
+                    cdh_queue_out.put(new_dict_out)
                     daq_connected = False
 
+                elif "SEND_TRACE" in command_keys:
+                    (msg_id, en_channels) = command_in["SEND_TRACE"] 
+                    status = daq_sock.send_trace_config(en_channels)
+                    new_dict_out = OrderedDict()
+                    new_dict_out["SEND_TRACE"] = (msg_id, status)
+                    #cdh_pipe_out.send(new_dict_out)
+                    cdh_queue_out.put(new_dict_out)
 
-            elif "DISCONNECT" in command_keys:
-                (msg_id, _) = command_in["DISCONNECT"] 
-                daq_sock.close()
-                new_dict_out = OrderedDict()
-                new_dict_out["DISCONNECT"] = (msg_id, None)
-                cdh_pipe_out.send(new_dict_out)
-                daq_connected = False
+                elif "CLOSE_PROCESS" in command_keys:
+                    (msg_id, _) = command_in["CLOSE_PROCESS"] 
+                    daq_sock.close()
+                    new_dict_out = OrderedDict()
+                    new_dict_out["CLOSE_PROCESS"] = (msg_id, None)
+                    #cdh_pipe_out.send(new_dict_out)
+                    cdh_queue_out.put(new_dict_out)
+                    daq_connected = False
 
-
-
-            elif "SEND_TRACE" in command_keys:
-                (msg_id, en_channels) = command_in["SEND_TRACE"] 
-                status = daq_sock.send_trace_config(en_channels)
-                new_dict_out = OrderedDict()
-                new_dict_out["SEND_TRACE"] = (msg_id, status)
-                cdh_pipe_out.send(new_dict_out)
-
-            elif "CLOSE_PROCESS" in command_keys:
-                (msg_id, _) = command_in["CLOSE_PROCESS"] 
-                daq_sock.close()
-                new_dict_out = OrderedDict()
-                new_dict_out["CLOSE_PROCESS"] = (msg_id, None)
-                cdh_pipe_out.send(new_dict_out)
-                daq_connected = False
-
-
-            else:
-                print("INVALID CDH Object")
+                # activates or deactivates the debug switch for this process
+                elif "ACQ_DBG" in command_keys:
+                    (msg_id, val) = command_in["ACQ_DBG"] 
+                    new_dict_out = OrderedDict()
+                    new_dict_out["ACQ_DBG"] = (msg_id, None)
+                    #cdh_pipe_out.send(new_dict_out)
+                    cdh_queue_out.put(new_dict_out)
+                    if val == True:
+                        acq_debug = True
+                    else:
+                        acq_debug = False
+                else:
+                    print("INVALID CDH Object")
 
 
         #####################################################################
         #                  MAIN RANGELINE ACQUISITION                       #
         #####################################################################
 
+        if acq_debug:
+            time_div_0_ns = time.perf_counter_ns()
         if daq_connected:
             try:
                 (radar_data, data_valid) = daq_sock.receive_message()
             except ConnectionResetError:
                 new_dict_out = OrderedDict()
                 new_dict_out["STATUS"] = (acq_msg_id, "CONN_RESET")
-                cdh_pipe_out.send(new_dict_out)
+                #cdh_pipe_out.send(new_dict_out)
+                cdh_queue_out.put(new_dict_out)
                 acq_msg_id += 1
                 daq_connected = False
                 buffer_setup = False
@@ -348,11 +521,20 @@ def main_acq_loop(cdh_pipe_in, cdh_pipe_out, data_queue):
 
             # check for returning none
             if data_valid == False:
+                if acq_debug:
+                    print(f"data_valid = False")
+                    time_div_1_ns = time.perf_counter_ns()
                 continue
 
             else:
+                if acq_debug: # NOTE DEBUG
+                    time_div_1_ns = time.perf_counter_ns() # NOTE DEBUG
                 if radar_data.message_type == TLVPlotCmd.SEND_TRACE_DATA:
                     tot_rangelines += 1
+
+                    if acq_debug: # NOTE DEBUG
+                        time_div_2_ns = time.perf_counter_ns() # NOTE DEBUG
+
                     az_val = float(
                         from_14_bit(
                             radar_data.get_by_tag(
@@ -360,6 +542,9 @@ def main_acq_loop(cdh_pipe_in, cdh_pipe_out, data_queue):
                             ).data,
                             True,))
                     
+                    if acq_debug: # NOTE DEBUG
+                        time_div_3_ns = time.perf_counter_ns() # NOTE DEBUG
+
                     el_val = float(
                         from_14_bit(
                             radar_data.get_by_tag(
@@ -367,16 +552,24 @@ def main_acq_loop(cdh_pipe_in, cdh_pipe_out, data_queue):
                             ).data,
                             False,))
 
+                    if acq_debug: # NOTE DEBUG
+                        time_div_4_ns = time.perf_counter_ns() # NOTE DEBUG
+
                     rangeline = np.frombuffer(
                         radar_data.get_by_tag(TLVPlotTag.DATA_DOUBLE).data, 
                             dtype=np.complex64)
 
+                    if acq_debug: # NOTE DEBUG
+                        time_div_5_ns = time.perf_counter_ns() # NOTE DEBUG
 
                     channel_val = int.from_bytes(
                         radar_data.get_by_tag(
                             TLVTracePCIeHTGZRF80002Tag.CHANNEL_UINT).data,
                         "big",
                         signed=False,)
+
+                    if acq_debug: # NOTE DEBUG
+                        time_div_6_ns = time.perf_counter_ns() # NOTE DEBUG
 
 
                     # setup the buffers now because you don't know the 
@@ -407,26 +600,32 @@ def main_acq_loop(cdh_pipe_in, cdh_pipe_out, data_queue):
                     i += 1
 
                     # DEBUG
-                    if az_val_prev == None:
-                        pass
+                    #if az_val_prev == None:
+                    #    pass
 
-                    else:
-                        az_diff = (az_val - az_val_prev)
-                        abs_diff = np.abs(az_diff)
-                        if abs_diff > 5:
-                            print(f"ACQ->az_diff = {az_diff}")
-                    az_val_prev = az_val
+                    #else:
+                    #    az_diff = (az_val - az_val_prev)
+                    #    abs_diff = np.abs(az_diff)
+                    #    if abs_diff > 5:
+                    #        print(f"ACQ->az_diff = {az_diff}")
+                    #az_val_prev = az_val
 
                 else:
                     print("Warning: Received non-plot command data")
 
+            if acq_debug: # NOTE DEBUG
+                time_div_7_ns = time.perf_counter_ns() # NOTE DEBUG
 
             # condition to transfer a chunk to the queue
+            if acq_debug: # NOTE DEBUG
+                chunk_dur_ns = 0
             if i == CHUNK_SIZE:
+                if acq_debug: # NOTE DEBUG
+                    time_div_chunk_0 = time.perf_counter_ns() # NOTE DEBUG
                 while True:
                     if data_queue.full():
                         print("data_queue Full!")
-                        time.sleep(0.05)
+                        time.sleep(0.01)
                     else:
                         break
                 # I am having some weird stuff happen and copying these arrays
@@ -467,7 +666,6 @@ def main_acq_loop(cdh_pipe_in, cdh_pipe_out, data_queue):
                 el_array = np.empty((CHUNK_SIZE))
                 ch_array = np.empty((CHUNK_SIZE))
 
-
                 chunk_count += 1
                 i = 0
                 if (chunk_count % 10) == 0:
@@ -483,9 +681,15 @@ def main_acq_loop(cdh_pipe_in, cdh_pipe_out, data_queue):
                     dbg_prev_chunk_time  = dbg_curr_chunk_time
                     dbg_prev_chunk_count = chunk_count
 
-
+                if acq_debug: # NOTE DEBUG
+                    time_div_chunk_1 = time.perf_counter_ns() # NOTE DEBUG
+                    chunk_dur_ns = time_div_chunk_1 - time_div_chunk_0
+                    chunk_dur_tot_us += chunk_dur_ns/1e3
 
         else: # daq not connected
-            time.sleep(0.05)
+            time.sleep(0.01)
+
+        if acq_debug: # NOTE DEBUG
+            loop_end_ns = time.perf_counter_ns() # NOTE DEBUG
 
 
