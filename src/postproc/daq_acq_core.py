@@ -44,86 +44,88 @@ def from_14_bit(data: bytes, signed: bool):
 # this is modified to incorporate the various functions from daq_comms that 
 # were previously in SimpRadar
 class DAQSocket:
-    def __init__(self):
-        self.sock = None
+    def __init__(s):
+        s.sock = None
+        s.daq_connected = False
 
-    def connect(self, addr):
-        self.sock = socket.socket()
-        self.sock.connect((addr, 10001))
-        self.sock.settimeout(0.25)
-        self.data_buffer = bytearray()
+    def connect(s, addr):
+        s.sock = socket.socket()
+        s.sock.connect((addr, 10001))
+        s.sock.settimeout(0.25)
+        s.data_buffer = bytearray()
 
         # buffer variables
-        #self.MAX_BUF_SIZE = 65536
-        self.MAX_BUF_SIZE = 1048576 
-        self.sock_accesses = 0
-        self.buf_init = False
-        self.curr_buf = None
-        self.next_buf = None
-        self.curr_buf_bytes = 0
-        self.buf_ind = 0
+        #s.MAX_BUF_SIZE = 65536
+        s.MAX_BUF_SIZE = 1048576 
+        s.buf_init = False
+        s.curr_buf = None
+        s.next_buf = None
+        s.curr_buf_bytes = 0
+        s.buf_ind = 0
 
-    def close(self):
-        self.buf_init = False
-        self.sock.close()
+    def close(s):
+        s.daq_connected = False
+        s.buf_init = False
+        if s.sock != None:
+            s.sock.close()
 
 
-    def read_from_buf(self, length):
+    def read_from_buf(s, length):
         # initialize the buffer
-        if not self.buf_init:
-            #self.curr_buf = self.sock.recv(self.MAX_BUF_SIZE)
-            vals = self.recv_alias(self.MAX_BUF_SIZE)
+        if not s.buf_init:
+            #s.curr_buf = s.sock.recv(s.MAX_BUF_SIZE)
+            vals = s.recv_alias(s.MAX_BUF_SIZE)
             if vals == None:
                 return None
             else:
-                self.curr_buf = vals
-            self.curr_buf_bytes = len(self.curr_buf)
-            self.buf_init = True
+                s.curr_buf = vals
+            s.curr_buf_bytes = len(s.curr_buf)
+            s.buf_init = True
 
         # the straighforward grab
-        if length <= self.curr_buf_bytes:
-            data_out = self.curr_buf[self.buf_ind:self.buf_ind+length]
-            self.buf_ind = self.buf_ind + length
-            self.curr_buf_bytes = self.curr_buf_bytes - length
+        if length <= s.curr_buf_bytes:
+            data_out = s.curr_buf[s.buf_ind:s.buf_ind+length]
+            s.buf_ind = s.buf_ind + length
+            s.curr_buf_bytes = s.curr_buf_bytes - length
             return data_out
 
         # need to read more bytes from the socket 
-        if length > self.curr_buf_bytes:
-            #self.next_buf = self.sock.recv(self.MAX_BUF_SIZE)
-            vals = self.recv_alias(self.MAX_BUF_SIZE)
+        if length > s.curr_buf_bytes:
+            #s.next_buf = s.sock.recv(s.MAX_BUF_SIZE)
+            vals = s.recv_alias(s.MAX_BUF_SIZE)
             if vals == None:
                 return None
             else:
-                self.next_buf = vals
-            #self.next_buf = self.recv_alias(self.MAX_BUF_SIZE)
-            self.next_buf_bytes = len(self.next_buf)
+                s.next_buf = vals
+            #s.next_buf = s.recv_alias(s.MAX_BUF_SIZE)
+            s.next_buf_bytes = len(s.next_buf)
 
             # not enough bytes, hopefully a rare occurrence
-            if length > (self.curr_buf_bytes + self.next_buf_bytes):
+            if length > (s.curr_buf_bytes + s.next_buf_bytes):
                 print("Warning: LOW DATA RATE OR BUFFER PROBLEM")
-                #self.next_buf += self.sock.recv(self.MAX_BUF_SIZE)
-                #self.next_buf += self.recv_alias(self.MAX_BUF_SIZE)
-                vals = self.recv_alias(self.MAX_BUF_SIZE)
+                #s.next_buf += s.sock.recv(s.MAX_BUF_SIZE)
+                #s.next_buf += s.recv_alias(s.MAX_BUF_SIZE)
+                vals = s.recv_alias(s.MAX_BUF_SIZE)
                 if vals == None:
                     return None
                 else:
-                    self.next_buf = vals
-                self.next_buf_bytes = len(self.next_buf)
+                    s.next_buf = vals
+                s.next_buf_bytes = len(s.next_buf)
 
             # if it happens again we abort
-            if length > (self.curr_buf_bytes + self.next_buf_bytes):
+            if length > (s.curr_buf_bytes + s.next_buf_bytes):
                 print("Warning: TOO FEW BYTES")
                 return None
             
             # grab everything left in the current buffer
-            data_out = self.curr_buf[self.buf_ind:]
-            excess_bytes = length - self.curr_buf_bytes
+            data_out = s.curr_buf[s.buf_ind:]
+            excess_bytes = length - s.curr_buf_bytes
 
             # grab the remaining necessary from the next buffer
-            data_out += self.next_buf[:excess_bytes]
-            self.curr_buf_bytes = self.next_buf_bytes - excess_bytes
-            self.buf_ind = excess_bytes
-            self.curr_buf = self.next_buf
+            data_out += s.next_buf[:excess_bytes]
+            s.curr_buf_bytes = s.next_buf_bytes - excess_bytes
+            s.buf_ind = excess_bytes
+            s.curr_buf = s.next_buf
             return data_out
 
     # if we get something that derails the acquisition process we want to 
@@ -131,50 +133,50 @@ class DAQSocket:
     # this is designed to happen infrequently as it requires messing with
     # the size of teh buffer in order to be done cleanly which theoretically
     # is a very slow thing and this file is a speed bottleneck for the code
-    def return_to_buf(self, vals):
-        self.curr_buf = self.curr_buf[self.buf_ind:]
-        self.curr_buf = vals + self.curr_buf
-        self.buf_ind  = 0
-        self.curr_buf_bytes += len(vals)
+    def return_to_buf(s, vals):
+        s.curr_buf = s.curr_buf[s.buf_ind:]
+        s.curr_buf = vals + s.curr_buf
+        s.buf_ind  = 0
+        s.curr_buf_bytes += len(vals)
                    
                 
-    def recv_full(self, length):
-        data = bytearray()
-        while len(data) < length:
-            try:
-                if len(self.data_buffer) > 0:
-                    data = self.data_buffer[:length]
-                    self.data_buffer = self.data_buffer[length:]
-                if len(data) == length:
-                    break
-                data += self.read_from_buf(length-len(data))
-                #data += self.sock.recv(length-len(data))
-            except socket.timeout:
-                self.data_buffer += data
-                return None
-        return bytes(data)
-
-
-    #def recv_full(self, length):
+    #def recv_full(s, length):
     #    data = bytearray()
     #    while len(data) < length:
     #        try:
-    #            if len(self.data_buffer) > 0:
-    #                data = self.data_buffer[:length]
-    #                self.data_buffer = self.data_buffer[length:]
+    #            if len(s.data_buffer) > 0:
+    #                data = s.data_buffer[:length]
+    #                s.data_buffer = s.data_buffer[length:]
     #            if len(data) == length:
     #                break
-    #            data += self.read_from_buf(length-len(data))
-    #            #data += self.sock.recv(length-len(data))
+    #            data += s.read_from_buf(length-len(data))
+    #            #data += s.sock.recv(length-len(data))
     #        except socket.timeout:
-    #            self.data_buffer += data
+    #            s.data_buffer += data
     #            return None
     #    return bytes(data)
 
 
-    def receive_message(self):
-        #length = self.recv_full(4)
-        length = self.read_from_buf(4)
+    #def recv_full(s, length):
+    #    data = bytearray()
+    #    while len(data) < length:
+    #        try:
+    #            if len(s.data_buffer) > 0:
+    #                data = s.data_buffer[:length]
+    #                s.data_buffer = s.data_buffer[length:]
+    #            if len(data) == length:
+    #                break
+    #            data += s.read_from_buf(length-len(data))
+    #            #data += s.sock.recv(length-len(data))
+    #        except socket.timeout:
+    #            s.data_buffer += data
+    #            return None
+    #    return bytes(data)
+
+
+    def receive_message(s):
+        #length = s.recv_full(4)
+        length = s.read_from_buf(4)
 
         # if a timeout occurred getting the data, we just wait til the next
         # loop iteration
@@ -182,25 +184,25 @@ class DAQSocket:
             return (None, False)
 
         packet_size = int.from_bytes(length, "big", signed=False)
-        #data = self.recv_full(packet_size)
-        data = self.read_from_buf(packet_size)
+        #data = s.recv_full(packet_size)
+        data = s.read_from_buf(packet_size)
 
         # for a timeout, we return the valid length value back to the buffer 
         # so on the next iteration we pull that from the buffer 
         if data == None:
-            #self.data_buffer += length
-            self.return_to_buf(length)
+            #s.data_buffer += length
+            s.return_to_buf(length)
             return (None, False)
 
-        #recv_delimiter = self.recv_full(4)
-        recv_delimiter = self.read_from_buf(4)
+        #recv_delimiter = s.recv_full(4)
+        recv_delimiter = s.read_from_buf(4)
         # for a timeout here we have to return both "data" and "length" values
         # to the buffer
         if recv_delimiter == None:
-            #self.data_buffer += data 
-            #self.data_buffer += length
-            self.return_to_buf(data)
-            self.return_to_buf(length)
+            #s.data_buffer += data 
+            #s.data_buffer += length
+            s.return_to_buf(data)
+            s.return_to_buf(length)
             return (None, False)
 
         if recv_delimiter != delimiter:
@@ -225,21 +227,21 @@ class DAQSocket:
         
         return full_message
 
-    def send_message(self, message: TLVMessage):
-        self.sock.send(DAQSocket.pack_message(message))
+    def send_message(s, message: TLVMessage):
+        s.sock.send(DAQSocket.pack_message(message))
 
     # so I can track accesses to the socket better
-    def recv_alias(self, length):
+    def recv_alias(s, length):
         try:
-            vals = self.sock.recv(length)
+            vals = s.sock.recv(length)
         except socket.timeout:
             return None
 
-        #self.sock_accesses += 1
-        #if vals != self.MAX_BUF_SIZE:
-        #    print(f"sock accessed only grabbed {len(vals)} vals")
-        #if self.sock_accesses % 1000 == 0:
-        #    print(f"numb sock_accesses = {self.sock_accesses}")
+        # everything else, assume the DAQ has disconnected
+        except Exception as e:
+            s.close()
+            return None
+
         return vals
 
 
@@ -278,17 +280,16 @@ class DAQSocket:
             s.connect(addr)
         
         except IOError as e:
-            #s.daq_connected = False
             s.close()
             return False
 
         except Exception as e:
-            #s.daq_connected = False
             s.close()
             print(e)
             return False
    
         # receive configs (and do nothing with them)
+        s.daq_connected = True
         s.receive_message()
         s.send_trace_config(en_channels)
         return True
@@ -320,7 +321,6 @@ def main_acq_loop(cdh_queue_in, cdh_queue_out, data_queue):
     CHUNK_SIZE = 10000 
     chunk_count = 0
     daq_sock = DAQSocket()
-    daq_connected = False
     tot_rangelines = 0
     acq_msg_id = 0
     buffer_setup = False
@@ -373,6 +373,7 @@ def main_acq_loop(cdh_queue_in, cdh_queue_out, data_queue):
     dbg_loop_cntr = 0
     dbg_prev_chunk_time = None
     dbg_prev_chunk_count = 0
+
     while True:
         cdh_loop_cntr += 1
         #print(f"cdh_loop_cntr: {cdh_loop_cntr}")
@@ -435,13 +436,11 @@ def main_acq_loop(cdh_queue_in, cdh_queue_out, data_queue):
         loop_start_ns = time.perf_counter_ns()
 
         # only check once every chunk, see if that speeds things up
-        if ((i == CHUNK_SIZE-1) or ((not daq_connected) and 
-                (cdh_loop_cntr >= 50)) or (daq_connected and 
-                cdh_loop_cntr >= 100000)):
+        if ((not daq_sock.daq_connected) or (i == CHUNK_SIZE-1) or 
+                (daq_sock.daq_connected and cdh_loop_cntr >= 100000)):
             cdh_loop_cntr = 0
             #while cdh_pipe_in.poll():
             while not cdh_queue_in.empty():
-                print("CDH VALUE")
                 #command_in = cdh_pipe_in.recv()
                 command_in = cdh_queue_in.get()
                 command_keys = command_in.keys()
@@ -453,11 +452,17 @@ def main_acq_loop(cdh_queue_in, cdh_queue_out, data_queue):
                     new_dict_out["INIT_CONN"] = (msg_id, status)
                     #cdh_pipe_out.send(new_dict_out)
                     cdh_queue_out.put(new_dict_out)
-
                     if status:
-                        daq_connected = True
+                        daq_sock.daq_connected = True
                     else:
-                        daq_connected = False
+                        daq_sock.daq_connected = False
+
+                elif "CONN_STATUS" in command_keys:
+                    (msg_id, _) = command_in["CONN_STATUS"] 
+                    new_dict_out = OrderedDict()
+                    new_dict_out["CONN_STATUS"] = (msg_id, daq_sock.daq_connected)
+                    #cdh_pipe_out.send(new_dict_out)
+                    cdh_queue_out.put(new_dict_out)
 
                 elif "DISCONNECT" in command_keys:
                     (msg_id, _) = command_in["DISCONNECT"] 
@@ -466,7 +471,6 @@ def main_acq_loop(cdh_queue_in, cdh_queue_out, data_queue):
                     new_dict_out["DISCONNECT"] = (msg_id, None)
                     #cdh_pipe_out.send(new_dict_out)
                     cdh_queue_out.put(new_dict_out)
-                    daq_connected = False
 
                 elif "SEND_TRACE" in command_keys:
                     (msg_id, en_channels) = command_in["SEND_TRACE"] 
@@ -483,7 +487,6 @@ def main_acq_loop(cdh_queue_in, cdh_queue_out, data_queue):
                     new_dict_out["CLOSE_PROCESS"] = (msg_id, None)
                     #cdh_pipe_out.send(new_dict_out)
                     cdh_queue_out.put(new_dict_out)
-                    daq_connected = False
 
                 # activates or deactivates the debug switch for this process
                 elif "ACQ_DBG" in command_keys:
@@ -497,7 +500,8 @@ def main_acq_loop(cdh_queue_in, cdh_queue_out, data_queue):
                     else:
                         acq_debug = False
                 else:
-                    print("INVALID CDH Object")
+                    print(f"command_keys: {command_keys}")
+                    print("INVALID CDH Object\n")
 
 
         #####################################################################
@@ -506,7 +510,7 @@ def main_acq_loop(cdh_queue_in, cdh_queue_out, data_queue):
 
         if acq_debug:
             time_div_0_ns = time.perf_counter_ns()
-        if daq_connected:
+        if daq_sock.daq_connected:
             try:
                 (radar_data, data_valid) = daq_sock.receive_message()
             except ConnectionResetError:
@@ -515,7 +519,7 @@ def main_acq_loop(cdh_queue_in, cdh_queue_out, data_queue):
                 #cdh_pipe_out.send(new_dict_out)
                 cdh_queue_out.put(new_dict_out)
                 acq_msg_id += 1
-                daq_connected = False
+                daq_sock.close()
                 buffer_setup = False
                 i = 0
 
@@ -657,6 +661,7 @@ def main_acq_loop(cdh_queue_in, cdh_queue_out, data_queue):
 
                 #data_queue.put((rangelines_array, az_array, el_array, 
                 #    ch_array, chunk_count))
+                #print(f"chunk_count {chunk_count} put")
                 data_queue.put((rng_arr_cpy, az_arr_cpy, el_arr_cpy, 
                     ch_arr_cpy, chunk_count))
 
@@ -691,5 +696,4 @@ def main_acq_loop(cdh_queue_in, cdh_queue_out, data_queue):
 
         if acq_debug: # NOTE DEBUG
             loop_end_ns = time.perf_counter_ns() # NOTE DEBUG
-
 

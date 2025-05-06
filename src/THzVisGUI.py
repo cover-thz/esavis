@@ -260,7 +260,7 @@ class MainWindow(QMainWindow):
         # this is used to mark time for how often we're querying the processing
         # core to see if the DAQ is connected
         s.last_daq_query_time   = None
-        s.daq_query_period      = 1
+        s.daq_query_period      = 2.
 
         # sets ths title and default size of the window
         s.setWindowTitle('THz Vizualizer GUI')
@@ -647,7 +647,7 @@ class MainWindow(QMainWindow):
             print("finished data pipe handling")
 
         # check the input queries
-        if query_pipe_in.poll():
+        while query_pipe_in.poll():
             query_in_dict = query_pipe_in.recv()
             if "DAQ_STATUS" in query_in_dict.keys():
                 s.last_daq_query_time = time.time()
@@ -675,10 +675,9 @@ class MainWindow(QMainWindow):
                 if s.cfg_dict["data_src"] == "dat_file":
                     stat_id = "PROC_FILE"
                     s.main_thz_tab.update_data_src_status(stat_id)
-
             else:
                 print(f"Warning: invalid query keys: {query_in_dict.keys()}")
-                       
+
         if _dbg:
             print("finished query_pipe_in handling")
 

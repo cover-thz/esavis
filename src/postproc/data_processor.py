@@ -186,7 +186,7 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
             if "DAQ_STATUS" in query_in_list:
                 send_status = True
                 query_out_dict = OrderedDict()
-                if radar.daq_connected:
+                if radar.get_conn_status():
                     query_out_dict["DAQ_STATUS"] = "CONNECTED"
                 else:
                     query_out_dict["DAQ_STATUS"] = "NOT_CONNECTED"
@@ -240,7 +240,7 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
                     ch0_en = cfg_dict["ch0_en"]
                     ch1_en = cfg_dict["ch1_en"]
 
-                    if not radar.daq_connected:
+                    if not radar.get_conn_status():
                         addr   = cfg_dict["daq_addr"]
                         conn_success = radar.setup_comms(addr, ch0_en, ch1_en)
                         #if not conn_success:
@@ -278,7 +278,8 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
         #                      DATA GATHERING STEPS                         #
         #####################################################################
         if cfg_dict["data_src"] == "daq":
-            if not radar.daq_connected:
+            if not radar.get_conn_status():
+                time.sleep(0.01)
                 continue
 
             daq_num_rangelines = cfg_dict["daq_num_rangelines"]

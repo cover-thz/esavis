@@ -181,6 +181,12 @@ class THzImageTab(QWidget):
             s.frame_pause_btn_clicked)
 
 
+        ####################################################################
+        # set the default save image path
+        #
+        s.ld_save_image_curr_dir_ledit.setText(s.cfg_dict["default_data_dir"])
+
+
     def set_gui_config_params(s, cfg_dict):
         """
         takes the passed postprocessing config dictionary and distributes 
@@ -415,6 +421,8 @@ class THzImageTab(QWidget):
     # NOTE TODO need to add saving of surface plots functionality
     # NOTE TODO THIS NEEDS MAJOR WORK NOW THAT WE HAVE DAQ CAPABILITIES 
     def ld_save_image_autosave_btn_clicked(s):
+        
+        #if s.cfg_dict["data_src"] == "dat_file"
         #frame_style = s.cfg_dict["frame_style"]
         plot_style = s.cfg_dict["plot_style"]
         data_fpath_0 = s.cfg_dict["data_fpath_0"]
@@ -441,7 +449,7 @@ class THzImageTab(QWidget):
         
 
     def ld_save_image_chng_dir_btn_clicked(s):
-        (fpath, ok) = QFileDialog.getExistingDirectory(
+        fpath = QFileDialog.getExistingDirectory(
             s, "Select Directory to Autosave Images", 
             s.cfg_dict["default_data_dir"])
         if fpath:
@@ -449,6 +457,7 @@ class THzImageTab(QWidget):
             new_cfg_dict = OrderedDict()
             new_cfg_dict["default_data_dir"] = fpath
             s.update_config(new_cfg_dict)
+            s.ld_save_image_curr_dir_ledit.setText(s.cfg_dict["default_data_dir"])
 
 
     def reset_camera_btn_clicked(s):

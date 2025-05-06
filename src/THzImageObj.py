@@ -258,30 +258,38 @@ class THzImageObj(QHBoxLayout):
 
 
     # NOTE CONSIDER PUSHING THIS LOGIC BACK INTO THzImageTab()
-    def save_cur_image(s, fpath, fprefix):
+    def save_cur_image(s, fpath, desc):
         """
         saves the current image to file, will probably move this to the 
         seperate image types later so the appropriate image class will save
         the image
         """
         #ipdb.set_trace() # TODO Debug REMOVE
-        image_data = s.image_data
+        pixel_grid = s.pixel_grid
         #if image_data == None:
         #    raise Exception("There is no image data to save")
 
-        az_grid     = s.az_grid
-        el_grid     = s.el_grid
-        color_min   = s.color_min
-        color_max   = s.color_max
+        cfg_dict = s.cfg_dict
+        az_grid     = s.az_grid_1d
+        el_grid     = s.el_grid_1d
 
-        postproc_config_dict  = s.cfg_dict
-        plot_style  = postproc_config_dict["plot_style"]
-        cmap_str = postproc_config_dict["colormap"]
+        # Now figure out the color scale limits
+        autocolor = s.cfg_dict["autoscale_color"]
+        cmap_str  = s.cfg_dict["colormap"]
+        if not autocolor:
+            color_min = s.cfg_dict["color_scale_min"]
+            color_max = s.cfg_dict["color_scale_max"]
+        else:
+            flat_img = s.pixel_grid_nans.flatten()
+            color_min = np.nanmin(flat_img)
+            color_max = np.nanmax(flat_img)
+
+        plot_style = postproc_config_dict["plot_style"]
+        cmap_str   = postproc_config_dict["colormap"]
 
 
         fig, ax = plt.subplots()
-
-        plt.imshow(image_data.T, extent=[az_grid.min(), az_grid.max(), 
+        plt.imshow(pixel_grid.T, extent=[az_grid.min(), az_grid.max(), 
                                         el_grid.min(), el_grid.max()],
                                         aspect='equal', origin='lower', 
                                         cmap=cmap_str, vmin=color_min, 
@@ -291,23 +299,23 @@ class THzImageObj(QHBoxLayout):
 
         if plot_style in ["front_peak_range"]:
             plt.colorbar(label='range [cm]')
-            plt.title('front peak range, initial\n' + fprefix)
+            plt.title('front peak range, initial\n' + desc)
 
         elif plot_style in ["back_peak_range"]:
             plt.colorbar(label='range [cm]')
-            plt.title('back peak range, initial\n' + fprefix)
+            plt.title('back peak range, initial\n' + desc)
 
         elif plot_style in ["integ_power_plot"]:
             plt.colorbar(label='power [dB]')
-            plt.title('integrated power plot\n' + fprefix)
+            plt.title('integrated power plot\n' + desc)
 
         elif plot_style in ["num_avgs_plot"]:
             plt.colorbar(label='num avgs')
-            plt.title('number of averages plot\n' + fprefix)
+            plt.title('number of averages plot\n' + desc)
 
         else:
             plt.colorbar(label='?')
-            plt.title('unknown plot type\n' + fprefix)
+            plt.title('unknown plot type\n' + desc)
 
         plt.xlabel('interp. Az encoder vals')
         plt.ylabel('interp. El encoder vals from start')
@@ -316,6 +324,7 @@ class THzImageObj(QHBoxLayout):
         print(f"fpath = {fpath}")
         fig.savefig(fpath)
 
+        fig.close()
         #if plot_style in ["front_peak_range", "back_peak_range", 
         #"integ_power_plot", "num_avgs_plot"]:
 

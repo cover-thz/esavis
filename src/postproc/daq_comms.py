@@ -49,16 +49,16 @@ class SimpRadar:
     addr                = None
     #daq_sock            = None
     en_channels         = None 
-    daq_connected       = False
     rangeline_buffer    = None
     state               = "RESET"
+    daq_connected       = None
 
     def __init__(s):
         #s.daq_sock = DAQSocket()
         s.tot_rangelines    = 0
         s.en_channels       = []
         s.cdh_msg_id        = 0
-        s.acq_timeout       = 3.0
+        s.acq_timeout       = 10.0
 
         # buffer of radar data samples
         s.rangeline_buffer = None
@@ -108,13 +108,12 @@ class SimpRadar:
             s.acq_dbg_flag = en_val
 
 
-
     # sends a value to the acq_obj using the cdh pipe and waits for a response
     # from the acq_obj
     def ack_cdh_handshake_trans(s, key, value_out):
         new_dict_out        = OrderedDict()
         msg_id_out          = s.cdh_msg_id
-        print(f"handshake trans: {key}, {value_out}, {msg_id_out}")
+        #print(f"handshake trans: {key}, {value_out}, {msg_id_out}")
         new_dict_out[key]   = (msg_id_out, value_out)
         s.cdh_msg_id       += 1
         #s.cdh_pipe_out.send(new_dict_out)
@@ -127,7 +126,7 @@ class SimpRadar:
                 new_dict_in = s.cdh_queue_rx.get()
                 if key in new_dict_in.keys():
                     (msg_id_in, value_in) = new_dict_in[key]
-                    print(f"handshake reply: {key}, {msg_id_in}, {value_in}")
+                    #print(f"handshake reply: {key}, {msg_id_in}, {value_in}")
                     # verify that the response is directed to the same message
                     # and not just the same message type
                     if msg_id_in == msg_id_out:
@@ -145,6 +144,7 @@ class SimpRadar:
         s.addr = addr
         s.set_en_channels(ch0_en, ch1_en, send_trace=False)
         status = s.init_connection()
+        s.daq_connected = status
         return status
 
 
@@ -175,19 +175,26 @@ class SimpRadar:
     def init_connection(s):
         status = s.ack_cdh_handshake_trans("INIT_CONN", (s.addr, s.en_channels))
         if status:
-            s.daq_connected = True
             print("Connected")
             return True
         else:
-            s.daq_connected = False
             return False
+
+    # this grabs the connection status from the local daq_connected variable
+    # a much "cheaper" operation than querying the daq_acq_core
+    def get_conn_status(s):
+        return s.daq_connected
+
+    def get_true_conn_status(s):
+        status = s.ack_cdh_handshake_trans("CONN_STATUS", None) 
+        # update the daq_connected variable
+        s.daq_connected = status
+        return s.daq_connected
+
 
 
     def disconnect(s):
-        if s.daq_connected:
-            #s.daq_sock.close()
-            ack = s.ack_cdh_handshake_trans("DISCONNECT", None)
-            s.daq_connected = False
+        ack = s.ack_cdh_handshake_trans("DISCONNECT", None)
     
 
     # need to call this at the beginning and whenever we change the number of 
@@ -200,12 +207,15 @@ class SimpRadar:
         try:
             if s.num_buf_samples == 0:
                 if s.data_queue.empty():
-                    #print("queue empty")
+                    # here's when we ACTUALLY check for the connection status
+                    # since data has stopped flowing
+                    _ = s.get_true_conn_status()
                     time.sleep(0.01)
                     return (None, None, None, None, False)
                 else:
                     (rangelines_array_in, az_array_in, el_array_in, 
                         ch_array_in, chunk_count) = s.data_queue.get(timeout=5)
+                    #print(f"chunk_count {chunk_count} pulled")
                     count_diff = chunk_count - s.prev_chunk_count
                     if count_diff != 1:
                         print(f"chunk_count diff: {count_diff}")
@@ -298,7 +308,7 @@ class SimpRadar:
                 tot_misc_dur        += tot_misc_inc
 
                 loop_start = time.time_ns()
-            if not s.daq_connected:
+            if not s.get_conn_status():
                 turn_flag = "DISABLED"
                 status_flag = "DAQ_NOT_CONNECTED"
                 break
@@ -310,6 +320,7 @@ class SimpRadar:
                 if i == num_rangelines:
                     print("num_rangelines reached")
                     break
+
 
             # this is if there's a timeout
             if time.time() - start_time > timeout:
@@ -324,7 +335,6 @@ class SimpRadar:
                 cdh_dict_in = s.cdh_queue_rx.get()
                 if "STATUS" in cdh_dict_in:
                     if cdh_dict_in["STATUS"] == "CONN_RESET":
-                        s.daq_connected = False
                         status_flag = "CONN_RESET"
                         turn_flag = "DISABLED"
                         break
@@ -338,7 +348,7 @@ class SimpRadar:
 
             (rangeline, az_val, el_val, 
              channel_val, data_valid) = s.get_sample()
-
+            
             if debug:
                 other_time_start = time.time_ns()
 
@@ -479,6 +489,7 @@ class SimpRadar:
                 print(f"tot_other_dur: {tot_other_dur/1e3/i:.4f} us")
                 print(f"tot_misc_dur: {tot_misc_dur/1e3/i:.5f} us")
                 print("-------------------------------------------------------\n")
+
         return (rangelines_array, az_array, el_array, ch_array, 
                 i, turn_flag, reset_in_array, status_flag)
 
