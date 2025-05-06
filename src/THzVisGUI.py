@@ -180,6 +180,7 @@ DFLT_CFG_DICT["plot_style"]      = "front_peak_range"
 DFLT_CFG_DICT["peak_selection"]  = "front"
 DFLT_CFG_DICT["fname_list"]  = None
 DFLT_CFG_DICT["paused"]     = False
+DFLT_CFG_DICT["invert_range"] = False
     
 # These values do not appear in the GUI yet
 # so they are "hard-coded"

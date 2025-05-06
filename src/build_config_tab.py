@@ -251,21 +251,26 @@ def build_config_tab(cfg_tab):
     # Eighth row of widgets on this tab page
     #
     row8_layout         = QHBoxLayout()
-    fft_len_note_lbl    = QLabel("*only used on time-domain input data")
-    row8_layout.addWidget(fft_len_note_lbl)
+    fft_len_note_lbl    = QLabel("*only used on\ntime-domain input data")
     cfg_tab.fft_len_note_lbl    = fft_len_note_lbl
 
-    blank_cfg_lbl = QLabel("                            ")
+    inv_range_chkb = QCheckBox()
+    inv_range_chkb.setText("Invert Range       ")
+
+    blank_cfg_lbl = QLabel("                ")
     noise_frac_lbl = QLabel("Noise fraction start:")
     noise_frac_ledit = QLineEdit()
 
     # layout
+    row8_layout.addWidget(fft_len_note_lbl)
+    row8_layout.addWidget(inv_range_chkb)
     row8_layout.addWidget(blank_cfg_lbl)
     row8_layout.addWidget(noise_frac_lbl)
     row8_layout.addWidget(noise_frac_ledit)
 
     # add member variables
     cfg_tab.blank_cfg_lbl       = blank_cfg_lbl
+    cfg_tab.inv_range_chkb      = inv_range_chkb
     cfg_tab.noise_frac_lbl      = noise_frac_lbl
     cfg_tab.noise_frac_ledit    = noise_frac_ledit
 
@@ -643,6 +648,11 @@ class setup_config_callbacks:
         cfg_tab.process_side1_chkb.stateChanged.connect(
             lambda: s.chkbox_update(cfg_tab.process_side1_chkb,
             "disable_el_side1", True))
+
+
+        cfg_tab.inv_range_chkb.stateChanged.connect(
+            lambda: s.chkbox_update(cfg_tab.inv_range_chkb,
+            "invert_range"))
 
         cfg_tab.calc_wt_sum_chkb.stateChanged.connect(
             lambda: s.chkbox_update(cfg_tab.calc_wt_sum_chkb,

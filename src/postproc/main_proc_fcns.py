@@ -311,9 +311,11 @@ class CoverProc:
             # first we perform our spectral conversions
             #data_format_in  = cfg_dict["data_format_in"]
             fft_len_in    = cfg_dict["fft_len"]
+            invert_range  = cfg_dict["invert_range"]
             (coarse_power_grid, freq_lut, 
              fft_len) = lpf.spectra_conv(s.r_grid_data, 
-                            data_format_in, fft_len_in, fs_post_dec)
+                            data_format_in, fft_len_in, fs_post_dec, 
+                            invert_range)
 
             chirp_span      = cfg_dict["chirp_span"]
             chirp_time      = cfg_dict["chirp_time"]

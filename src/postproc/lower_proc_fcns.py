@@ -575,16 +575,21 @@ def check_pix_fraction(r_grid_valids):
 
 # here's the FFT and power spectrum calculations.  Rather straightforward
 
-def spectra_conv(coarse_rangelines_grid, data_format_in, fft_len, fs_post_dec):
+def spectra_conv(coarse_rangelines_grid, data_format_in, fft_len, fs_post_dec,
+                 invert_range=False):
     if data_format_in.lower() == "time_domain":
         coarse_power_grid = np.square(np.abs(np.fft.fft(
             coarse_rangelines_grid, fft_len)))
-        coarse_power_grid = np.flip(coarse_power_grid, 2)
+
+        if not invert_range:
+            coarse_power_grid = np.flip(coarse_power_grid, 2)
         fft_len_out = fft_len
 
     elif data_format_in.lower() == "fft":
         coarse_power_grid = np.square(np.abs(coarse_rangelines_grid))
-        coarse_power_grid = np.flip(coarse_power_grid, 2)
+
+        if not invert_range:
+            coarse_power_grid = np.flip(coarse_power_grid, 2)
         fft_len_out = coarse_power_grid.shape[2]
 
     else: # data_format_in.lower() == "power_spectrum"
@@ -592,7 +597,9 @@ def spectra_conv(coarse_rangelines_grid, data_format_in, fft_len, fs_post_dec):
         # and flip the axis for ranges to be correct
         #coarse_power_grid = 
         coarse_power_grid = coarse_rangelines_grid.astype(np.float64)
-        coarse_power_grid = np.flip(coarse_power_grid, 2)
+
+        if not invert_range:
+            coarse_power_grid = np.flip(coarse_power_grid, 2)
         fft_len_out = coarse_power_grid.shape[2]
 
     # frequency vector, contains the frequency bins for each FFT (they're all
