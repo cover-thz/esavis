@@ -474,7 +474,7 @@ class THzImageTab(QWidget):
             s, "Select Directory to Autosave Images", 
             s.cfg_dict["default_data_dir"])
         if fpath:
-            fpath = conv_fpath_to_unix(fpath)
+            fpath = conv_fpath_to_unix(fpath) + "/"
             new_cfg_dict = OrderedDict()
             new_cfg_dict["default_data_dir"] = fpath
             s.update_config(new_cfg_dict)
