@@ -181,7 +181,16 @@ DFLT_CFG_DICT["peak_selection"]  = "front"
 DFLT_CFG_DICT["fname_list"]  = None
 DFLT_CFG_DICT["paused"]     = False
 DFLT_CFG_DICT["invert_range"] = False
-    
+
+# Visible light camera stuff
+DFLT_CFG_DICT["camera_x"] = -3920.0
+DFLT_CFG_DICT["camera_y"] = -1122.0
+DFLT_CFG_DICT["camera_h_scale"] = 11.0
+DFLT_CFG_DICT["camera_v_scale"] = 8.0
+DFLT_CFG_DICT["camera_step_int"] = 10
+DFLT_CFG_DICT["camera_opacity"] = 0.3
+
+
 # These values do not appear in the GUI yet
 # so they are "hard-coded"
 DFLT_CFG_DICT["daq_timeout"]  = 2.
@@ -425,6 +434,7 @@ class MainWindow(QMainWindow):
         if s.cfg_dict != None:
             s.cfg_tab.set_gui_config_params(s.cfg_dict)
             s.main_thz_tab.set_gui_config_params(s.cfg_dict)
+            s.camera_tab.set_gui_config_params(s.cfg_dict)
         return ret_val
 
 
@@ -457,6 +467,14 @@ class MainWindow(QMainWindow):
 
         note that cfg_dict_in is not a complete cfg_dict, it only contains 
         keys that have been changed.   same with cfg_flags_in
+
+        The central object of the GUI "cfg_dict" is updated every time this 
+        function is called, however the updated "cfg_dict" is not sent to 
+        the processing core.  That happens less frequently in the timer 
+        event handler.  This is to minimize overwhelming the processing 
+        core's pipe whenever the user makes a small change to the system by 
+        typing values in a textbox it's all to keep the processing system 
+        moving quickly.  
         """
         
         # here we check the input dict to see if there are any changes that
@@ -494,7 +512,8 @@ class MainWindow(QMainWindow):
             # construct an old dictionary
             old_cfg_dict = copy.deepcopy(cfg_dict)
 
-            # update the dictionary
+            # HERE is where the global cfg_dict object that contains the 
+            # configuration for the entire system is updated
             for key in cfg_dict_in.keys():
                 cfg_dict[key] = cfg_dict_in[key]
 
@@ -576,9 +595,12 @@ class MainWindow(QMainWindow):
         elif "force_update" in cfg_dict["flags"]:
             update = True
 
-        # instead of actually performing the update here we "mark" it for
-        # update by the timer handler which will perform the actual update
-        # and clear the flags from the dict
+        # instead of actually sending the updated cfg_dict to the processing 
+        # core  here we "mark" it for update by the timer handler which will 
+        # perform the actual update and clear the flags from the dict.  
+        # 
+        # we do this to minimize the number of updates sent to the processing
+        # core to keep the system from slowing down too much
         if update:
             s.update_cfg_flag = True
 
