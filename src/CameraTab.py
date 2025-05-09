@@ -139,7 +139,7 @@ class CameraTab(QWidget):
         s.image_widget.addItem(s.camera_item)
 
         s.image_plot_item = s.image_widget.getPlotItem()
-        s.image_plot_item.invertX(True)
+        s.image_plot_item.invertX(False)
         s.image_plot_item.invertY(True)
 
         # This keeps the aspect ratio equal to 1 so the image doesn't get 
