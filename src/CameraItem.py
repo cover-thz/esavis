@@ -202,7 +202,7 @@ class CameraItem(pg.ImageItem):
     index = -1
     camera = None
 
-    flip_h = False
+    flip_h = True
     flip_v = False
 
     def __init__(self):
