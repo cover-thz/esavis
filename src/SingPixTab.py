@@ -96,7 +96,9 @@ class SingPixTab(QWidget):
         #
         s.main_layout  = QVBoxLayout() 
         s.upper_layout = QHBoxLayout()
-        #s.aux_layout   = QHBoxLayout() # doing this because it's the minimum effort
+
+        # doing this because it's the minimum effort
+        #s.aux_layout   = QHBoxLayout() 
         s.lower_layout = QHBoxLayout()
 
         s.thz_image_obj = tio.THzImageObj(s, s.cfg_dict)
@@ -116,11 +118,8 @@ class SingPixTab(QWidget):
         # NOTE test plot
         s.aux_plot_obj.plt_axes.plot([0,1,2,3,4],[10,1,20,3,40], color="r")
 
-
         s.main_layout.addLayout(s.upper_layout)
-
         s.setLayout(s.main_layout)
-
 
 
         ####################################################################
@@ -132,10 +131,17 @@ class SingPixTab(QWidget):
 
     def update_image(s, frame_data, new_frame_flag, reset_camera=False):
         """
-        This is called whenver a new frame comes in and properly distributes 
+        This is called whenever a new frame comes in and properly distributes 
         it to the THzImageObj widgets 
         """
         s.thz_image_obj.update_image(frame_data, new_frame_flag, 
             reset_camera)
 
+
+    def aux_update(s, aux_data_in, new_frame_flag):
+        """
+        this updates all the appropriate auxilary plot objects when a new 
+        frame ( + auxiliary data) comes in
+        """
+        s.aux_plot_obj.aux_update(aux_data_in, new_frame_flag)
 

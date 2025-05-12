@@ -614,6 +614,7 @@ class MainWindow(QMainWindow):
         """
         # TODO change the updates based on which tabs are visible to make
         # the GUI look less sluggish
+        # processing ef
         s.main_thz_tab.update_image(frame_in, new_frame_flag)
         s.camera_tab.update_image(frame_in, new_frame_flag)
         s.sing_pix_tab.update_image(frame_in, new_frame_flag)

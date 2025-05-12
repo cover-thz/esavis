@@ -387,27 +387,35 @@ class CoverProc:
                         calc_weighted_sum)
 
                 aux_data_out = collections.OrderedDict()
-                aux_data_out["aux_peak_ranges"] = aux_peak_ranges
-                aux_data_out["aux_peak_powers_lin"] = aux_peak_powers_lin
-                aux_data_out["aux_noise_floor"]     = aux_noise_floor
-                aux_data_out["aux_num_peaks"]       = aux_num_peaks
-                aux_data_out["aux_adj_lin_thresh"]  = aux_adj_lin_thresh
-                aux_data_out["aux_adj_lin_contr"]   = aux_adj_lin_contr
-                aux_data_out["aux_weight_sum_start"] = aux_weight_sum_start
-                aux_data_out["aux_weight_sum_end"]  = aux_weight_sum_end
+                aux_data_out["x_ind"] = aux_x_ind
+                aux_data_out["y_ind"] = aux_y_ind
+                aux_data_out["rangeline"] = aux_rngline
+                aux_data_out["range_lut_cm"] = range_lut_cm
+                aux_data_out["peak_ranges"] = aux_peak_ranges
+                aux_data_out["peak_powers_lin"] = aux_peak_powers_lin
+                aux_data_out["noise_floor"]     = aux_noise_floor
+                aux_data_out["num_peaks"]       = aux_num_peaks
+                aux_data_out["adj_lin_thresh"]  = aux_adj_lin_thresh
+                aux_data_out["adj_lin_contr"]   = aux_adj_lin_contr
+                aux_data_out["weight_sum_start"] = aux_weight_sum_start
+                aux_data_out["weight_sum_end"]  = aux_weight_sum_end
 
 
             except:
                 print("invalid aux_rngline data")
                 aux_data_out = collections.OrderedDict()
-                aux_data_out["aux_peak_ranges"] = None
-                aux_data_out["aux_peak_powers_lin"] = None
-                aux_data_out["aux_noise_floor"]     = None
-                aux_data_out["aux_num_peaks"]       = None
-                aux_data_out["aux_adj_lin_thresh"]  = None
-                aux_data_out["aux_adj_lin_contr"]   = None
-                aux_data_out["aux_weight_sum_start"] = None
-                aux_data_out["aux_weight_sum_end"]  = None
+                aux_data_out["x_ind"] = aux_x_ind
+                aux_data_out["y_ind"] = aux_y_ind
+                aux_data_out["rangeline"] = aux_rngline
+                aux_data_out["range_lut_cm"] = range_lut_cm
+                aux_data_out["peak_ranges"] = None
+                aux_data_out["peak_powers_lin"] = None
+                aux_data_out["noise_floor"]     = None
+                aux_data_out["num_peaks"]       = None
+                aux_data_out["adj_lin_thresh"]  = None
+                aux_data_out["adj_lin_contr"]   = None
+                aux_data_out["weight_sum_start"] = None
+                aux_data_out["weight_sum_end"]  = None
                 
 
             new_frame_flag = True
