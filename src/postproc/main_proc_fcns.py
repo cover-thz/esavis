@@ -359,7 +359,7 @@ class CoverProc:
                                         max_range, dead_pix_val, dbg_prof)                   
             if dbg_prof:
                 num_valids = np.sum(valid_pixels_grid)
-                print(f"num_valid_pixels: {num_valids}")
+                print(f"    num_valid_pixels: {num_valids}")
 
             # frame data
             frame_out = collections.OrderedDict()

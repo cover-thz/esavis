@@ -23,6 +23,16 @@ import os
 import daq_acq_core as dac
 import ipdb
 from collections import OrderedDict
+from numba import jit
+
+def docstring(docstr):
+    def assign_doc(f):
+        f.__doc__ = docstr
+        return f
+    return assign_doc
+##############################################################################
+##############################################################################
+
 
 # NOTE TODO NOTE TODO 
 # NOTE TODO NOTE TODO 
@@ -192,7 +202,6 @@ class SimpRadar:
         return s.daq_connected
 
 
-
     def disconnect(s):
         ack = s.ack_cdh_handshake_trans("DISCONNECT", None)
     
@@ -202,7 +211,7 @@ class SimpRadar:
     def send_trace_config(s):
         ack = s.ack_cdh_handshake_trans("SEND_TRACE", s.en_channels)
 
-
+    # let's see what numba does
     def get_sample(s):
         try:
             if s.num_buf_samples == 0:
@@ -210,7 +219,7 @@ class SimpRadar:
                     # here's when we ACTUALLY check for the connection status
                     # since data has stopped flowing
                     _ = s.get_true_conn_status()
-                    time.sleep(0.01)
+                    time.sleep(0.001)
                     return (None, None, None, None, False)
                 else:
                     (rangelines_array_in, az_array_in, el_array_in, 
@@ -246,23 +255,22 @@ class SimpRadar:
         return (rangeline, az_val, el_val, channel_val, True)
 
 
-
-
     #def __del__(s):
     #    s.acq_obj.join() # might need to close the pipes brutally in order
                          # for this to work
-
-
 
     # main workhorse function
     # NOTE currently a little hacky since I wanted to minimize the number
     # of changes, but the method by which reangelines are iterated through
     # to detect turnaround is inefficient now that we grab many rangelines
     # at once
-    def get_daq_data(s, num_rangelines, turnaround_mode, turn_hyst, min_az, 
-                     max_az, ch0_offset, ch1_offset, timeout=3, debug=False):
+    def get_daq_data(s, num_rangelines, turnaround_mode, turn_hyst, min_az_in, 
+                     max_az_in, ch0_offset, ch1_offset, timeout=3, debug=False):
                                               
         start_time = time.time()
+
+        min_az = min_az_in + ch0_offset
+        max_az = max_az_in + ch1_offset
         
         if not turnaround_mode:
             s.state = "RESET"
@@ -285,17 +293,23 @@ class SimpRadar:
         
         # debug time vals
         tot_dur             = 0
+        tot_profiler_calcs_dur    = 0
+        tot_preamble_dur    = 0
         tot_datagrab_dur    = 0
         tot_other_dur       = 0
         tot_misc_dur        = 0
         if debug:
             loop_start          = time.time_ns()
+            profiler_premb_end  = loop_start
             data_grab_start     = loop_start
             other_time_start    = loop_start
             loop_end            = loop_start
         while True:
             if debug:
+                temp                = time.time_ns() 
                 tot_inc             = (loop_end - loop_start)
+                tot_profiler_calcs_inc = (profiler_premb_end - loop_start)
+                tot_preamble_inc    = (data_grab_start - loop_start)
                 tot_datagrab_inc    = (other_time_start - data_grab_start)
                 tot_other_inc       = (loop_end - other_time_start)
                 tot_misc_inc        = (tot_inc - tot_datagrab_inc - 
@@ -303,11 +317,15 @@ class SimpRadar:
                                         
 
                 tot_dur             += tot_inc
+                tot_profiler_calcs_dur += tot_profiler_calcs_inc
+                tot_preamble_dur    += tot_preamble_inc
                 tot_datagrab_dur    += tot_datagrab_inc
                 tot_other_dur       += tot_other_inc
                 tot_misc_dur        += tot_misc_inc
 
-                loop_start = time.time_ns()
+                loop_start = temp
+                profiler_premb_end = time.time_ns()
+
             if not s.get_conn_status():
                 turn_flag = "DISABLED"
                 status_flag = "DAQ_NOT_CONNECTED"
@@ -328,16 +346,21 @@ class SimpRadar:
                 status_flag = "TIMEOUT"
                 break
 
+            if not s.get_conn_status():
+                status_flag = "CONN_RESET"
+                turn_flag = "DISABLED"
+                break
+
             # check for status from the core
             #if s.cdh_pipe_in.poll():
-            if not s.cdh_queue_rx.empty():
-                #cdh_dict_in = s.cdh_pipe_in.recv()
-                cdh_dict_in = s.cdh_queue_rx.get()
-                if "STATUS" in cdh_dict_in:
-                    if cdh_dict_in["STATUS"] == "CONN_RESET":
-                        status_flag = "CONN_RESET"
-                        turn_flag = "DISABLED"
-                        break
+            #if not s.cdh_queue_rx.empty():
+            #    #cdh_dict_in = s.cdh_pipe_in.recv()
+            #    cdh_dict_in = s.cdh_queue_rx.get()
+            #    if "STATUS" in cdh_dict_in:
+            #        if cdh_dict_in["STATUS"] == "CONN_RESET":
+            #            status_flag = "CONN_RESET"
+            #            turn_flag = "DISABLED"
+            #            break
 
 
             ##################################################################
@@ -356,21 +379,8 @@ class SimpRadar:
             if data_valid == False:
                 if debug:
                     loop_end = time.time_ns()
-                    #print("daq_comms: data_valid == False")
+                    print("daq_comms: data_valid == False")
                 continue
-
-            # DEBUG
-            #if az_val_prev == None:
-            #    pass
-            #else:
-            #    az_diff = (az_val - az_val_prev)
-            #    abs_diff = np.abs(az_diff)
-            #    if abs_diff > 5:
-            #        pass
-                    #print(f"az_diff = {az_diff}")
-            #az_val_prev = az_val
-
-
 
             # setup the buffers now because you don't know the 
             # length of the rangeline until now
@@ -395,10 +405,12 @@ class SimpRadar:
             # Note: nonzero turn_hyst will produce "wobble" at frame
             # edges
             if turnaround_mode:
-                if channel_val == 0:
-                    az_val_adj = az_val + ch0_offset
-                else:
-                    az_val_adj = az_val + ch1_offset
+
+                az_val_adj = az_val
+                #if channel_val == 0:
+                #    az_val_adj = az_val + ch0_offset
+                #else:
+                #    az_val_adj = az_val + ch1_offset
 
                 if s.state == "RESET":
                     turn_flag = "RESET"
@@ -407,7 +419,7 @@ class SimpRadar:
                     elif az_val_adj > (max_az + turn_hyst):
                         s.state = "TURNING_MAX"
                     else:
-                        az_val_adj = "WAITING_FOR_TURN"
+                        s.state = "WAITING_FOR_TURN"
 
                 elif s.state == "WAITING_FOR_TURN":
                     turn_flag = "RESET"
@@ -450,7 +462,6 @@ class SimpRadar:
                 # Now we perform the appropriate updates based on 
                 # state
 
-
                 # this is to ensure the processing reset prior to 
                 # grabbing the first data sample 
                 if turn_flag in ["RESET", "START_FRAME"]:
@@ -484,7 +495,8 @@ class SimpRadar:
                 print("---------------DURATIONS PER RANGELINE ACQ ------------")
                 print(f"Total number of rangelines: {i}")
                 print(f"tot_dur: {tot_dur/1e3/i:.4f} us")
-                #print(f"tot_daq_sock_dur: {tot_daq_sock_dur/1e3/i:.4f} us")
+                print(f"tot_profiler_calcs_dur: {tot_profiler_calcs_dur/1e3/i:.4f} us")
+                print(f"tot_preamble_dur: {tot_preamble_dur/1e3/i:.4f} us")
                 print(f"tot_datagrab_dur: {tot_datagrab_dur/1e3/i:.4f} us")
                 print(f"tot_other_dur: {tot_other_dur/1e3/i:.4f} us")
                 print(f"tot_misc_dur: {tot_misc_dur/1e3/i:.5f} us")
@@ -492,5 +504,83 @@ class SimpRadar:
 
         return (rangelines_array, az_array, el_array, ch_array, 
                 i, turn_flag, reset_in_array, status_flag)
+
+
+    # NOTE Work-in-progress functions to replace get_daq_data()
+
+
+    """
+    some stream of consciousness
+        ideally we'd have some margin on our azimuth turnaround.  We'd have 
+        the actual aimuth limits, like 205 to -205 encoder counts.  Then we'd 
+        have 5 valid encoder counts we'd just trash (200 to 205 and 
+        -200 to -205).  We'd then return the 200 to -200 Azimuth frame, and
+        display only that range.  This means we'd lose about 2.5% of the frame
+        This is likely not an issue.  It would also slow things down by 
+        about 2.5%, also not an issue.
+
+        So, the min_az and max_az sent to the functions below are not the min
+        and max az at the end of the line with the GUI, but rather those 
+        values including the margin (so 205 to -205).  The postprocessing 
+        will later trim out the edges to clean up the frame
+
+        Ok. Assumptions regarding the azimuth values:
+            - assumed to be in time-recieved-order
+            - 
+
+    
+    """
+
+    @docstring("""
+        az_buf_in   - 1D vector of azimuth values
+        min_az      - desired minimum azimuth value for frame edge
+        max_az      - desired maximum azimuth value for frame edge
+    """)
+    def get_frame_indices_from_buffer(az_buf_in, min_az, max_az):
+
+        # construct the arrays. Separating out processing-intensive tasks
+        # for clarity
+        az_buf_min_set = az_buf_in - min_az
+        az_buf_max_set = az_buf_in - max_az
+
+        # Extracting the indices where turnaround occurs
+        min_az_inds = np.where(az_buf_min_set <= 0)[0]
+        max_az_inds = np.where(az_buf_max_set >= 0)[0]
+
+
+
+    @docstring("""
+        Function Name: get_daq_data2()
+        Description:
+            grabs the requested number of rangelines from the DAQ.  However
+            it actually does quite a few other things if turnaround_mode is 
+            True.  
+
+            If turnaround_mode is True, then it will wait for the azimuth to 
+            "turn around" and send the frame grabbed that way
+
+    """)
+    def get_daq_data2(s, num_rangelines, turnaround_mode, turn_hyst, min_az, 
+                      max_az, ch0_offset, ch1_offset, timeout=3, debug=False):
+
+        if not turnaround_mode:
+            pass
+        else:
+            # NOTE many of these functions don't exist yet
+            az_buffer = s.get_az_buffer()
+
+            # check if a turnaround is present
+            az_buf_min = az_buffer.min()
+            az_buf_max = az_buffer.max()
+
+            # this indicates a full frame is present
+            if (az_buf_min < min_az) and (az_buf_max > max_az):
+                # call C function to extract frame indices
+                # use frame indices to slice up the buffer into frames 
+                # assume that there are at most 2 frames in the buffer
+                pass
+
+
+
 
 

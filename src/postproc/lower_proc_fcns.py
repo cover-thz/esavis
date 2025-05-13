@@ -12,6 +12,7 @@
 
 import ctypes as ct
 import numpy as np
+#from numba import jit, njit
 import ipdb
 import time
 import os
@@ -85,40 +86,19 @@ def docstring(docstr):
 ##############################################################################
 ##############################################################################
 
-@docstring("""
-    Function Name: calc_coarse_rangelines_grid()
-""")
-def calc_coarse_rangelines_grid(coarse_az_array, coarse_el_array, 
-        el_array_adj, az_array_adj, rangelines_adj, 
-        coarse_valid_grid, coarse_rangelines_grid, npts_az, npts_el):
 
-    min_coarse_az = min(coarse_az_array)
-    max_coarse_az = max(coarse_az_array)
+# a small piece of calc_coarse_rangelines_grid() that we can attempt to speed
+# up with parallel code
+#@njit
+def nearest_rangeline_loop(el_array_adj, az_array_adj, min_coarse_az, 
+                           min_coarse_el, az_ind_coeff, el_ind_coeff, 
+                           npts_az, npts_el, num_local_pts_matrix, 
+                           local_rngln_inds, local_az_vals, local_el_vals,
+                           coarse_az_array, coarse_el_array,
+                           rangelines_adj, coarse_rangelines_grid, 
+                           coarse_valid_grid, coarse_az_out, coarse_el_out):
 
-    min_coarse_el = min(coarse_el_array)
-    max_coarse_el = max(coarse_el_array)
-
-    el_ind_coeff = (npts_el-1) / (max_coarse_el - min_coarse_el)
-    az_ind_coeff = (npts_az-1) / (max_coarse_az - min_coarse_az)
-
-    # need to create large array of "nearby values"
-    # assume it's 10 times the "average" oversampling rate
-    # this shouldn't be a problem
-    max_loc_pts = max(int(len(rangelines_adj) / (npts_az * npts_el) * 10), 100)
-    local_rngln_inds = np.zeros((npts_az, npts_el, max_loc_pts), dtype=int)
-    local_az_vals    = np.zeros((npts_az, npts_el, max_loc_pts), dtype=int)
-    local_el_vals    = np.zeros((npts_az, npts_el, max_loc_pts), dtype=int)
-
-    # this holds how many points are in each "local_rangeline_inds_matrix" 
-    # location as the length of that array is not the number actually filled
-    num_local_pts_matrix = np.zeros((npts_az, npts_el), dtype=int)
-
-    # we also want to retain the elevation and azimuth encoder values
-    # so we can check for later regridded rangelines to select the best
-    coarse_az_out = np.zeros(coarse_valid_grid.shape, dtype=np.float64)
-    coarse_el_out = np.zeros(coarse_valid_grid.shape, dtype=np.float64)
-
-
+                           
     # iterate through each rangeline
     for i in range(len(el_array_adj)):
         elev = el_array_adj[i]
@@ -175,6 +155,111 @@ def calc_coarse_rangelines_grid(coarse_az_array, coarse_el_array,
 
     return (coarse_rangelines_grid, coarse_valid_grid, coarse_az_out, 
             coarse_el_out)
+
+
+@docstring("""
+    Function Name: calc_coarse_rangelines_grid()
+""")
+#@jit(nopython=True)
+def calc_coarse_rangelines_grid(coarse_az_array, coarse_el_array, 
+        el_array_adj, az_array_adj, rangelines_adj, 
+        coarse_valid_grid, coarse_rangelines_grid, npts_az, npts_el):
+
+    min_coarse_az = min(coarse_az_array)
+    max_coarse_az = max(coarse_az_array)
+
+    min_coarse_el = min(coarse_el_array)
+    max_coarse_el = max(coarse_el_array)
+
+    el_ind_coeff = (npts_el-1) / (max_coarse_el - min_coarse_el)
+    az_ind_coeff = (npts_az-1) / (max_coarse_az - min_coarse_az)
+
+    # need to create large array of "nearby values"
+    # assume it's 10 times the "average" oversampling rate
+    # this shouldn't be a problem
+    max_loc_pts = max(int(len(rangelines_adj) / (npts_az * npts_el) * 10), 100)
+    local_rngln_inds = np.zeros((npts_az, npts_el, max_loc_pts), dtype=np.int32)
+    local_az_vals    = np.zeros((npts_az, npts_el, max_loc_pts), dtype=np.int32)
+    local_el_vals    = np.zeros((npts_az, npts_el, max_loc_pts), dtype=np.int32)
+
+    # this holds how many points are in each "local_rangeline_inds_matrix" 
+    # location as the length of that array is not the number actually filled
+    num_local_pts_matrix = np.zeros((npts_az, npts_el), dtype=np.int32)
+
+    # we also want to retain the elevation and azimuth encoder values
+    # so we can check for later regridded rangelines to select the best
+    coarse_az_out = np.zeros(coarse_valid_grid.shape, dtype=np.float64)
+    coarse_el_out = np.zeros(coarse_valid_grid.shape, dtype=np.float64)
+
+    use_numba_fcn = False
+    #use_numba_fcn = True
+    if not use_numba_fcn:
+        # iterate through each rangeline
+        for i in range(len(el_array_adj)):
+            elev = el_array_adj[i]
+            azi  = az_array_adj[i]
+
+            # nearest indices
+            n_az_ind = int(round(((azi- min_coarse_az) * az_ind_coeff)))
+
+            if n_az_ind > (npts_az-1):
+                continue
+
+            n_el_ind = int(round(((elev - min_coarse_el) * el_ind_coeff)))
+
+            if n_el_ind > (npts_el-1):
+                continue
+
+            # number of points also doubles as the next empty index
+            next_ind = num_local_pts_matrix[n_az_ind][n_el_ind]
+
+            # assign the value and increment the number of local points there
+            local_rngln_inds[n_az_ind][n_el_ind][next_ind] = i
+            local_az_vals[n_az_ind][n_el_ind][next_ind] = azi
+            local_el_vals[n_az_ind][n_el_ind][next_ind] = elev
+
+            num_local_pts_matrix[n_az_ind][n_el_ind] += 1
+
+
+        # iterate through each pixel and find the nearest rangeline
+        for i in range(len(coarse_az_array)):
+            for j in range(len(coarse_el_array)):
+                num_loc_pts = num_local_pts_matrix[i][j]
+                el_array_loc = local_el_vals[i][j][:num_loc_pts]
+                az_array_loc = local_az_vals[i][j][:num_loc_pts]
+
+                dist_arr = (el_array_loc-coarse_el_array[j])**2 + \
+                           (az_array_loc-coarse_az_array[i])**2 
+
+                # closest index in local arrays
+                if len(dist_arr) > 0:
+                    ind_n = np.argmin(dist_arr)
+
+                    # rangeline index
+                    rng_ind = local_rngln_inds[i][j][ind_n]
+                    nearest_rangeline = rangelines_adj[rng_ind]
+
+                    coarse_rangelines_grid[i][j] = nearest_rangeline
+                    coarse_valid_grid[i][j] = True
+                    coarse_az_out[i][j] = local_az_vals[i][j][ind_n]
+                    coarse_el_out[i][j] = local_el_vals[i][j][ind_n]
+
+                else:
+                    coarse_valid_grid[i][j] = False
+    else:
+        (coarse_rangelines_grid, coarse_valid_grid, coarse_az_out, 
+            coarse_el_out) = nearest_rangeline_loop(el_array_adj, 
+                    az_array_adj, min_coarse_az, min_coarse_el, az_ind_coeff, 
+                    el_ind_coeff, npts_az, npts_el, num_local_pts_matrix, 
+                    local_rngln_inds, local_az_vals, local_el_vals,
+                    coarse_az_array, coarse_el_array,
+                    rangelines_adj, coarse_rangelines_grid, 
+                    coarse_valid_grid, coarse_az_out, coarse_el_out)
+
+
+    return (coarse_rangelines_grid, coarse_valid_grid, coarse_az_out, 
+            coarse_el_out)
+
 
 
 ##############################################################################
@@ -413,26 +498,13 @@ def regrid_rangelines(rangelines_in, el_array_in, az_array_in, channels_in,
     disable_el_side0, disable_el_side1, ch0_en, ch1_en, ch0_offset, ch1_offset, 
     el_offset0, el_offset1, ideal_az_array, ideal_el_array, xlen, ylen, 
     dbg_prof=False):
-    
-
     """
-    While the raw elevation and azimuth values do provide useful information
-    for the location of each radar rangeline, due to various offsets and other 
-    idiosyncrasies in the radar, they do not describe the location of each
-    radar rangeline in a straightforward manner.  So this function will use
-    some parameters along with elevation and azimuth encoder values to create 
-    an "adjusted" version of the azimuth and elevation output to make it 
-    easier to fit the values to a grid later
-
-
-    NOTE TODO 
-    NOTE TODO 
-    NOTE TODO 
+    this performs regridding of the rangelines, meaning a list of rangelines 
+    comes in, along with their elevation, azimuth, and channel arrays and 
+    a bunch of metadata and they are first adjusted based on offsets and 
+    the metadata so that the output adjusted elevation and azimuth arrays can
+    be used to represent the location of each rangeline accurately
     
-    NOTE TODO 
-    NOTE TODO 
-    NOTE TODO 
-
     """
     if dbg_prof:
         regrid_start = time.time_ns()
@@ -469,7 +541,7 @@ def regrid_rangelines(rangelines_in, el_array_in, az_array_in, channels_in,
         real_el_out) = calc_coarse_rangelines_grid(ideal_az_array, 
         ideal_el_array, el_array_adj, az_array_adj, rangelines_adj, 
         coarse_valid_grid, coarse_rangelines_grid, npts_az, npts_el)
-    
+
     if dbg_prof:
         time_2 = time.time_ns()
         dur_ms = float(time_2-time_1) / 1e6
@@ -789,7 +861,7 @@ def extract_peaks_c(coarse_power_grid_in, coarse_valid_grid_in, xlen_in,
     cfunc_stop = time.time_ns()
     if dbg_prof:
         cfcn_time_ms = float(cfunc_stop - cfunc_start) / 1e6
-        print(f"*******C function only duration: {cfcn_time_ms:.4f} ms")
+        print(f"        C function only duration: {cfcn_time_ms:.4f} ms")
     ###########################################################################
     ###########################################################################
 

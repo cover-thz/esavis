@@ -282,6 +282,10 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
                 time.sleep(0.01)
                 continue
 
+            if profiler_enabled:
+                start_time = time.time()
+                print("********************** Start Point **********************")
+
             daq_num_rangelines = cfg_dict["daq_num_rangelines"]
             daq_timeout         = cfg_dict["daq_timeout"]
 
@@ -352,7 +356,7 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
 
 
             if profiler_enabled:
-                start_time = time.time()
+                proc_start_time = time.time()
             (frame_out, aux_data_out, 
              new_frame_flag) = proc_obj.postproc_data(rangelines_array, 
                                              az_array, el_array, ch_array, 
@@ -363,8 +367,16 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
 
             if profiler_enabled:
                 end_time = time.time()
-                proc_time_ms = (end_time - start_time) * 1000
-                print(f"    pixel processing time: {proc_time_ms:.4f}\n") 
+                proc_time_ms = (end_time - proc_start_time) * 1000
+                print(f"    pixel processing time: {proc_time_ms:.4f}") 
+                tot_time_ms = (end_time - start_time) * 1000
+                if new_frame_flag:
+                    print("    frame generated this snippet")
+                else:
+                    print("    frame NOT generated this snippet")
+                print(f"Total Frame Snippet Process Time: {tot_time_ms:.4f} ms")
+                print("******************** End Point ********************\n")
+                
 
         # future work
         #elif cfg_dict["data_src"] == "video_file"

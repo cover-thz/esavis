@@ -266,6 +266,9 @@ class MainWindow(QMainWindow):
         s.DAQ_CONNECTED_PERIOD  = 0.1
         s.min_update_period     = s.NO_DAQ_PERIOD
 
+        # used for seeing the frame-to-frame "rate"
+        s.prev_frame_time = None
+
         # this is used to mark time for how often we're querying the processing
         # core to see if the DAQ is connected
         s.last_daq_query_time   = None
@@ -322,10 +325,6 @@ class MainWindow(QMainWindow):
                                         s.camera_tab, s.sing_pix_tab) 
                                         
 
-
-
-
-
         s.debug_tab = DebugTab(CFG_DFLT_PATH, CONFIG_DIR, 
                                         s.update_config, 
                                         s.cfg_dict)
@@ -334,7 +333,7 @@ class MainWindow(QMainWindow):
         s.tab_widget.addTab(s.cfg_tab, "Config")
         s.tab_widget.addTab(s.main_thz_tab, "Main THz Image")
         #s.tab_widget.addTab(s.camera_tab, "Camera Overlay")
-        s.tab_widget.addTab(s.camera_tab, "Large Viewer")
+        s.tab_widget.addTab(s.camera_tab, "Camera Overlay")
         s.tab_widget.addTab(s.sing_pix_tab, "Single Pixel")
         s.tab_widget.addTab(s.debug_tab, "Debug")
 
@@ -342,9 +341,13 @@ class MainWindow(QMainWindow):
 
 
         # set the GUI to view the config tab
+        s.tab_index_dict = {}
+        s.tab_index_dict[0] = "Config"
+        s.tab_index_dict[1] = "Main THz Image"
+        s.tab_index_dict[2] = "Camera Overlay"
+        s.tab_index_dict[3] = "Single Pixel"
+        s.tab_index_dict[4] = "Debug"
         s.tab_widget.setCurrentIndex(0)
-
-        #s.tab_widget.currentChanged.connect(s.tab_switch_callback)
 
 
         # check for default postprocessing config and execute configuration 
@@ -606,7 +609,6 @@ class MainWindow(QMainWindow):
 
 
 
-
     def frame_update(s, frame_in, new_frame_flag):
         """
         this updates all the appropriate THz image objects when a new frame 
@@ -614,9 +616,23 @@ class MainWindow(QMainWindow):
         """
         # TODO change the updates based on which tabs are visible to make
         # the GUI look less sluggish
-        s.main_thz_tab.update_image(frame_in, new_frame_flag)
-        s.camera_tab.update_image(frame_in, new_frame_flag)
-        s.sing_pix_tab.update_image(frame_in, new_frame_flag)
+        if new_frame_flag:
+            if s.prev_frame_time == None:
+                s.prev_frame_time = time.time_ns()
+
+            else:
+                curr_time = time.time_ns()
+                frame_period_ns = curr_time - s.prev_frame_time
+                frame_period_ms = frame_period_ns / 1e6
+                print(f"frame_period_ms = {frame_period_ms:.4f}")
+                s.prev_frame_time = curr_time
+        
+        if s.tab_index_dict[s.tab_widget.currentIndex()] == "Main THz Image":
+            s.main_thz_tab.update_image(frame_in, new_frame_flag)
+        elif s.tab_index_dict[s.tab_widget.currentIndex()] == "Camera Overlay":
+            s.camera_tab.update_image(frame_in, new_frame_flag)
+        elif s.tab_index_dict[s.tab_widget.currentIndex()] == "Single Pixel":
+            s.sing_pix_tab.update_image(frame_in, new_frame_flag)
 
 
     def aux_update(s, aux_data_in, new_frame_flag):
@@ -662,7 +678,11 @@ class MainWindow(QMainWindow):
             frame_in    = data_in[0]
             aux_data_in = data_in[1]
             
+            pre = time.time_ns() # NOTE TODO DEBUG REMOVE
             s.frame_update(frame_in, True)
+            post = time.time_ns() # NOTE TODO DEBUG REMOVE
+            print(f"frame_update duration: {((post-pre)/1e6):.4f} ms\n")
+
             s.aux_update(aux_data_in, True)
             if s.cfg_dict["data_src"] == "dat_file":
                 stat_id = "FILE_PROC"
@@ -798,6 +818,7 @@ if __name__ == '__main__':
     cfg_dict["default_data_dir"] = DFLT_DATA_DIR
 
     # construct the multiprocessing system
+    mp.set_start_method("spawn")
     (proc_cfg_pipe, cfg_pipe)      = mp.Pipe(duplex=False)
     (err_pipe, proc_err_pipe)      = mp.Pipe(duplex=False)
     (data_pipe, proc_data_pipe)    = mp.Pipe(duplex=False)

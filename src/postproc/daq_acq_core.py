@@ -55,7 +55,7 @@ class DAQSocket:
         s.data_buffer = bytearray()
 
         # buffer variables
-        #s.MAX_BUF_SIZE = 65536
+        #s.MAX_BUF_SIZE = 16384
         s.MAX_BUF_SIZE = 1048576 
         s.buf_init = False
         s.curr_buf = None
@@ -318,7 +318,7 @@ be changed often
 
 #def main_acq_loop(cdh_pipe_in, cdh_pipe_out, data_queue):
 def main_acq_loop(cdh_queue_in, cdh_queue_out, data_queue):
-    CHUNK_SIZE = 10000 
+    CHUNK_SIZE = 1000 
     chunk_count = 0
     daq_sock = DAQSocket()
     tot_rangelines = 0
@@ -514,8 +514,10 @@ def main_acq_loop(cdh_queue_in, cdh_queue_out, data_queue):
             try:
                 (radar_data, data_valid) = daq_sock.receive_message()
             except ConnectionResetError:
-                new_dict_out = OrderedDict()
-                new_dict_out["STATUS"] = (acq_msg_id, "CONN_RESET")
+                # don't bother notifying the upsteram core, it will query
+                # this core when it runs out of data
+                #new_dict_out = OrderedDict()
+                #new_dict_out["CONN_STATUS"] = (acq_msg_id, False)
                 #cdh_pipe_out.send(new_dict_out)
                 cdh_queue_out.put(new_dict_out)
                 acq_msg_id += 1
@@ -682,7 +684,7 @@ def main_acq_loop(cdh_queue_in, cdh_queue_out, data_queue):
                             dbg_prev_chunk_count) * CHUNK_SIZE)
                         chunk_time_diff  = dbg_curr_chunk_time - dbg_prev_chunk_time
                         rng_per_sec      = chunk_rangelines / chunk_time_diff
-                        print(f"rangelines per second: {rng_per_sec}")
+                        #print(f"rangelines per second: {rng_per_sec}")
                     dbg_prev_chunk_time  = dbg_curr_chunk_time
                     dbg_prev_chunk_count = chunk_count
 
