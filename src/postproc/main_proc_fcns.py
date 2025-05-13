@@ -121,15 +121,15 @@ class CoverProc:
         #        Grab Some Data and Check for Reset Conditions          #
         #################################################################
 
+        if dbg_prof:
+            preamble_start = time.time_ns()
+
         len_rangeline = len(rangelines_array[-1])
         rng_dtype = rangelines_array.dtype
                                                  
         num_rangelines = len(rangelines_array)
         s.accum_rangelines += num_rangelines
         #print(f"accumulated rangelines: {s.accum_rangelines}")
-        if dbg_prof:
-            #print(f"accumulated rangelines: {s.accum_rangelines}")
-            pass
 
         reset_proc = False
         if ((s.uninitialized) or ("recalc_coarse_grid" in cfg_flags)):
@@ -229,6 +229,10 @@ class CoverProc:
 
         el_offset0          = cfg_dict["el_offset0"]
         el_offset1          = cfg_dict["el_offset1"]
+        if dbg_prof:
+            preamble_end = time.time_ns()
+            dur_ms = (preamble_end - preamble_start)/1e6
+            print(f"    postproc_data preamble duration: {dur_ms:.4f} ms")
 
         (new_rangelines_grid, new_valid_grid, ideal_az_array, 
          ideal_el_array, new_az_out, 
@@ -243,8 +247,7 @@ class CoverProc:
         
         num_valids = np.sum(new_valid_grid)
         if dbg_prof:
-            #print(f"pre update_grid valids: {num_valids}")
-            pass
+            update_grid_start = time.time_ns()
 
         # this compares the passed rangelines grid azimuth and elvation
         # values and evaluates how "close" they are to the ideal when
@@ -255,6 +258,12 @@ class CoverProc:
                             s.r_grid_data, s.r_grid_valids, s.r_grid_az, 
                             s.r_grid_el, s.ideal_az_array, 
                             s.ideal_el_array)
+
+        if dbg_prof:
+            update_grid_end = time.time_ns()
+            dur_ms = (update_grid_end - update_grid_start)/1e6
+            print(f"    postproc_data update_grid duration: {dur_ms:.4f} ms")
+
 
         num_valids = np.sum(valid_grid_out)
         if dbg_prof:
@@ -336,6 +345,12 @@ class CoverProc:
 
             plot_style = cfg_dict["plot_style"]
 
+            if dbg_prof:
+                misc_dur_1_end = time.time_ns()
+                dur_ms = (misc_dur_1_end - update_grid_end)/1e6
+                print(f"    postproc_data misc_dur_1 duration: {dur_ms:.4f} ms")
+
+
             # NOTE TODO: Need to put in code to perform point cloud if we 
             # do that
 
@@ -358,6 +373,9 @@ class CoverProc:
                                         calc_weighted_sum, min_range, 
                                         max_range, dead_pix_val, dbg_prof)                   
             if dbg_prof:
+                peak_find_end = time.time_ns()
+                dur_ms = (peak_find_end - misc_dur_1_end)/1e6
+                print(f"    postproc_data peakfinding duration: {dur_ms:.4f} ms")
                 num_valids = np.sum(valid_pixels_grid)
                 print(f"    num_valid_pixels: {num_valids}")
 
@@ -367,7 +385,6 @@ class CoverProc:
             frame_out["valid_pixels_grid"]  = valid_pixels_grid
             frame_out["noise_floor_grid"]   = noise_floor_grid
             frame_out["update_id"]          = update_id
-
 
             # aux data
             aux_x_ind = cfg_dict["aux_x_ind"]
@@ -423,6 +440,12 @@ class CoverProc:
             # clear the preprocessed buffer now that we've processed the 
             # frame
             s.clear_preproc_buffer()
+
+            if dbg_prof:
+                postamble_end = time.time_ns()
+                dur_ms = (postamble_end - peak_find_end)/1e6
+                print(f"    postproc_data postamble duration: {dur_ms:.4f} ms")
+
 
         else:
             frame_out       = None

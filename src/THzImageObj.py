@@ -110,6 +110,10 @@ class THzImageObj(QHBoxLayout):
         s.max_el = None
 
 
+    def set_mesh_opacity(s, opacity):
+        s.thz_mesh_obj.set_mesh_opacity(opacity)
+
+
     def calc_coarse_grids(s, new_xlen, new_ylen):
         """
         Only needs to be done if there's a change in the frame dimensions
@@ -371,6 +375,9 @@ class THzMeshImage(pg.PlotWidget):
 
     def set_levels(s, min_val, max_val):
         s.color_mesh.setLevels((min_val, max_val))
+
+    def set_mesh_opacity(s, opacity):
+        s.color_mesh.setOpacity(opacity)
 
 
     def update_plot(s, az_grid_2d, el_grid_2d, image, cmap_str, color_min, 

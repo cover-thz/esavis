@@ -357,12 +357,20 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
 
             if profiler_enabled:
                 proc_start_time = time.time()
-            (frame_out, aux_data_out, 
-             new_frame_flag) = proc_obj.postproc_data(rangelines_array, 
-                                             az_array, el_array, ch_array, 
-                                             turn_flag, reset_in_array, 
-                                             cfg_dict, cfg_flags, None, 
-                                             update_id, dbg_prof)
+            try:
+                (frame_out, aux_data_out, 
+                 new_frame_flag) = proc_obj.postproc_data(rangelines_array, 
+                                                 az_array, el_array, ch_array, 
+                                                 turn_flag, reset_in_array, 
+                                                 cfg_dict, cfg_flags, None, 
+                                                 update_id, dbg_prof)
+            except Exception as e:
+                print(e)
+                ipdb.set_trace()
+                print("")
+                print("")
+                print("")
+                print("")
                                             
 
             if profiler_enabled:

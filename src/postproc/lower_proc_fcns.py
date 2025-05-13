@@ -12,7 +12,7 @@
 
 import ctypes as ct
 import numpy as np
-#from numba import jit, njit
+from numba import jit, njit, prange
 import ipdb
 import time
 import os
@@ -89,7 +89,34 @@ def docstring(docstr):
 
 # a small piece of calc_coarse_rangelines_grid() that we can attempt to speed
 # up with parallel code
-#@njit
+"""
+Notes:
+    Current status of things:
+    
+    el_array_adj - list type containing np.float64s
+    az_array_adj - list type containing np.float64s
+    min_coarse_az - np.float64
+    min_coarse_el - np.float64
+    az_ind_coeff  - np.float64
+    el_ind_coeff  - np.float64
+    npts_az - int
+    npts_el - int
+    num_local_pts_matrix - numpy array of shape (npts_az, npts_el) of int32s
+    local_rngln_inds - numpy array of shape (npts_az, npts_el, 100) of int32s
+    local_az_vals    - numpy array of shape (npts_az, npts_el, 100) of int32s 
+    local_el_vals    - numpy array of shape (npts_az, npts_el, 100) of int32s 
+    coarse_az_array  - numpy array of shape (npts_az) of float64s
+    coarse_el_array  - numpy array of shape (npts_el) of float64s
+    rangelines_adj   - list type containing numpy arrays of shape (rangeline_len) of type complex64
+    coarse_rangelines_grid - numpy array of shape (npts_az, npts_el, rangeline_len) of complex64 
+    coarse_valid_grid - numpy array of shape (npts_az, npts_el) of bools
+    coarse_az_out  - numpy array of shape (npts_az, npts_el) of float64s
+    coarse_el_out  - numpy array of shape (npts_az, npts_el) of float64s
+"""
+
+
+#@njit(parallel=True)
+@njit
 def nearest_rangeline_loop(el_array_adj, az_array_adj, min_coarse_az, 
                            min_coarse_el, az_ind_coeff, el_ind_coeff, 
                            npts_az, npts_el, num_local_pts_matrix, 
@@ -98,9 +125,9 @@ def nearest_rangeline_loop(el_array_adj, az_array_adj, min_coarse_az,
                            rangelines_adj, coarse_rangelines_grid, 
                            coarse_valid_grid, coarse_az_out, coarse_el_out):
 
-                           
+    #ipdb.set_trace()                          
     # iterate through each rangeline
-    for i in range(len(el_array_adj)):
+    for i in prange(el_array_adj.shape[0]):
         elev = el_array_adj[i]
         azi  = az_array_adj[i]
 
@@ -128,8 +155,8 @@ def nearest_rangeline_loop(el_array_adj, az_array_adj, min_coarse_az,
 
 
     # iterate through each pixel and find the nearest rangeline
-    for i in range(len(coarse_az_array)):
-        for j in range(len(coarse_el_array)):
+    for i in prange(coarse_az_array.shape[0]):
+        for j in prange(coarse_el_array.shape[0]):
             num_loc_pts = num_local_pts_matrix[i][j]
             el_array_loc = local_el_vals[i][j][:num_loc_pts]
             az_array_loc = local_az_vals[i][j][:num_loc_pts]
@@ -191,8 +218,13 @@ def calc_coarse_rangelines_grid(coarse_az_array, coarse_el_array,
     coarse_az_out = np.zeros(coarse_valid_grid.shape, dtype=np.float64)
     coarse_el_out = np.zeros(coarse_valid_grid.shape, dtype=np.float64)
 
-    use_numba_fcn = False
-    #use_numba_fcn = True
+    # convert list objects to numpy arrays
+    el_array_adj = np.array(el_array_adj)
+    az_array_adj = np.array(az_array_adj)
+    rangelines_adj = np.array(rangelines_adj)
+
+    #use_numba_fcn = False
+    use_numba_fcn = True
     if not use_numba_fcn:
         # iterate through each rangeline
         for i in range(len(el_array_adj)):
@@ -849,8 +881,8 @@ def extract_peaks_c(coarse_power_grid_in, coarse_valid_grid_in, xlen_in,
 
     ###########################################################################
     ###########################################################################
-    if dbg_prof:
-        cfunc_start = time.time_ns()
+    #if dbg_prof:
+    #    cfunc_start = time.time_ns()
     # call the C functions
     ret_val = extract_all_rangeline_peaks(power_array, valid_array, arr_len, 
         rng_len, range_lut_cm, threshold_lin, contrast_lin, half_peak_width, 
@@ -859,9 +891,9 @@ def extract_peaks_c(coarse_power_grid_in, coarse_valid_grid_in, xlen_in,
         peak_powers_lin_array, noise_floor_array, num_peaks_array, 
         sel_ranges_array_out) 
     cfunc_stop = time.time_ns()
-    if dbg_prof:
-        cfcn_time_ms = float(cfunc_stop - cfunc_start) / 1e6
-        print(f"        C function only duration: {cfcn_time_ms:.4f} ms")
+    #if dbg_prof:
+    #    cfcn_time_ms = float(cfunc_stop - cfunc_start) / 1e6
+    #    print(f"        C function only duration: {cfcn_time_ms:.4f} ms")
     ###########################################################################
     ###########################################################################
 

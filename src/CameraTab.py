@@ -128,15 +128,15 @@ class CameraTab(QWidget):
         # visible-light camera 
         s.image_widget = pg.PlotWidget()
 
+        # Camera Object Setup
+        s.camera_item = ca.CameraItem()
+        s.image_widget.addItem(s.camera_item)
+
         # THz Image Setup
         # If I'm correct I should be able to just grab the mesh and use that
         s.thz_image_obj = tio.THzImageObj(s, s.cfg_dict)
         s.thz_mesh_plot = s.thz_image_obj.thz_mesh_obj.color_mesh
         s.image_widget.addItem(s.thz_mesh_plot)
-
-        # Camera Object Setup
-        s.camera_item = ca.CameraItem()
-        s.image_widget.addItem(s.camera_item)
 
         s.image_plot_item = s.image_widget.getPlotItem()
         s.image_plot_item.invertX(True)
@@ -153,7 +153,8 @@ class CameraTab(QWidget):
         v_scale = cfg_dict["camera_v_scale"]
         opacity = cfg_dict["camera_opacity"]
 
-        s.camera_item.setOpacity(opacity)
+        s.thz_image_obj.set_mesh_opacity(opacity)
+        #s.camera_item.setOpacity(opacity)
         s.camera_item.make_transform(x, y, h_scale, v_scale)
 
 
@@ -299,7 +300,8 @@ class CameraTab(QWidget):
         s.opacity_ledit.setText(str(cfg_dict["camera_opacity"]))
 
         # Change the actual image settings
-        s.camera_item.setOpacity(opacity)
+        s.thz_image_obj.set_mesh_opacity(opacity)
+        #s.camera_item.setOpacity(opacity)
         s.camera_item.make_transform(x, y, h_scale, v_scale)
 
 
