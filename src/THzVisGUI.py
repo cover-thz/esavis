@@ -203,6 +203,9 @@ DFLT_CFG_DICT["daq_addr"]  = "localhost"
 # GUI
 DFLT_CFG_DICT["aux_x_ind"] = 10
 DFLT_CFG_DICT["aux_y_ind"] = 10
+DFLT_CFG_DICT["aux_az_val"] = -1
+DFLT_CFG_DICT["aux_el_val"] = -1
+
 DFLT_CFG_DICT["flags"] = []
 
 
@@ -214,6 +217,8 @@ DFLT_CFG_DICT["profiler"] = False
 #DFLT_CFG_DICT["daq_debug"] = False
 DFLT_CFG_DICT["daq_debug"] = True
 DFLT_CFG_DICT["acq_dbg"] = False
+
+DFLT_CFG_DICT["frame_update_dbg"] = False
 
 
 ##############################################################################
@@ -616,7 +621,7 @@ class MainWindow(QMainWindow):
         """
         # TODO change the updates based on which tabs are visible to make
         # the GUI look less sluggish
-        if new_frame_flag:
+        if new_frame_flag and s.cfg_dict["frame_update_dbg"]:
             if s.prev_frame_time == None:
                 s.prev_frame_time = time.time_ns()
 
@@ -640,7 +645,8 @@ class MainWindow(QMainWindow):
         this updates all the appropriate auxilary plot objects when a new 
         frame ( + auxiliary data) comes in
         """
-        s.sing_pix_tab.aux_update(aux_data_in, new_frame_flag)
+        if s.tab_index_dict[s.tab_widget.currentIndex()] == "Single Pixel":
+            s.sing_pix_tab.aux_update(aux_data_in, new_frame_flag)
 
     
     def timer_handler(s):
@@ -681,7 +687,8 @@ class MainWindow(QMainWindow):
             pre = time.time_ns() # NOTE TODO DEBUG REMOVE
             s.frame_update(frame_in, True)
             post = time.time_ns() # NOTE TODO DEBUG REMOVE
-            print(f"frame_update duration: {((post-pre)/1e6):.4f} ms\n")
+            if s.cfg_dict["frame_update_dbg"]:
+                print(f"frame_update duration: {((post-pre)/1e6):.4f} ms\n")
 
             s.aux_update(aux_data_in, True)
             if s.cfg_dict["data_src"] == "dat_file":

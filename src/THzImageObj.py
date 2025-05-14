@@ -9,7 +9,7 @@
 #
 
 from PySide6 import QtCore, QtWidgets, QtGui
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QObject, Signal
 import PySide6
 import ipdb # NOTE REMOVE
 from math import nan
@@ -57,6 +57,33 @@ from PySide6.QtWidgets import (
 #    QFileDialog,
 #)
 
+##############################################################################
+##############################################################################
+
+class MyViewBox(pg.ViewBox):
+    def __init__(s, click_callback=None, *args, **kwargs):
+        s.click_callback = click_callback
+        super().__init__(*args, **kwargs)
+
+    def mouseClickEvent(s, ev):
+        if ev.button() == QtCore.Qt.RightButton:
+            ev.ignore()
+        else:
+            #position = s.mapSceneToView(ev.pos())
+            event_position = ev.pos()
+            scene_pos = s.mapToScene(event_position)
+            position = s.mapSceneToView(scene_pos)
+            if s.click_callback != None:
+                s.click_callback(position)
+        ev.accept()
+
+
+
+
+
+##############################################################################
+##############################################################################
+
 
 #class THzImage(pg.PlotWidget):
 class THzImageObj(QHBoxLayout):
@@ -72,7 +99,12 @@ class THzImageObj(QHBoxLayout):
     pixel_grid = None
     valid_pixels_grid = None
     
-    def __init__(s, thz_image_tab, cfg_dict, main_image=False):
+    # signal defintions
+    new_pix_clicked = Signal(object, object, object)
+
+
+    def __init__(s, thz_image_tab, cfg_dict, sing_pix_flag=False, 
+                 main_image=False):
         super().__init__()
         #super().__init__(background="transparent")
 
@@ -82,7 +114,8 @@ class THzImageObj(QHBoxLayout):
         s.main_image = main_image
 
         s.thz_image_tab   = thz_image_tab
-        s.thz_mesh_obj    = THzMeshImage(thz_image_tab)
+        s.thz_mesh_obj    = THzMeshImage(thz_image_tab, sing_pix_flag, 
+                                mouse_click_callback=s.mouse_click_event)
         s.thz_surface_obj = THzSurfaceObj(thz_image_tab)
 
         s.thz_image_stack.addWidget(s.thz_mesh_obj)
@@ -110,8 +143,35 @@ class THzImageObj(QHBoxLayout):
         s.max_el = None
 
 
+
     def set_mesh_opacity(s, opacity):
         s.thz_mesh_obj.set_mesh_opacity(opacity)
+
+
+    def get_nearest_pix_ind(s, position):
+        if (type(s.az_grid_1d) != type(None)) and (type(s.el_grid_1d) != type(None)):
+            x_val = position.x()
+            y_val = position.y()
+
+            # grab the nearest indices
+            az_ind = np.argmin(np.abs(s.az_grid_1d - x_val))
+            el_ind = np.argmin(np.abs(s.el_grid_1d - y_val))
+            #ipdb.set_trace()
+            #print("")
+            #print("")
+            #print("")
+            #print("")
+            return (az_ind, el_ind)
+        else:
+            return (None, None)
+
+    # handle mouse events for the single pixel tab
+    def mouse_click_event(s, position):
+        #scene_pos = s.thz_mesh_obj.getViewBox().mapToScene(event_position)
+        #position = s.thz_mesh_obj.getViewBox().mapSceneToView(scene_pos)
+        (az_ind, el_ind) = s.get_nearest_pix_ind(position)
+        if az_ind != None:
+            s.new_pix_clicked.emit(position, az_ind, el_ind)
 
 
     def calc_coarse_grids(s, new_xlen, new_ylen):
@@ -346,8 +406,16 @@ class THzMeshImage(pg.PlotWidget):
     """
     thz_image_tab   = None
     
-    def __init__(s, thz_image_tab):
-        super().__init__()
+    def __init__(s, thz_image_tab, sing_pix_flag=False, 
+                    mouse_click_callback=None):
+        if sing_pix_flag:
+            s.view_box = MyViewBox(click_callback=mouse_click_callback)
+            plot_item = pg.PlotItem(viewBox=s.view_box)
+            super().__init__(viewBox=s.view_box)
+        else:
+            super().__init__()
+        s.sing_pix_flag = sing_pix_flag
+
         #super().__init__(background="transparent")
 
         s.thz_image_tab = thz_image_tab
@@ -361,11 +429,7 @@ class THzMeshImage(pg.PlotWidget):
         s.color_mesh = pg.PColorMeshItem()
         s.color_mesh.setColorMap(pg.colormap.getFromMatplotlib("jet_r"))
         s.plot_item = s.getPlotItem()
-        s.view_box = s.plot_item.getViewBox()
         s.addItem(s.color_mesh)
-
-        # NOTE unfinished
-        s.scene().sigMouseClicked.connect(s.mouse_click_event)
 
 
         s.setTitle("THz Image")
@@ -387,9 +451,6 @@ class THzMeshImage(pg.PlotWidget):
         s.color_mesh.setData(az_grid_2d, el_grid_2d, image, autoLevels=False)
         cmap = pg.colormap.getFromMatplotlib(cmap_str) 
         s.color_mesh.setColorMap(cmap)
-
-    def mouse_click_event(s, event):
-        pass
 
 
     #def make_grids_2d(s, x_grid, y_grid):

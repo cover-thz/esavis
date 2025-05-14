@@ -116,7 +116,7 @@ Notes:
 
 
 #@njit(parallel=True)
-@njit
+@njit(cache=True)
 def nearest_rangeline_loop(el_array_adj, az_array_adj, min_coarse_az, 
                            min_coarse_el, az_ind_coeff, el_ind_coeff, 
                            npts_az, npts_el, num_local_pts_matrix, 

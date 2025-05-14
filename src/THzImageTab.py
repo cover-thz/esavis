@@ -4,6 +4,7 @@ from PySide6.QtCore import Qt
 import os
 import ipdb # NOTE REMOVE
 import json
+import math
 from math import nan
 #import sys
 #import signal
@@ -388,18 +389,24 @@ class THzImageTab(QWidget):
         s.cs_ledit_min.insert(str(value))
     
     def update_cs_min_slider(s):
-        value = int(float(s.cs_ledit_min.text()))
+        value = s.cs_ledit_min.text()
         if value != "":
-            s.cs_slider_min.setValue(value)
+            value = float(value)
+            if not math.isnan(value):
+                value = int(value)
+                s.cs_slider_min.setValue(value)
 
     def update_cs_max_ledit(s, value):
         s.cs_ledit_max.clear()
         s.cs_ledit_max.insert(str(value))
     
     def update_cs_max_slider(s):
-        value = int(float(s.cs_ledit_max.text()))
+        value = s.cs_ledit_max.text()
         if value != "":
-            s.cs_slider_max.setValue(value)
+            value = float(value)
+            if not math.isnan(value):
+                value = int(value)
+                s.cs_slider_max.setValue(value)
 
 
     #########################################################################
@@ -465,9 +472,6 @@ class THzImageTab(QWidget):
             msgbox.exec()
 
 
-
-
-        
 
     def ld_save_image_chng_dir_btn_clicked(s):
         fpath = QFileDialog.getExistingDirectory(
@@ -555,6 +559,9 @@ class THzImageTab(QWidget):
         """
         s.cs_ledit_min.setText(str(color_min))
         s.cs_ledit_max.setText(str(color_max))
+
+        s.update_cs_min_slider()
+        s.update_cs_max_slider()
 
 
 
