@@ -190,6 +190,12 @@ DFLT_CFG_DICT["camera_v_scale"] = 8.0
 DFLT_CFG_DICT["camera_step_int"] = 10
 DFLT_CFG_DICT["camera_opacity"] = 0.3
 
+DFLT_CFG_DICT["aux_x_ind"] = 10
+DFLT_CFG_DICT["aux_y_ind"] = 10
+DFLT_CFG_DICT["aux_az_val"] = -1
+DFLT_CFG_DICT["aux_el_val"] = -1
+
+
 
 # These values do not appear in the GUI yet
 # so they are "hard-coded"
@@ -198,13 +204,8 @@ DFLT_CFG_DICT["el_encoder_to_cm"]  = 16/500
 DFLT_CFG_DICT["az_encoder_to_cm"]  = 16/500
 DFLT_CFG_DICT["daq_addr"]  = "localhost"
 
+DFLT_CFG_DICT["data_src_ovr"] = "None"
 
-# These are currently hard-coded but need to be propagated to the single-pixel
-# GUI
-DFLT_CFG_DICT["aux_x_ind"] = 10
-DFLT_CFG_DICT["aux_y_ind"] = 10
-DFLT_CFG_DICT["aux_az_val"] = -1
-DFLT_CFG_DICT["aux_el_val"] = -1
 
 DFLT_CFG_DICT["flags"] = []
 
@@ -389,8 +390,14 @@ class MainWindow(QMainWindow):
 
 
     def closeEvent(s, event):
-        s.lock_pipes = True
         s.timer.stop()
+        s.lock_pipes = True
+        time.sleep(0.1)
+
+        # NOTE the following 2 lines does not appear to work, but this is 
+        # cleanup, we can defer this problem indefinitely 
+        s.cfg_dict["data_src"] = "disabled"
+        s.proc_pipes.cfg_pipe.send(s.cfg_dict)
 
         cfg_pipe    = s.proc_pipes.cfg_pipe
         err_pipe    = s.proc_pipes.err_pipe
@@ -412,6 +419,7 @@ class MainWindow(QMainWindow):
         close_dict["flags"] = "close_process"
         cfg_pipe.send(close_dict)
         event.accept()
+
 
     def init_camera_tab(s):
         """
@@ -682,7 +690,8 @@ class MainWindow(QMainWindow):
         if data_pipe.poll():
             data_in     = data_pipe.recv()
             frame_in    = data_in[0]
-            aux_data_in = data_in[1]
+            frame_id    = data_in[1]
+            aux_data_in = data_in[2]
             
             pre = time.time_ns() # NOTE TODO DEBUG REMOVE
             s.frame_update(frame_in, True)
@@ -822,6 +831,7 @@ if __name__ == '__main__':
     # this should be all we need for the initial configuration dictionary
     cfg_dict = OrderedDict()
     cfg_dict["data_src"] = "disabled"
+    cfg_dict["data_src_ovr"] = "None"
     cfg_dict["default_data_dir"] = DFLT_DATA_DIR
 
     # construct the multiprocessing system

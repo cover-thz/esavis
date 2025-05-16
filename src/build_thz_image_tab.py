@@ -117,6 +117,19 @@ def build_thz_image_tab(thz_img_tab):
     src_tab_sublayout_row1.addWidget(blank2_src_lbl)
     src_tab_sublayout_row1.addWidget(daq_src_rbut)
 
+    # src_tab_sublayout_row1pt5
+    src_tab_sublayout_row1pt5 = QHBoxLayout()
+    disabled_src_rbut       = QRadioButton()
+    disabled_src_rbut.setText("Disabled")
+    blank3_src_lbl       = QLabel("")
+    blank4_src_lbl       = QLabel("")
+    use_buf_src_rbut       = QRadioButton()
+    use_buf_src_rbut.setText("Most Recent Frame")
+    src_tab_sublayout_row1pt5.addWidget(disabled_src_rbut)
+    src_tab_sublayout_row1pt5.addWidget(blank3_src_lbl)
+    src_tab_sublayout_row1pt5.addWidget(blank4_src_lbl)
+    src_tab_sublayout_row1pt5.addWidget(use_buf_src_rbut)
+
     # src_tab_sublayout_row2
     src_tab_sublayout_row2 = QHBoxLayout()
     daq_status_lbl = QLabel("DAQ Status: ")
@@ -144,12 +157,14 @@ def build_thz_image_tab(thz_img_tab):
 
     # Add member variables
     # (not adding the sublayouts because we probably don't need them)
-    thz_img_tab.src_tab = src_tab
-    thz_img_tab.file_src_rbut = file_src_rbut
-    thz_img_tab.daq_src_rbut  = daq_src_rbut
-    thz_img_tab.daq_status_ledit = daq_status_ledit
-    thz_img_tab.file_status_ledit = file_status_ledit
-    thz_img_tab.src_tab_top_layout = src_tab_top_layout
+    thz_img_tab.src_tab             = src_tab
+    thz_img_tab.file_src_rbut       = file_src_rbut
+    thz_img_tab.daq_src_rbut        = daq_src_rbut
+    thz_img_tab.disabled_src_rbut   = disabled_src_rbut
+    thz_img_tab.use_buf_src_rbut    = use_buf_src_rbut
+    thz_img_tab.daq_status_ledit    = daq_status_ledit
+    thz_img_tab.file_status_ledit   = file_status_ledit
+    thz_img_tab.src_tab_top_layout  = src_tab_top_layout
 
     # final piece
     src_tab.setLayout(src_tab_top_layout)
@@ -837,6 +852,15 @@ class setup_thz_tab_callbacks:
 
         thz_tab.daq_src_rbut.toggled.connect(
             lambda: thz_tab.update_data_src_status("NOT_CONNECTED"))
+
+        thz_tab.disabled_src_rbut.toggled.connect(
+            lambda: s.rbut_update(thz_tab.disabled_src_rbut, 
+            "disabled", "data_src"))
+
+
+        thz_tab.use_buf_src_rbut.toggled.connect(
+            lambda: s.rbut_update(thz_tab.use_buf_src_rbut, 
+            "use_buffer", "data_src"))
 
 
         thz_tab.front_peak_rbut.toggled.connect(

@@ -116,7 +116,8 @@ class CoverProc:
 
     def postproc_data(s, rangelines_array, az_array, el_array, 
                       ch_array, turn_flag, reset_in_array, cfg_dict, 
-                      cfg_flags, file_params, update_id, dbg_prof=False):
+                      cfg_flags, file_params, update_id, coarse_grid_in,
+                      coarse_grid_ovr, dbg_prof=False):
 
         #################################################################
         #        Grab Some Data and Check for Reset Conditions          #
@@ -141,19 +142,16 @@ class CoverProc:
             s.rng_len       = len_rangeline
             reset_proc   = True
 
-
         # if rangeline data type changed
         if s.rng_dtype != rng_dtype:
             s.rng_dtype = rng_dtype
             reset_proc = True
-
 
         if cfg_dict["frame_style"] == "azimuth_turnaround":
             if reset_in_array:
                 reset_proc = True
             elif turn_flag == "RESET":
                 reset_proc = True
-
 
         # different sources of certain information for a file.  This is the 
         # least confusing way to do it for the main operators of this program
@@ -201,7 +199,6 @@ class CoverProc:
                                                 min_az, max_az, 
                                                 xlen, ylen)
 
-
             # have to reset the grid when making these adjustments
             s.reset_coarse_grids(coarse_az_1d, coarse_el_1d, 
                 ideal_az_array, ideal_el_array, xlen, ylen, 
@@ -213,63 +210,74 @@ class CoverProc:
         #################################################################
         #                        Regridding Steps                       #
         #################################################################
-        el_side_0_start     = cfg_dict["el_side_0_start"]
-        el_side_1_start     = cfg_dict["el_side_1_start"]
+        if not coarse_grid_ovr:
+            el_side_0_start     = cfg_dict["el_side_0_start"]
+            el_side_1_start     = cfg_dict["el_side_1_start"]
 
-        el_side_0_end       = cfg_dict["el_side_0_end"]
-        el_side_1_end       = cfg_dict["el_side_1_end"]
+            el_side_0_end       = cfg_dict["el_side_0_end"]
+            el_side_1_end       = cfg_dict["el_side_1_end"]
 
-        disable_el_side0    = cfg_dict["disable_el_side0"]
-        disable_el_side1    = cfg_dict["disable_el_side1"]
+            disable_el_side0    = cfg_dict["disable_el_side0"]
+            disable_el_side1    = cfg_dict["disable_el_side1"]
 
-        ch0_en              = cfg_dict["ch0_en"]
-        ch1_en              = cfg_dict["ch1_en"]
+            ch0_en              = cfg_dict["ch0_en"]
+            ch1_en              = cfg_dict["ch1_en"]
 
-        ch0_offset          = cfg_dict["ch0_offset"]
-        ch1_offset          = cfg_dict["ch1_offset"]
+            ch0_offset          = cfg_dict["ch0_offset"]
+            ch1_offset          = cfg_dict["ch1_offset"]
 
-        el_offset0          = cfg_dict["el_offset0"]
-        el_offset1          = cfg_dict["el_offset1"]
-        if dbg_prof:
-            preamble_end = time.time_ns()
-            dur_ms = (preamble_end - preamble_start)/1e6
-            print(f"    postproc_data preamble duration: {dur_ms:.4f} ms")
+            el_offset0          = cfg_dict["el_offset0"]
+            el_offset1          = cfg_dict["el_offset1"]
+            if dbg_prof:
+                preamble_end = time.time_ns()
+                dur_ms = (preamble_end - preamble_start)/1e6
+                print(f"    postproc_data preamble duration: {dur_ms:.4f} ms")
 
-        (new_rangelines_grid, new_valid_grid, ideal_az_array, 
-         ideal_el_array, new_az_out, 
-         new_el_out) = lpf.regrid_rangelines(rangelines_array, el_array, 
-                            az_array, ch_array, el_side_0_start, 
-                            el_side_0_end,  el_side_1_start, 
-                            el_side_1_end,  disable_el_side0, 
-                            disable_el_side1,  ch0_en, ch1_en, 
-                            ch0_offset, ch1_offset, el_offset0, el_offset1, 
-                            s.coarse_az_1d, s.coarse_el_1d,  s.xlen, s.ylen, 
-                            dbg_prof)
-        
-        num_valids = np.sum(new_valid_grid)
-        if dbg_prof:
-            update_grid_start = time.time_ns()
+            (new_rangelines_grid, new_valid_grid, ideal_az_array, 
+             ideal_el_array, new_az_out, 
+             new_el_out) = lpf.regrid_rangelines(rangelines_array, el_array, 
+                                az_array, ch_array, el_side_0_start, 
+                                el_side_0_end,  el_side_1_start, 
+                                el_side_1_end,  disable_el_side0, 
+                                disable_el_side1,  ch0_en, ch1_en, 
+                                ch0_offset, ch1_offset, el_offset0, el_offset1, 
+                                s.coarse_az_1d, s.coarse_el_1d,  s.xlen, s.ylen, 
+                                dbg_prof)
+            
+            num_valids = np.sum(new_valid_grid)
+            if dbg_prof:
+                update_grid_start = time.time_ns()
 
-        # this compares the passed rangelines grid azimuth and elvation
-        # values and evaluates how "close" they are to the ideal when
-        # compared with the current "rangeline_grid_data"
-        (r_grid_out, valid_grid_out, grid_az_out, 
-         grid_el_out) = lpf.update_grid(new_rangelines_grid, 
-                            new_valid_grid, new_az_out, new_el_out, 
-                            s.r_grid_data, s.r_grid_valids, s.r_grid_az, 
-                            s.r_grid_el, s.ideal_az_array, 
-                            s.ideal_el_array)
+            # this compares the passed rangelines grid azimuth and elvation
+            # values and evaluates how "close" they are to the ideal when
+            # compared with the current "rangeline_grid_data"
+            (r_grid_out, valid_grid_out, grid_az_out, 
+             grid_el_out) = lpf.update_grid(new_rangelines_grid, 
+                                new_valid_grid, new_az_out, new_el_out, 
+                                s.r_grid_data, s.r_grid_valids, s.r_grid_az, 
+                                s.r_grid_el, s.ideal_az_array, 
+                                s.ideal_el_array)
 
-        if dbg_prof:
-            update_grid_end = time.time_ns()
-            dur_ms = (update_grid_end - update_grid_start)/1e6
-            print(f"    postproc_data update_grid duration: {dur_ms:.4f} ms")
+            if dbg_prof:
+                update_grid_end = time.time_ns()
+                dur_ms = (update_grid_end - update_grid_start)/1e6
+                print(f"    postproc_data update_grid duration: {dur_ms:.4f} ms")
 
 
-        num_valids = np.sum(valid_grid_out)
-        if dbg_prof:
-            #print(f"post update_grid valids: {num_valids}")
+            num_valids = np.sum(valid_grid_out)
+            if dbg_prof:
+                #print(f"post update_grid valids: {num_valids}")
+                pass
+
+        #################################################################
+        #             For when input is a buffered coarse grid          #
+        #################################################################
+
+        elif coarse_grid_ovr:
             pass
+
+
+
 
         s.r_grid_data   = r_grid_out
         s.r_grid_valids = valid_grid_out
@@ -286,7 +294,9 @@ class CoverProc:
         #################################################################
 
         process_frame = False
-        if cfg_dict["frame_style"] == "fraction_col_filled":
+        if coarse_grid_ovr:
+            process_frame = True
+        elif cfg_dict["frame_style"] == "fraction_col_filled":
             curr_col_fraction = lpf.check_col_fraction(s.r_grid_valids)
             if curr_col_fraction >= cfg_dict["fraction_filled_thresh"]:
                 process_frame = True
@@ -322,6 +332,7 @@ class CoverProc:
             #data_format_in  = cfg_dict["data_format_in"]
             fft_len_in    = cfg_dict["fft_len"]
             invert_range  = cfg_dict["invert_range"]
+            preprocessed_grid = s.r_grid_data
             (coarse_power_grid, freq_lut, 
              fft_len) = lpf.spectra_conv(s.r_grid_data, 
                             data_format_in, fft_len_in, fs_post_dec, 
@@ -391,6 +402,10 @@ class CoverProc:
             aux_x_ind = cfg_dict["aux_x_ind"]
             aux_y_ind = cfg_dict["aux_y_ind"]
 
+            frame_id_out = s.frame_id
+            s.frame_id += 1
+
+
             try: # in case you have bad index data, etc.
                 #aux_rngline = s.r_grid_data[aux_x_ind][aux_y_ind]
                 aux_power_spectra = coarse_power_grid[aux_x_ind][aux_y_ind]
@@ -430,8 +445,7 @@ class CoverProc:
                 aux_data_out["noise_ind_start"] = noise_ind_start
                 aux_data_out["noise_ind_end"] = noise_ind_end
 
-                aux_data_out["frame_id"] = s.frame_id
-                s.frame_id += 1
+                aux_data_out["frame_id"] = frame_id_out
 
             except:
                 print("invalid aux_power_spectra data")
@@ -475,7 +489,9 @@ class CoverProc:
             frame_out       = None
             aux_data_out    = None
             new_frame_flag  = False
+            frame_id_out    = None
 
-        return (frame_out, aux_data_out, new_frame_flag) 
+        return (frame_out, aux_data_out, new_frame_flag, 
+                frame_id_out, preprocessed_grid) 
 
 

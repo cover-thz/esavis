@@ -168,7 +168,7 @@ if __name__ == "__main__":
         
 
         (frame_out, aux_data_out, 
-         new_frame_flag) = proc_obj.postproc_data(
+         new_frame_flag, frame_id_out) = proc_obj.postproc_data(
                             rangelines_array, 
                             az_array, el_array, ch_array, 
                             turn_flag, reset_in_array, cfg_dict, 
