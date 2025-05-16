@@ -116,7 +116,7 @@ class CoverProc:
 
     def postproc_data(s, rangelines_array, az_array, el_array, 
                       ch_array, turn_flag, reset_in_array, cfg_dict, 
-                      cfg_flags, file_params, update_id, coarse_grid_dict_in,
+                      cfg_flags, file_params, update_id, coarse_grid_in,
                       coarse_grid_ovr, dbg_prof=False):
 
         #################################################################
@@ -126,33 +126,32 @@ class CoverProc:
         if dbg_prof:
             preamble_start = time.time_ns()
 
+        len_rangeline = len(rangelines_array[-1])
+        rng_dtype = rangelines_array.dtype
+                                                 
+        num_rangelines = len(rangelines_array)
+        s.accum_rangelines += num_rangelines
+        #print(f"accumulated rangelines: {s.accum_rangelines}")
+
         reset_proc = False
-        if not coarse_grid_ovr:
-            len_rangeline = len(rangelines_array[-1])
-            rng_dtype = rangelines_array.dtype
-                                                     
-            num_rangelines = len(rangelines_array)
-            s.accum_rangelines += num_rangelines
-            #print(f"accumulated rangelines: {s.accum_rangelines}")
+        if ((s.uninitialized) or ("recalc_coarse_grid" in cfg_flags)):
+            reset_proc = True
 
-            if ((s.uninitialized) or ("recalc_coarse_grid" in cfg_flags)):
+        # if rangeline length changed
+        if len_rangeline != s.rng_len:
+            s.rng_len       = len_rangeline
+            reset_proc   = True
+
+        # if rangeline data type changed
+        if s.rng_dtype != rng_dtype:
+            s.rng_dtype = rng_dtype
+            reset_proc = True
+
+        if cfg_dict["frame_style"] == "azimuth_turnaround":
+            if reset_in_array:
                 reset_proc = True
-
-            # if rangeline length changed
-            if len_rangeline != s.rng_len:
-                s.rng_len       = len_rangeline
-                reset_proc   = True
-
-            # if rangeline data type changed
-            if s.rng_dtype != rng_dtype:
-                s.rng_dtype = rng_dtype
+            elif turn_flag == "RESET":
                 reset_proc = True
-
-            if cfg_dict["frame_style"] == "azimuth_turnaround":
-                if reset_in_array:
-                    reset_proc = True
-                elif turn_flag == "RESET":
-                    reset_proc = True
 
         # different sources of certain information for a file.  This is the 
         # least confusing way to do it for the main operators of this program
@@ -173,23 +172,9 @@ class CoverProc:
         elif cfg_dict["data_src"] == "video_file":
             pass
 
-        elif cfg_dict["data_src"] == "daq":
+        else: # cfg_dict["data_src"] == "daq"
             data_format_in = cfg_dict["data_format_in"]
             fs_post_dec    = cfg_dict["fs_post_dec"]
-
-        elif cfg_dict["data_src"] == "use_buffer":
-            data_format_in = "power_spectrum"
-            fs_post_dec    = cfg_dict["fs_post_dec"]
-            if ((s.uninitialized) or ("recalc_coarse_grid" in cfg_flags)):
-                reset_proc = True
-
-            grid_data_in = coarse_grid_dict_in["coarse_grid"]
-            len_rangeline = grid_data_in[0][0]
-            rng_dtype = grid_data_in.dtype
-            num_rangelines = grid_data_in.shape[0] + grid_data_in.shape[1]
-
-        else: # shouldn't get here
-            print("ERROR!")
 
 
         # if certain parameters are changed, it messes with everything
@@ -289,21 +274,15 @@ class CoverProc:
         #################################################################
 
         elif coarse_grid_ovr:
-            (r_grid_out, valid_grid_out, grid_az_out, 
-             grid_el_out) = lpf.regrid_existing_grid(coarse_grid_dict_in, 
-                                s.coarse_az_1d, s.coarse_el_1d,  s.xlen, 
-                                s.ylen)
+            pass
+
+
+
 
         s.r_grid_data   = r_grid_out
         s.r_grid_valids = valid_grid_out
         s.r_grid_az     = grid_az_out
         s.r_grid_el     = grid_el_out
-        coarse_grid_dict_out = collections.OrderedDict()
-        coarse_grid_dict_out["coarse_grid"] = s.r_grid_data
-        coarse_grid_dict_out["coarse_valids"] = s.r_grid_valids
-        coarse_grid_dict_out["az_grid"] = s.r_grid_az
-        coarse_grid_dict_out["el_grid"] = s.r_grid_el
-
 
 
         # here we perform the checks to see if we've satisfied 
@@ -353,6 +332,7 @@ class CoverProc:
             #data_format_in  = cfg_dict["data_format_in"]
             fft_len_in    = cfg_dict["fft_len"]
             invert_range  = cfg_dict["invert_range"]
+            preprocessed_grid = s.r_grid_data
             (coarse_power_grid, freq_lut, 
              fft_len) = lpf.spectra_conv(s.r_grid_data, 
                             data_format_in, fft_len_in, fs_post_dec, 
@@ -512,6 +492,6 @@ class CoverProc:
             frame_id_out    = None
 
         return (frame_out, aux_data_out, new_frame_flag, 
-                frame_id_out, coarse_grid_dict_out) 
+                frame_id_out, preprocessed_grid) 
 
 

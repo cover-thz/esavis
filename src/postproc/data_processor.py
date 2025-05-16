@@ -215,12 +215,7 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
                 #####################
                 # only do DAQ operations if the DAQ is the data source
                 if cfg_dict["data_src"] == "daq":
-                    # if the system is paused, disconnect from the DAQ
-                    # this appears to be the cleanest way to deal with pausing
-                    if cfg_dict["paused"] == True:
-                        radar.disconnect()
-
-                    elif ("setup_daq" in cfg_flags) or ("update_daq_ch" in cfg_flags):
+                    if ("setup_daq" in cfg_flags) or ("update_daq_ch" in cfg_flags):
                         ch0_en = cfg_dict["ch0_en"]
                         ch1_en = cfg_dict["ch1_en"]
 
@@ -261,7 +256,32 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
             # This is an override for the data_source 
             buf_frames_flag = True
             if cfg_dict["data_src"] == "use_buffer":
-                pass
+                buf_frames_flag = False
+                coarse_grid_ovr = True
+
+                try:
+                    buf_frame_id = cfg_dict["curr_frame_id"] 
+                    coarse_grid_dict_in = frame_buffer[buf_frame_id]
+                    (frame_out, aux_data_out, new_frame_flag, frame_id_out, 
+                     coarse_grid_dict_out) = proc_obj.postproc_data(
+                                         rangelines_array, 
+                                         az_array, el_array, ch_array, 
+                                         turn_flag, reset_in_array, 
+                                         cfg_dict, cfg_flags, file_params, 
+                                         update_id, coarse_grid_dict_in, 
+                                         coarse_grid_ovr, dbg_prof)
+
+                except Exception as e:
+                    print(e)
+                    print("got to e")
+                    ipdb.set_trace()
+                    print("")
+                    print("")
+                    print("")
+                    print("")
+                    print("")
+
+
 
             elif cfg_dict["data_src"] == "daq":
                 if not radar.get_conn_status():
@@ -342,26 +362,16 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
 
                 if profiler_enabled:
                     proc_start_time = time.time()
-                try:
-                    coarse_grid_ovr = False
-                    coarse_grid_in = None
-                    (frame_out, aux_data_out, new_frame_flag, frame_id_out, 
-                     preprocessed_grid) = proc_obj.postproc_data(rangelines_array, 
-                                             az_array, el_array, ch_array, 
-                                             turn_flag, reset_in_array, 
-                                             cfg_dict, cfg_flags, None, 
-                                             update_id, coarse_grid_in, 
-                                             coarse_grid_ovr, dbg_prof)
-                                             
-                except Exception as e:
-                    print(e)
-                    ipdb.set_trace()
-                    print("")
-                    print("")
-                    print("")
-                    print("")
-                    print("")
-
+                coarse_grid_ovr = False
+                coarse_grid_dict_in = None
+                (frame_out, aux_data_out, new_frame_flag, frame_id_out, 
+                 coarse_grid_dict_out) = proc_obj.postproc_data(rangelines_array, 
+                                         az_array, el_array, ch_array, 
+                                         turn_flag, reset_in_array, 
+                                         cfg_dict, cfg_flags, None, 
+                                         update_id, coarse_grid_dict_in, 
+                                         coarse_grid_ovr, dbg_prof)
+                                         
 
                 if profiler_enabled:
                     end_time = time.time()
@@ -377,8 +387,6 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
                     
 
             elif cfg_dict["data_src"] == "dat_file":
-                if cfg_dict["paused"] == True:
-                    continue
                 if cfg_dict["fname_list"] == None:
                     time.sleep(0.01)
                     continue
@@ -444,16 +452,15 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
                     new_frame_flag = False
                 else:
                     coarse_grid_ovr = False
-                    coarse_grid_in = None
+                    coarse_grid_dict_in = None
                     (frame_out, aux_data_out, new_frame_flag, frame_id_out, 
-                     preprocessed_grid) = proc_obj.postproc_data(
+                     coarse_grid_dict_out) = proc_obj.postproc_data(
                                          rangelines_array, 
                                          az_array, el_array, ch_array, 
                                          turn_flag, reset_in_array, 
                                          cfg_dict, cfg_flags, file_params, 
-                                         update_id, coarse_grid_in, 
+                                         update_id, coarse_grid_dict_in, 
                                          coarse_grid_ovr, dbg_prof)
-                    #print(f"file processed with new_frame_flag = {new_frame_flag}")
                                              
             else: #cfg_dict["data_src"] == "disabled":
                 pass
@@ -469,7 +476,7 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
                         # remove the oldest frame in the buffer
                         del frame_buffer[list(frame_buf_keys)[0]]
 
-                    frame_buffer[frame_id_out] = (frame_out, aux_data_out)
+                    frame_buffer[frame_id_out] = coarse_grid_dict_out
 
     except Exception as e2:
         print("\n\nGot to e2 exception point")

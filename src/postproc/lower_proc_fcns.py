@@ -523,6 +523,50 @@ def calc_coarse_grid(min_el, max_el, min_az, max_az, xlen,
 ##############################################################################
 ##############################################################################
 
+# Very crude
+def regrid_existing_grid(coarse_grid_dict_in, ideal_az_array, ideal_el_array, 
+                         xlen, ylen):
+    grid_data_in    = coarse_grid_dict_in["coarse_grid"]
+    grid_valids_in  = coarse_grid_dict_in["coarse_valids"]
+    grid_az_in      = coarse_grid_dict_in["az_grid"]
+    grid_el_in      = coarse_grid_dict_in["el_grid"]
+
+    rangelines = []
+    az_array = []
+    el_array = []
+    for i in range(grid_data_in.shape[0]):
+        for j in range(grid_data_in.shape[1]):
+            if grid_valids_in[i][j]:
+                rangelines.append(grid_data_in[i][j])
+                az_array.append(grid_az_in[i][j])
+                el_array.append(grid_el_in[i][j])
+
+    rangelines  = np.array(rangelines)
+    az_array    = np.array(az_array)
+    el_array    = np.array(el_array)
+
+    # Each rangeline must be the same size 
+    coarse_rangelines_grid = np.zeros((ideal_az_array.shape[0], 
+                            ideal_el_array.shape[0], rangelines[0].shape[0]),
+                            dtype=type(rangelines[0][0]))
+
+
+    coarse_valid_grid = np.zeros((ideal_az_array.shape[0], 
+            ideal_el_array.shape[0]), dtype=bool)
+
+    (coarse_rangelines_grid, coarse_valid_grid, real_az_out, 
+        real_el_out) = calc_coarse_rangelines_grid(ideal_az_array, 
+        ideal_el_array, el_array, az_array, rangelines, 
+        coarse_valid_grid, coarse_rangelines_grid, xlen, ylen)
+
+    return (coarse_rangelines_grid, coarse_valid_grid, real_az_out, 
+            real_el_out)
+            
+
+
+##############################################################################
+##############################################################################
+
 
 # NOTE TODO fill out the docstring
 def regrid_rangelines(rangelines_in, el_array_in, az_array_in, channels_in, 

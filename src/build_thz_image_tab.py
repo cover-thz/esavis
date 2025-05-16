@@ -152,6 +152,7 @@ def build_thz_image_tab(thz_img_tab):
     # Toplevel layout of "Source" tab
     src_tab_top_layout.addWidget(src_tab_lbl_1)
     src_tab_top_layout.addLayout(src_tab_sublayout_row1)
+    src_tab_top_layout.addLayout(src_tab_sublayout_row1pt5)
     src_tab_top_layout.addLayout(src_tab_sublayout_row2)
     src_tab_top_layout.addLayout(src_tab_sublayout_row3)
 

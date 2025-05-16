@@ -178,8 +178,8 @@ class THzImageTab(QWidget):
         s.reset_camera_btn.clicked.connect(
             s.reset_camera_btn_clicked)
 
-        s.frame_pause_btn.clicked.connect(
-            s.frame_pause_btn_clicked)
+        #s.frame_pause_btn.clicked.connect(
+        #    s.frame_pause_btn_clicked)
 
 
         ####################################################################
@@ -311,18 +311,19 @@ class THzImageTab(QWidget):
             json.dump(cfg_dict, file)
 
     def frame_pause_btn_clicked(s):
-        if not s.cfg_dict["paused"]:
-            new_cfg_dict = OrderedDict()
-            new_cfg_dict["paused"] = True
-            #s.update_config(new_cfg_dict)
-            s.update_config(new_cfg_dict, ["force_update"])
-            s.frame_pause_btn.setText("Resume Capture")
-        else:
-            new_cfg_dict = OrderedDict()
-            new_cfg_dict["paused"] = False
-            #s.update_config(new_cfg_dict)
-            s.update_config(new_cfg_dict, ["force_update"])
-            s.frame_pause_btn.setText("Pause Capture")
+        #if not s.cfg_dict["paused"]:
+        #    new_cfg_dict = OrderedDict()
+        #    new_cfg_dict["paused"] = True
+        #    #s.update_config(new_cfg_dict)
+        #    s.update_config(new_cfg_dict, ["force_update"])
+        #    s.frame_pause_btn.setText("Resume Capture")
+        #else:
+        #    new_cfg_dict = OrderedDict()
+        #    new_cfg_dict["paused"] = False
+        #    #s.update_config(new_cfg_dict)
+        #    s.update_config(new_cfg_dict, ["force_update"])
+        #    s.frame_pause_btn.setText("Pause Capture")
+        pass
 
 
 

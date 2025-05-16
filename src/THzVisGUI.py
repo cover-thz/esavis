@@ -622,11 +622,19 @@ class MainWindow(QMainWindow):
 
 
 
-    def frame_update(s, frame_in, new_frame_flag):
+    def frame_update(s, frame_in, frame_id, new_frame_flag):
         """
         this updates all the appropriate THz image objects when a new frame 
         comes in
         """
+        if new_frame_flag:
+            cfg_dict_update = OrderedDict()
+            if s.cfg_dict["data_src"] != "use_buffer":
+                cfg_dict_update["curr_frame_id"] = frame_id
+                s.update_config(cfg_dict_update)
+
+
+
         # TODO change the updates based on which tabs are visible to make
         # the GUI look less sluggish
         if new_frame_flag and s.cfg_dict["frame_update_dbg"]:
@@ -694,7 +702,7 @@ class MainWindow(QMainWindow):
             aux_data_in = data_in[2]
             
             pre = time.time_ns() # NOTE TODO DEBUG REMOVE
-            s.frame_update(frame_in, True)
+            s.frame_update(frame_in, frame_id, True)
             post = time.time_ns() # NOTE TODO DEBUG REMOVE
             if s.cfg_dict["frame_update_dbg"]:
                 print(f"frame_update duration: {((post-pre)/1e6):.4f} ms\n")
@@ -764,7 +772,7 @@ class MainWindow(QMainWindow):
             if ((time.time() - s.last_update_time) > s.min_update_period):
                 s.update_cfg_flag = True
                 s.update_config(None)
-                s.frame_update(None, False)
+                s.frame_update(None, None, False)
 
         if _dbg:
             print("finished check of min update period handling")
