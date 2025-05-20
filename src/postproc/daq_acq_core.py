@@ -47,6 +47,7 @@ class DAQSocket:
     def __init__(s):
         s.sock = None
         s.daq_connected = False
+        s.acq_debug = False
 
     def connect(s, addr):
         s.sock = socket.socket()
@@ -57,11 +58,16 @@ class DAQSocket:
         # buffer variables
         #s.MAX_BUF_SIZE = 16384
         s.MAX_BUF_SIZE = 1048576 
+        #s.MAX_BUF_SIZE = 8388608
         s.buf_init = False
         s.curr_buf = None
         s.next_buf = None
         s.curr_buf_bytes = 0
         s.buf_ind = 0
+
+        s.DBG__dur_0_accum_ns = 0
+        s.DBG__dur_1_accum_ns = 0
+        s.DBG__rx_cntr = 0
 
     def close(s):
         s.daq_connected = False
@@ -175,6 +181,9 @@ class DAQSocket:
 
 
     def receive_message(s):
+        if s.acq_debug:
+            rx_start = time.perf_counter_ns()
+
         #length = s.recv_full(4)
         length = s.read_from_buf(4)
 
@@ -216,7 +225,25 @@ class DAQSocket:
             except_str += f"dumped to {file_name}"
             raise RuntimeError(except_str)
 
-        return (TLVMessage.decode(data), True)
+
+        if s.acq_debug:
+            preamble_end = time.perf_counter_ns()
+        msg_out = TLVMessage.decode(data)
+        if s.acq_debug:
+            fcn_end = time.perf_counter_ns()
+
+            s.DBG__dur_0_accum_ns += (preamble_end - rx_start)
+            s.DBG__dur_1_accum_ns += (fcn_end - preamble_end)
+            s.DBG__rx_cntr += 1
+
+            if (s.DBG__rx_cntr % 50000) == 0:
+                avg_dur_0 = s.DBG__dur_0_accum_ns / s.DBG__rx_cntr / 1e3
+                avg_dur_1 = s.DBG__dur_1_accum_ns / s.DBG__rx_cntr / 1e3
+                print(f"total receive_message() calls: {s.DBG__rx_cntr}")
+                print(f"receive_message() duration 0 avg: {avg_dur_0:.4f} us")
+                print(f"receive_message() duration 1 avg: {avg_dur_1:.4f} us\n")
+
+        return (msg_out, True)
     
     @staticmethod
     def pack_message(message: TLVMessage):
@@ -380,7 +407,6 @@ def main_acq_loop(cdh_queue_in, cdh_queue_out, data_queue):
         #####################################################################
         #                DEBUG TIME DURATION HANDLING STEPS                 #
         #####################################################################
-
         if acq_debug:
             slice_0_ns_dur = time_div_0_ns - loop_start_ns
             slice_1_ns_dur = time_div_1_ns - time_div_0_ns
@@ -496,9 +522,11 @@ def main_acq_loop(cdh_queue_in, cdh_queue_out, data_queue):
                     #cdh_pipe_out.send(new_dict_out)
                     cdh_queue_out.put(new_dict_out)
                     if val == True:
-                        acq_debug = True
+                        daq_sock.acq_debug = True
+                        #acq_debug = True
                     else:
-                        acq_debug = False
+                        daq_sock.acq_debug = False
+                        #acq_debug = False
                 else:
                     print(f"command_keys: {command_keys}")
                     print("INVALID CDH Object\n")
@@ -519,8 +547,8 @@ def main_acq_loop(cdh_queue_in, cdh_queue_out, data_queue):
                 #new_dict_out = OrderedDict()
                 #new_dict_out["CONN_STATUS"] = (acq_msg_id, False)
                 #cdh_pipe_out.send(new_dict_out)
-                cdh_queue_out.put(new_dict_out)
-                acq_msg_id += 1
+                #cdh_queue_out.put(new_dict_out)
+                #acq_msg_id += 1
                 daq_sock.close()
                 buffer_setup = False
                 i = 0

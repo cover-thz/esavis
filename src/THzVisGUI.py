@@ -33,16 +33,15 @@ import multiprocessing as mp
 from collections import OrderedDict
 import copy
 import subprocess
+import time
 
-
+# compile the C functions
 if __name__ == '__main__':
     CWD = os.getcwd() 
     if os.name == "nt":
-        # remake the makefile
         c_funcs_dir = CWD + "\\postproc\\c_funcs"
         result = subprocess.run(["make"], cwd=c_funcs_dir)
     elif os.name == "posix":
-        # remake the makefile
         c_funcs_dir = CWD + "/postproc/c_funcs"
         result = subprocess.run(["make"], cwd=c_funcs_dir)
     else:
@@ -54,11 +53,10 @@ from THzImageTab import THzImageTab
 from DebugTab import DebugTab
 from CameraTab import CameraTab
 from SingPixTab import SingPixTab
-import time
 
 # crude but effective way of getting the postprocessing directory in here
 # without playing maddening namespace games with the modules in the that
-#directory
+# directory
 PROC_DIR    = os.path.abspath(os.path.join(os.getcwd(), 'postproc'))
 sys.path.append(PROC_DIR)
 import data_processor as dp
@@ -110,9 +108,6 @@ def sigint_handler(*_):
     print("HIT CTRL-C")
     QtGui.QGuiApplication.quit()
 
-##############################################################################
-# DEFAULT CONFIG SET
-##############################################################################
 ##############################################################################
 # DEFAULT CONFIG SET
 ##############################################################################
@@ -206,7 +201,6 @@ DFLT_CFG_DICT["daq_addr"]  = "localhost"
 
 DFLT_CFG_DICT["data_src_ovr"] = "None"
 
-
 DFLT_CFG_DICT["flags"] = []
 
 
@@ -270,6 +264,10 @@ class MainWindow(QMainWindow):
         # starts out at 2 seconds when the daq is not connected, changes t
         s.NO_DAQ_PERIOD         = 3.0
         s.DAQ_CONNECTED_PERIOD  = 0.1
+
+        s.SLOW_UPDATES  = 3.0
+        s.FAST_UPDATES  = 0.1
+
         s.min_update_period     = s.NO_DAQ_PERIOD
 
         # used for seeing the frame-to-frame "rate"
@@ -296,7 +294,7 @@ class MainWindow(QMainWindow):
         s.cfg_dict["flags"] = []
 
         # keys that indicate that a file should be reprocessed:
-        s.reproc_file_keys = ["el_side_0_start","el_side_0_end",
+        s.reproc_fbuf_keys = ["el_side_0_start","el_side_0_end",
             "el_side_1_start","el_side_1_end","ylen","xlen","fft_len",
             "num_noise_pts","noise_start_frac","chirp_span","chirp_time",
             "dead_pix_val","fs_adc","el_offset0","el_offset1",
@@ -307,6 +305,21 @@ class MainWindow(QMainWindow):
             "contrast_db","half_peak_width","min_range","max_range",
             "min_az","max_az","min_el","max_el","plot_style",
             "peak_selection","aux_x_ind","aux_y_ind"]
+
+
+        # config keys that if changed indicate that a file should be reloaded
+        # because the regridded version in the data processor isn't enough.  
+        # this usually means that the grid dimensions have changed or the 
+        # base rangeline extraction parameters like the elevation mirror 
+        # starting encoder value have changeed.
+        s.reload_file_keys = ["el_side_0_start","el_side_0_end",
+            "el_side_1_start","el_side_1_end","ylen","xlen","fft_len",
+            "fs_adc","el_offset0","el_offset1", "dec_val","ch0_offset",
+            "ch1_offset","disable_el_side0","disable_el_side1",
+            "ch0_en","ch1_en","data_format_in","min_az","max_az","min_el",
+            "max_el"]
+            
+            
 
         # create the tab widget which contains pretty much the remainder of
         # the GUI objects
@@ -338,7 +351,6 @@ class MainWindow(QMainWindow):
         # add the tabs to the tab widget 
         s.tab_widget.addTab(s.cfg_tab, "Config")
         s.tab_widget.addTab(s.main_thz_tab, "Main THz Image")
-        #s.tab_widget.addTab(s.camera_tab, "Camera Overlay")
         s.tab_widget.addTab(s.camera_tab, "Camera Overlay")
         s.tab_widget.addTab(s.sing_pix_tab, "Single Pixel")
         s.tab_widget.addTab(s.debug_tab, "Debug")
@@ -480,6 +492,18 @@ class MainWindow(QMainWindow):
         This function is called by lower level objects (the tabs) to "update"
         the configuraiton dictionary and trigger the main window to send
         an updated version of the configuraiton to the processing core.
+        
+        We don't want other objects in the GUI changing cfg_dict directly, so
+        while cfg_dict is sent pretty much everywhere, it is only ever changed
+        HERE.  
+
+        Additionally, some GUI object changes will trigger many calls to 
+        update_config() over a short period of time (like moving a slider).  
+        This has the potential to overwhelm the processing core as it would
+        require processing each change.  Thus here changes are accumulated 
+        and less frequent updates are sent to the processing core (in the 
+        timer_handler).  If an update needs to take effect ASAP, then the 
+        "force_update" flag can be sent through cfg_flags_in.  
 
         note that cfg_dict_in is not a complete cfg_dict, it only contains 
         keys that have been changed.   same with cfg_flags_in
@@ -492,36 +516,27 @@ class MainWindow(QMainWindow):
         typing values in a textbox it's all to keep the processing system 
         moving quickly.  
         """
-        
-        # here we check the input dict to see if there are any changes that
-        # trigger a flag change
+        #if (cfg_dict_in != None) and (cfg_dict_in != {}):
+        #    cfg_flags_none = (cfg_flags_in == None) or (cfg_flags_in != [])
+        #    just_curr_frame_id = ((len(cfg_dict_in.keys()) == 1) and 
+        #                         ("curr_frame_id" in cfg_dict_in.keys()))
 
-        # then here we append the cfg_flags_in, which is really just an 
-        # opportunity for hte lower level tab to force-trigger a flag 
-        # condition
-    
-        # NOTE we need to have some sort of buffering/throttling system so that
-        # we only send something line 3-4 updates per second maximum and if 
-        # there are more updates than that sent, then we combine them into a 
-        # single update with prefeerence to later update values.
-        #
-        # I can imagine changing the contrast slider repeatedly causing many
-        # contrast updates occuring in sort sequence, but only the last one 
-        # is actually propagated
-        #
-        # Alternatively we could have an "ACK" signal of some kind come back
-        # from the processor core along an new pipe to indicate the config
-        # has been recieved and is being processed so we could properly combine
-        # and buffer the requests 
-        #
-        #
+        #    if ((not cfg_flags_none) or (not just_curr_frame_id)):
+        #        print("--------------------")
+        #        print("UPDATE CONFIG (apart from just curr_frame_id)!:")
+        #        print(cfg_dict_in)
+        #        print(cfg_flags_in)
+        #        print("--------------------\n")
 
-        # NOTE  you need to calculate fs_post_dec from fs_adc and dec_val
-        # whenever either of them change
 
-        # NOTE construct some sort of buffering of changes when you have 
-        # tabs that don't have THz images visible so you don't hammer the
-        # processing
+        #else:
+        #    print("--------------------")
+        #    print("UPDATE CONFIG (apart from just curr_frame_id)!:")
+        #    print(cfg_dict_in)
+        #    print(cfg_flags_in)
+        #    print("--------------------\n")
+
+
         cfg_dict = s.cfg_dict
         cfg_flags = []
         if (cfg_dict_in != None) and (cfg_dict_in != {}):
@@ -537,11 +552,23 @@ class MainWindow(QMainWindow):
             if cfg_dict["fname_list"] != old_cfg_dict["fname_list"]:
                 s.append_if_absent(cfg_flags, "fname_changed")
 
-            for rf_key in s.reproc_file_keys:
+            # check to see if anything changed that requires a reprocessing 
+            # of the file buffer
+            for rf_key in s.reproc_fbuf_keys:
                 if rf_key in cfg_dict_in.keys():
-                    s.append_if_absent(cfg_flags, "reproc_file")
+                    s.append_if_absent(cfg_flags, "reproc_fbuf")
+
+            # check to see if something significant enough chagned that the 
+            # regridded rangelines of the file won't work anymore and the 
+            # file needs to be reloaded
+            for rf_key in s.reload_file_keys:
+                if rf_key in cfg_dict_in.keys():
+                    s.append_if_absent(cfg_flags, "reload_file")
 
 
+            # check to see if the pixel grid size/shape has changed
+            # which triggers a flag to notify the processor to recalculate
+            # those grids
             if cfg_dict["min_az"] != old_cfg_dict["min_az"]:
                 cfg_flags = s.append_if_absent(cfg_flags, "recalc_coarse_grid")
             elif cfg_dict["max_az"] != old_cfg_dict["max_az"]:
@@ -554,7 +581,6 @@ class MainWindow(QMainWindow):
                 cfg_flags = s.append_if_absent(cfg_flags, "recalc_coarse_grid")
             elif cfg_dict["ylen"] != old_cfg_dict["ylen"]:
                 cfg_flags = s.append_if_absent(cfg_flags, "recalc_coarse_grid")
-
 
             if cfg_dict["data_src"] == "daq":
                 if cfg_dict["ch0_en"] != old_cfg_dict["ch0_en"]:
@@ -569,8 +595,16 @@ class MainWindow(QMainWindow):
         cfg_dict["fs_post_dec"] = fs_adc/(16*(dec_val))
 
         # calculate the linear versions of threshold and contrast
-        cfg_dict["threshold_lin"]   = 10**(cfg_dict["threshold_db"]/10)
-        cfg_dict["contrast_lin"]    = 10**(cfg_dict["contrast_db"]/10)
+        try:
+            cfg_dict["threshold_lin"]   = 10**(cfg_dict["threshold_db"]/10)
+            cfg_dict["contrast_lin"]    = 10**(cfg_dict["contrast_db"]/10)
+        except OverflowError:
+            print("warning - threshold or contrast too high")
+            cfg_dict["threshold_lin"] = 1000.0
+            cfg_dict["contrast_lin"] = 100.0
+
+
+
 
         # always send the "setup_daq" flag if daq is data source
         if cfg_dict["data_src"] == "daq":
@@ -622,7 +656,7 @@ class MainWindow(QMainWindow):
 
 
 
-    def frame_update(s, frame_in, frame_id, new_frame_flag):
+    def frame_update(s, frame_in, frame_id, data_src_in, new_frame_flag):
         """
         this updates all the appropriate THz image objects when a new frame 
         comes in
@@ -699,18 +733,20 @@ class MainWindow(QMainWindow):
             data_in     = data_pipe.recv()
             frame_in    = data_in[0]
             frame_id    = data_in[1]
-            aux_data_in = data_in[2]
+            data_src_in = data_in[2]
+            aux_data_in = data_in[3]
             
             pre = time.time_ns() # NOTE TODO DEBUG REMOVE
-            s.frame_update(frame_in, frame_id, True)
+            s.frame_update(frame_in, frame_id, data_src_in, True)
             post = time.time_ns() # NOTE TODO DEBUG REMOVE
             if s.cfg_dict["frame_update_dbg"]:
                 print(f"frame_update duration: {((post-pre)/1e6):.4f} ms\n")
 
             s.aux_update(aux_data_in, True)
             if s.cfg_dict["data_src"] == "dat_file":
-                stat_id = "FILE_PROC"
-                s.main_thz_tab.update_data_src_status(stat_id)
+                if data_src_in == "dat_file":
+                    stat_id = "FILE_PROC"
+                    s.main_thz_tab.update_data_src_status(stat_id)
 
         if _dbg:
             print("finished data pipe handling")
@@ -725,14 +761,14 @@ class MainWindow(QMainWindow):
                     if not s.daq_connected:
                         print(f"stat_id = {stat_id}")
                     s.daq_connected = True
-                    s.min_update_period = s.DAQ_CONNECTED_PERIOD
+                    #s.min_update_period = s.DAQ_CONNECTED_PERIOD
                     s.main_thz_tab.update_data_src_status(stat_id)
                 else:
                     stat_id = "NOT_CONNECTED"
                     if s.daq_connected:
                         print(f"stat_id = {stat_id}")
                     s.daq_connected = False
-                    s.min_update_period = s.NO_DAQ_PERIOD
+                    #s.min_update_period = s.NO_DAQ_PERIOD
                     s.main_thz_tab.update_data_src_status(stat_id)
             elif "CFG_ACK" in query_in_dict.keys():
                 s.cfg_pipe_count -= 1
@@ -746,6 +782,25 @@ class MainWindow(QMainWindow):
                     s.main_thz_tab.update_data_src_status(stat_id)
             else:
                 print(f"Warning: invalid query keys: {query_in_dict.keys()}")
+
+        # set the update period based on the most recent set of queries, the 
+        # data_src, and the daq connection
+        if s.cfg_dict["data_src"] == "daq":
+            if s.daq_connected:
+                s.min_update_period = s.FAST_UPDATES 
+            else:
+                s.min_update_period = s.SLOW_UPDATES 
+
+        elif s.cfg_dict["data_src"] == "use_buffer":
+            s.min_update_period = s.FAST_UPDATES 
+
+
+        elif s.cfg_dict["data_src"] == "dat_file":
+            s.min_update_period = s.FAST_UPDATES 
+
+        else: # "disabled" or others
+            s.min_update_period = s.SLOW_UPDATES 
+
 
         if _dbg:
             print("finished query_pipe_in handling")
@@ -772,7 +827,7 @@ class MainWindow(QMainWindow):
             if ((time.time() - s.last_update_time) > s.min_update_period):
                 s.update_cfg_flag = True
                 s.update_config(None)
-                s.frame_update(None, None, False)
+                s.frame_update(None, None, None, False)
 
         if _dbg:
             print("finished check of min update period handling")

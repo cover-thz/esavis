@@ -56,7 +56,7 @@ class CoverProc:
     # of acquisiton we accumulate rangelines until the regridded rangelines
     # make a satisfactory frame (under certain conditions, such as azimuth
     # turnaround, % pixels, % columns, or just time) 
-    # we accumulate those in the "rangeline_grid" variable
+    # we accumulate those in the "r_grid_data" variable
     def clear_preproc_buffer(s):
         s.accum_rangelines = 0
 
@@ -441,6 +441,7 @@ class CoverProc:
                         calc_weighted_sum)
 
                 aux_data_out = collections.OrderedDict()
+                aux_data_out["data_valid"] = True
                 aux_data_out["x_ind"] = aux_x_ind
                 aux_data_out["y_ind"] = aux_y_ind
                 aux_data_out["aux_az_val"] = cfg_dict["aux_az_val"]
@@ -470,11 +471,12 @@ class CoverProc:
             except:
                 print("invalid aux_power_spectra data")
                 aux_data_out = collections.OrderedDict()
+                aux_data_out["data_valid"] = False
                 aux_data_out["x_ind"] = aux_x_ind
                 aux_data_out["y_ind"] = aux_y_ind
                 aux_data_out["aux_az_val"] = cfg_dict["aux_az_val"]
                 aux_data_out["aux_el_val"] = cfg_dict["aux_el_val"]
-                aux_data_out["power_spectra"] = aux_power_spectra
+                aux_data_out["power_spectra"] = None
                 aux_data_out["range_lut_cm"] = range_lut_cm
                 aux_data_out["peak_ranges"] = None
                 aux_data_out["peak_powers_lin"] = None

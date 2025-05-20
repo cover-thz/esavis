@@ -152,6 +152,12 @@ class SingPixTab(QWidget):
         s.weight_sum_chkb.setText("Weighted Sum")
         s.weight_sum_chkb.setChecked(False)
 
+        s.pt_mrkrs_chkb = QCheckBox()
+        s.pt_mrkrs_chkb.setText("Plot Point Markers")
+        s.pt_mrkrs_chkb.setChecked(False)
+
+
+        # arguments are (widget, row, col, row_width, col_width)
         s.ctrl_box_layout.addWidget(s.legend_chkb,       0, 0, 1, 1)
         s.ctrl_box_layout.addWidget(s.noise_limits_chkb, 1, 0, 1, 1)
         s.ctrl_box_layout.addWidget(s.noise_floor_chkb,  2, 0, 1, 1)
@@ -162,6 +168,7 @@ class SingPixTab(QWidget):
         s.ctrl_box_layout.addWidget(s.back_peak_chkb,    2, 1, 1, 1)
         s.ctrl_box_layout.addWidget(s.range_cuts_chkb,   3, 1, 1, 1)
         s.ctrl_box_layout.addWidget(s.weight_sum_chkb,   0, 2, 1, 1)
+        s.ctrl_box_layout.addWidget(s.pt_mrkrs_chkb,     1, 2, 1, 1)
 
 
         #s.upper_layout.addLayout(s.aux_layout)
@@ -191,18 +198,20 @@ class SingPixTab(QWidget):
         this updates all the appropriate auxilary plot objects when a new 
         frame ( + auxiliary data) comes in
         """
-        local_cfg_params = OrderedDict()
-        local_cfg_params["legend_en"] = bool(s.legend_chkb.isChecked())
-        local_cfg_params["noise_delim_en"] = bool(s.noise_limits_chkb.isChecked())
-        local_cfg_params["noise_floor_en"] = bool(s.noise_floor_chkb.isChecked())
-        local_cfg_params["thresh_en"] = bool(s.thresh_chkb.isChecked())
-        local_cfg_params["contr_en"] = bool(s.contr_chkb.isChecked())
-        local_cfg_params["front_peak_en"] = bool(s.front_peak_chkb.isChecked())
-        local_cfg_params["back_peak_en"] = bool(s.back_peak_chkb.isChecked())
-        local_cfg_params["range_cuts_en"] = bool(s.range_cuts_chkb.isChecked())
-        local_cfg_params["weight_sum_en"] = bool(s.weight_sum_chkb.isChecked())
+        loc_cfg_params = OrderedDict()
+        loc_cfg_params["legend_en"] = bool(s.legend_chkb.isChecked())
+        loc_cfg_params["noise_delim_en"] = bool(s.noise_limits_chkb.isChecked())
+        loc_cfg_params["noise_floor_en"] = bool(s.noise_floor_chkb.isChecked())
+        loc_cfg_params["thresh_en"] = bool(s.thresh_chkb.isChecked())
+        loc_cfg_params["contr_en"] = bool(s.contr_chkb.isChecked())
+        loc_cfg_params["front_peak_en"] = bool(s.front_peak_chkb.isChecked())
+        loc_cfg_params["back_peak_en"] = bool(s.back_peak_chkb.isChecked())
+        loc_cfg_params["range_cuts_en"] = bool(s.range_cuts_chkb.isChecked())
+        loc_cfg_params["weight_sum_en"] = bool(s.weight_sum_chkb.isChecked())
+        loc_cfg_params["pt_mrkrs_en"] = bool(s.pt_mrkrs_chkb.isChecked())
+
         s.aux_plot_obj.aux_update(aux_data_in, new_frame_flag, 
-            local_cfg_params)
+            loc_cfg_params)
 
 
 
@@ -218,7 +227,8 @@ class SingPixTab(QWidget):
         new_cfg_dict["aux_az_val"] = x_click
         new_cfg_dict["aux_el_val"] = y_click
 
+        cfg_flags = ["force_update"]
         # update the pixel being viewed
-        s.update_config(new_cfg_dict)
+        s.update_config(new_cfg_dict, cfg_flags)
 
 

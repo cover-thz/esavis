@@ -432,8 +432,8 @@ class THzImageTab(QWidget):
         if s.cfg_dict["data_src"] == "dat_file":
             #frame_style = s.cfg_dict["frame_style"]
             plot_style = s.cfg_dict["plot_style"]
-            data_fpath_0 = s.cfg_dict["data_fpath_0"]
-            data_fpath_1 = s.cfg_dict["data_fpath_1"]
+            data_fpath_0 = s.cfg_dict["data0_fpath"]
+            data_fpath_1 = s.cfg_dict["data1_fpath"]
 
             # use the pixel 0 filename to generate the image file if pixel 0 is 
             # in the dataset

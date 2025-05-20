@@ -92,36 +92,43 @@ new ones
 # Main loop that is called by the multiprocessing core.  This contains all the
 # input/output variables
 @docstring("""
-This means I ned to create a config object, a frame object and possibly
-additional objects
+Function Name: main_proc_loop()
+Description: 
+    main processing loop that gathers radar pulses from the DAQ or from a 
+    file input and processes them down to frames and auxiliary data before 
+    transferring the data to the THzVisGUI.  
 
-cfg_obj_pipe
-    this is a pipe that you send configuration objects through to reconfigure
-    the data processor.  It consists of a dictionary with values in it that 
-    need to be updated
+    This loop is instaitated from THzVisGUI as a child process and uses
+    Python's multiprocessing module to improve speed and efficiency
 
-    the number of x and y pixels.  It even includes things that change more 
-    frequently like threshold and contrast values.  
+Arguments:
+    cfg_obj_pipe
+        this is a pipe that you send configuration objects through to reconfigure
+        the data processor.  It consists of a dictionary with values in it that 
+        need to be updated
 
-    this could also contain file names for data files to process so we can 
-    pipe the data files through this postprocessing algorithm as well
-    
-    This config pipe actually should contain tagged data where only new values
-    are sent, to minimize the overhead 
+        the number of x and y pixels.  It even includes things that change more 
+        frequently like threshold and contrast values.  
 
-data_out_pipe
-    frame and auxiliary data (that needs to be synchronous with the frame) 
-    comes out here
+        this could also contain file names for data files to process so we can 
+        pipe the data files through this postprocessing algorithm as well
+        
+        This config pipe actually should contain tagged data where only new values
+        are sent, to minimize the overhead 
 
-query_out_pipe
-    This is a pipe where if there's some kind of query in the cfg_flags like 
-    "is the DAQ connected?" then the response to that query would come on
-    this pipe.  Intended for infrequent queries with low data volume, for
-    flags within the processor core as well as for debugging
+    data_out_pipe
+        frame and auxiliary data (that needs to be synchronous with the frame) 
+        comes out here
 
-frame_queue
-    a queue object that contains an object that contains all relelvent frame
-    data
+    query_in_pipe
+        A pipe
+
+    query_out_pipe
+        This is a pipe where if there's some kind of query in the cfg_flags like 
+        "is the DAQ connected?" then the response to that query would come on
+        this pipe.  Intended for infrequent queries with low data volume, for
+        flags within the processor core as well as for debugging
+
 """)
 def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe, 
                    query_out_pipe, cfg_dict):
@@ -158,6 +165,8 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
     #
     #   multiprocessing concurrent.futures stuff as desired
 
+    turn_flag = "DISABLED"
+
     try:
         while True:
             new_frame_flag = False
@@ -180,9 +189,9 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
             # do a status check of everything, the DAQ connection in particular
             # but anything that could periodically change asynchronously
 
-            #####################################################################
-            #                         SETUP CHANGES STEPS                       #
-            #####################################################################
+            ###################################################################
+            #                       SETUP CHANGES STEPS                       #
+            ###################################################################
             # check for new confiugration data
             cfg_update = False
             if (cfg_obj_pipe.poll()):
@@ -249,27 +258,50 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
             else: # no updated config values
                 cfg_flags = []
 
-            #####################################################################
-            #                      DATA GATHERING STEPS                         #
-            #####################################################################
 
-            # This is an override for the data_source 
+            # reset the buffer initialization parameter in case we've switched
+            # from dat_file to something else so it doesn't think it's 
+            # initialized accidentally
+            if cfg_dict["data_src"] != "dat_file":
+                file_params["buf_initialized"]  = False
+
+            ###################################################################
+            #                      DATA GATHERING STEPS                       #
+            ###################################################################
             buf_frames_flag = True
+            
+            # This is essentially the "paused
             if cfg_dict["data_src"] == "use_buffer":
                 buf_frames_flag = False
                 coarse_grid_ovr = True
+                turn_flag = "DISABLED"
+                reset_in_array = False
 
                 try:
-                    buf_frame_id = cfg_dict["curr_frame_id"] 
-                    coarse_grid_dict_in = frame_buffer[buf_frame_id]
-                    (frame_out, aux_data_out, new_frame_flag, frame_id_out, 
-                     coarse_grid_dict_out) = proc_obj.postproc_data(
-                                         rangelines_array, 
-                                         az_array, el_array, ch_array, 
-                                         turn_flag, reset_in_array, 
-                                         cfg_dict, cfg_flags, file_params, 
-                                         update_id, coarse_grid_dict_in, 
-                                         coarse_grid_ovr, dbg_prof)
+                    # check for empty frame buffer
+                    if frame_buffer == {}:
+                        time.sleep(0.01)
+                    else:
+                        buf_frame_id = cfg_dict["curr_frame_id"] 
+                        coarse_grid_dict_in = frame_buffer[buf_frame_id]
+                        #(frame_out, aux_data_out, new_frame_flag, frame_id_out, 
+                        # coarse_grid_dict_out) = proc_obj.postproc_data(
+                        #                     rangelines_array, 
+                        #                     az_array, el_array, ch_array, 
+                        #                     turn_flag, reset_in_array, 
+                        #                     cfg_dict, cfg_flags, file_params, 
+                        #                     update_id, coarse_grid_dict_in, 
+                        #                     coarse_grid_ovr, dbg_prof)
+
+                        (frame_out, aux_data_out, new_frame_flag, frame_id_out, 
+                         coarse_grid_dict_out) = proc_obj.postproc_data(
+                                             None, None, None, None, 
+                                             turn_flag, reset_in_array, 
+                                             cfg_dict, cfg_flags, None, 
+                                             update_id, coarse_grid_dict_in, 
+                                             coarse_grid_ovr, dbg_prof)
+
+
 
                 except Exception as e:
                     print(e)
@@ -391,31 +423,30 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
                     time.sleep(0.01)
                     continue
 
+                # these trigger the file to be parsed
                 if (("fname_changed" in cfg_flags) or 
-                   (file_params["buf_initialized"] == False)):
-
-                    query_out_dict = OrderedDict()
-                    query_out_dict["FILE_PROCESSING"] = True
-                    query_out_pipe.send(query_out_dict)
+                   (file_params["buf_initialized"] == False) or
+                   ("reload_file" in cfg_flags)):
 
                     if "fname_list" not in cfg_dict.keys():
                         error_pipe.send("FNAME_LIST_EMPTY")
                         continue
 
+                    query_out_dict = OrderedDict()
+                    query_out_dict["FILE_PROCESSING"] = True
+                    query_out_pipe.send(query_out_dict)
+
                     fs_adc = cfg_dict["fs_adc"]
                     fname_list = cfg_dict["fname_list"]
 
+                    # grab the initial file data
+                    # this can produce a massive amount of memory usage
                     (rangelines_array, el_array, az_array, ch_array, 
                      fs_post_dec, fft_flag, powcalc_flag, dec_val, 
                      len_rangeline, 
                      data_good) = dff.get_rangelines_from_file(fname_list, 
                                                                fs_adc)
             
-                    file_buf["rangelines"]  = rangelines_array
-                    file_buf["elevation"]   = el_array
-                    file_buf["azimuth"]     = az_array
-                    file_buf["channels"]    = ch_array
-
                     file_params["buf_initialized"] = True
                     file_params["fs_post_dec"]   = fs_post_dec
                     file_params["fft_flag"]      = fft_flag
@@ -424,13 +455,30 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
                     file_params["len_rangeline"] = len_rangeline
                     file_params["data_good"]     = data_good
 
-                else:
-                    if "reproc_file" not in cfg_flags:
-                        continue
+                    # process the file directly and store the resulting 
+                    # coarse grid in the file buffer
+                    coarse_grid_ovr = False
+                    coarse_grid_dict_in = None
+                    reset_in_array = False
+                    (frame_out, aux_data_out, new_frame_flag, frame_id_out, 
+                     file_coarse_grid_dict) = proc_obj.postproc_data(
+                                         rangelines_array, 
+                                         az_array, el_array, ch_array, 
+                                         turn_flag, reset_in_array, 
+                                         cfg_dict, cfg_flags, file_params, 
+                                         update_id, coarse_grid_dict_in, 
+                                         coarse_grid_ovr, dbg_prof)
+                    
+                    # delete these objects to minimize memory consumption
+                    # when the files are massive 
+                    del rangelines_array
+                    del el_array
+                    del az_array
+                    del ch_array
 
-                    query_out_dict = OrderedDict()
-                    query_out_dict["FILE_PROCESSING"] = True
-                    query_out_pipe.send(query_out_dict)
+                else:
+                    #if "reproc_fbuf" not in cfg_flags:
+                    #    continue
 
                     # grab the stored data of the most recent file and 
                     # re-process it
@@ -445,21 +493,19 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
                     len_rangeline       = file_params["len_rangeline"]
                     data_good           = file_params["data_good"]
 
-                turn_flag = False
+                turn_flag = "DISABLED"
                 reset_in_array = False
                 if not data_good:
                     error_pipe.send("FILE_FRAME_DATA_BAD")
                     new_frame_flag = False
                 else:
-                    coarse_grid_ovr = False
-                    coarse_grid_dict_in = None
+                    coarse_grid_ovr = True
                     (frame_out, aux_data_out, new_frame_flag, frame_id_out, 
                      coarse_grid_dict_out) = proc_obj.postproc_data(
-                                         rangelines_array, 
-                                         az_array, el_array, ch_array, 
+                                         None, None, None, None, 
                                          turn_flag, reset_in_array, 
                                          cfg_dict, cfg_flags, file_params, 
-                                         update_id, coarse_grid_dict_in, 
+                                         update_id, file_coarse_grid_dict, 
                                          coarse_grid_ovr, dbg_prof)
                                              
             else: #cfg_dict["data_src"] == "disabled":
@@ -467,7 +513,9 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
 
             # send frame
             if new_frame_flag:
-                data_out_pipe.send([frame_out, frame_id_out, aux_data_out])
+                data_src_out = cfg_dict["data_src"]
+                data_out_pipe.send([frame_out, frame_id_out, data_src_out, 
+                                    aux_data_out])
 
                 # this indicates we're getting "new frames" and should buffer them
                 if buf_frames_flag:

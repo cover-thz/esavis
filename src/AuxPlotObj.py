@@ -74,6 +74,8 @@ class AuxPlotObj(QWidget):
 
         # plot handles
         s.aux_main_plt_hndl = None
+        s.aux_pt_markers_hndl = None
+
         s.noise_plt_hndl_0 = None
         s.noise_plt_hndl_1 = None
         s.noise_floor_plt_hndl = None
@@ -99,8 +101,8 @@ class AuxPlotObj(QWidget):
         s.plot_handles = []
         s.labels_list = []
 
-    def aux_update(s, aux_data_in, new_frame_flag, local_cfg_params):
-        if new_frame_flag:
+    def aux_update(s, aux_data_in, new_frame_flag, loc_cfg_params):
+        if new_frame_flag and aux_data_in["data_valid"]:
             x_ind       = aux_data_in["x_ind"]
             y_ind       = aux_data_in["y_ind"]
             aux_az_val  = aux_data_in["aux_az_val"]
@@ -191,6 +193,21 @@ class AuxPlotObj(QWidget):
 
 
             ##################################################################
+            # main power spectrum x markers
+            label = "Pixel Power Spectrum [dB]"
+            if s.aux_pt_markers_hndl == None:
+                s.aux_pt_markers_hndl, = s.plt_axes.plot(range_lut_cm, 
+                    power_spectra_db, 'rx', label=label, linewidth=lw)
+
+            if loc_cfg_params["pt_mrkrs_en"]:
+                s.aux_pt_markers_hndl.set_data(range_lut_cm, power_spectra_db)
+
+            else:
+                s.aux_pt_markers_hndl.remove()
+                s.aux_pt_markers_hndl = None
+
+
+            ##################################################################
             # noise delimiters
             label = "Noise Floor Calc Delimiters"
             if s.noise_plt_hndl_0 == None:
@@ -200,7 +217,7 @@ class AuxPlotObj(QWidget):
                 s.noise_plt_hndl_1 = s.plt_axes.axvline(x=noise_val_end, 
                     color="magenta", label=label, linewidth=lw)
                             
-            if local_cfg_params["noise_delim_en"]:
+            if loc_cfg_params["noise_delim_en"]:
                 s.noise_plt_hndl_0.set_xdata([noise_val_start, noise_val_start])
                 s.noise_plt_hndl_1.set_xdata([noise_val_end, noise_val_end])
                 # ignore 1 so we don't get duplicate legends
@@ -226,7 +243,7 @@ class AuxPlotObj(QWidget):
                     linewidth=lw)
 
 
-            if local_cfg_params["noise_floor_en"]:
+            if loc_cfg_params["noise_floor_en"]:
                 s.noise_floor_plt_hndl.set_ydata([noise_floor_db, 
                     noise_floor_db])
                 s.plot_handles.append(s.noise_floor_plt_hndl)
@@ -244,7 +261,7 @@ class AuxPlotObj(QWidget):
                 s.threshold_plt_hndl = s.plt_axes.axhline(y=adj_thresh_db, 
                     color='b', linestyle='-', label=label, linewidth=lw)
 
-            if local_cfg_params["thresh_en"]:
+            if loc_cfg_params["thresh_en"]:
                 s.threshold_plt_hndl.set_ydata([adj_thresh_db, 
                     adj_thresh_db])
                 s.plot_handles.append(s.threshold_plt_hndl)
@@ -264,7 +281,7 @@ class AuxPlotObj(QWidget):
                     linewidth=lw)
 
 
-            if local_cfg_params["contr_en"]:
+            if loc_cfg_params["contr_en"]:
                 s.contrast_plt_hndl.set_ydata([adj_contr_db, 
                     adj_contr_db])
 
@@ -290,7 +307,7 @@ class AuxPlotObj(QWidget):
                     [front_peak_power_db], 'kp', markersize=14, 
                     label=label)
 
-            if local_cfg_params["front_peak_en"]:
+            if loc_cfg_params["front_peak_en"]:
                 s.front_peak_plt_hndl.set_data([front_peak_range], 
                     [front_peak_power_db])
                 s.plot_handles.append(s.front_peak_plt_hndl)
@@ -314,7 +331,7 @@ class AuxPlotObj(QWidget):
                     [back_peak_power_db], 'gp', markersize=14, 
                     label=label)
 
-            if local_cfg_params["back_peak_en"]:
+            if loc_cfg_params["back_peak_en"]:
                 s.back_peak_plt_hndl.set_data([back_peak_range], 
                     [back_peak_power_db])
                 s.plot_handles.append(s.back_peak_plt_hndl)
@@ -338,7 +355,7 @@ class AuxPlotObj(QWidget):
                 s.range_cut_plt_hndl_1 = s.plt_axes.axvline(x=max_range, 
                     color="black", label=label, linewidth=lw)
 
-            if local_cfg_params["range_cuts_en"]:
+            if loc_cfg_params["range_cuts_en"]:
                 s.range_cut_plt_hndl_0.set_xdata([min_range, min_range])
                 s.range_cut_plt_hndl_1.set_xdata([max_range, max_range])
                 s.plot_handles.append(s.range_cut_plt_hndl_0)
@@ -370,7 +387,7 @@ class AuxPlotObj(QWidget):
                     color="#6ed1cc", label=label, linewidth=lw)
 
 
-            if local_cfg_params["weight_sum_en"]:
+            if loc_cfg_params["weight_sum_en"]:
                 s.weight_sum_plt_hndl_0.set_xdata([weight_sum_start_range, 
                     weight_sum_start_range])
                 s.weight_sum_plt_hndl_1.set_xdata([weight_sum_end_range, 
@@ -394,7 +411,7 @@ class AuxPlotObj(QWidget):
             ##############################################################
             ##############################################################
             # legend
-            if local_cfg_params["legend_en"]:
+            if loc_cfg_params["legend_en"]:
                 s.legend = s.plt_axes.legend(s.plot_handles, s.labels_list)
             else:
                 legend = s.plt_axes.get_legend()

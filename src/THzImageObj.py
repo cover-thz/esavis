@@ -153,6 +153,14 @@ class THzImageObj(QHBoxLayout):
             x_val = position.x()
             y_val = position.y()
 
+            # need the size of a pixel in encoder counts
+            pix_az_len = np.abs(s.az_grid_1d[1] - s.az_grid_1d[0])
+            pix_el_len = np.abs(s.el_grid_1d[1] - s.el_grid_1d[0])
+
+            # need to increase the x and y values by half a pixel
+            x_val -= float(pix_az_len) / 2
+            y_val -= float(pix_el_len) / 2
+
             # grab the nearest indices
             az_ind = np.argmin(np.abs(s.az_grid_1d - x_val))
             el_ind = np.argmin(np.abs(s.el_grid_1d - y_val))
