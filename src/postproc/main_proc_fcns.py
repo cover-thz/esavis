@@ -294,6 +294,17 @@ class CoverProc:
                                 s.coarse_az_1d, s.coarse_el_1d,  s.xlen, 
                                 s.ylen)
 
+            if dbg_prof:
+                preamble_end = time.time_ns()
+                dur_ms = (preamble_end - preamble_start)/1e6
+            if dbg_prof:
+                update_grid_start = time.time_ns()
+            if dbg_prof:
+                update_grid_end = time.time_ns()
+ 
+ 
+ 
+
         s.r_grid_data   = r_grid_out
         s.r_grid_valids = valid_grid_out
         s.r_grid_az     = grid_az_out
