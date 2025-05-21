@@ -407,6 +407,21 @@ class SimpRadar:
             if turnaround_mode:
 
                 az_val_adj = az_val
+                # here we want to make sure that only the "true" edges
+                # of the image are checked, we want any overlap between
+                # the two channels to be preserved to minimize the likelihood
+                # of a gap in the center
+                # for now ch0 contains the largest encoder values, and ch1 
+                # contains the smallest encoder values
+                #min_ch = 1
+                #max_ch = 0
+                #channel_val_adj = channel_val
+
+                min_ch = True
+                max_ch = True
+                channel_val_adj = True
+
+               
                 #if channel_val == 0:
                 #    az_val_adj = az_val + ch0_offset
                 #else:
@@ -414,18 +429,22 @@ class SimpRadar:
 
                 if s.state == "RESET":
                     turn_flag = "RESET"
-                    if az_val_adj < (min_az - turn_hyst):
+                    if ((az_val_adj < (min_az - turn_hyst)) and 
+                            (channel_val_adj == min_ch)):
                         s.state = "TURNING_MIN"
-                    elif az_val_adj > (max_az + turn_hyst):
+                    elif ((az_val_adj > (max_az + turn_hyst)) and 
+                            (channel_val_adj == max_ch)):
                         s.state = "TURNING_MAX"
                     else:
                         s.state = "WAITING_FOR_TURN"
 
                 elif s.state == "WAITING_FOR_TURN":
                     turn_flag = "RESET"
-                    if az_val_adj < (min_az - turn_hyst):
+                    if ((az_val_adj < (min_az - turn_hyst)) and
+                            (channel_val_adj == min_ch)):
                         s.state = "TURNING_MIN"
-                    elif az_val_adj > (max_az + turn_hyst):
+                    elif ((az_val_adj > (max_az + turn_hyst)) and
+                            (channel_val_adj == max_ch)):
                         s.state = "TURNING_MAX"
 
                     # else: s.state stays the same
@@ -433,26 +452,30 @@ class SimpRadar:
                 elif s.state == "TURNING_MIN":
                     turn_flag = "RESET"
                     # start of frame
-                    if az_val_adj > (min_az + turn_hyst):
+                    if ((az_val_adj > (min_az + turn_hyst)) and
+                            (channel_val_adj == min_ch)):
                         s.state = "RUNNING_TO_MAX"
                         turn_flag = "START_FRAME"
 
                 elif s.state == "TURNING_MAX":
                     turn_flag = "RESET"
                     # start of frame
-                    if az_val_adj < (max_az - turn_hyst):
+                    if ((az_val_adj < (max_az - turn_hyst)) and
+                            (channel_val_adj == max_ch)):
                         s.state = "RUNNING_TO_MIN"
                         turn_flag = "START_FRAME"
 
                 elif s.state == "RUNNING_TO_MAX":
                     turn_flag = "RUNNING"
-                    if az_val_adj > (max_az + turn_hyst):
+                    if ((az_val_adj > (max_az + turn_hyst)) and
+                            (channel_val_adj == max_ch)):
                         s.state = "TURNING_MAX"
                         turn_flag = "END_FRAME"
 
                 elif s.state == "RUNNING_TO_MIN":
                     turn_flag = "RUNNING"
-                    if az_val_adj < (min_az - turn_hyst):
+                    if ((az_val_adj < (min_az - turn_hyst)) and
+                            (channel_val_adj == min_ch)):
                         s.state = "TURNING_MIN"
                         turn_flag = "END_FRAME"
 
