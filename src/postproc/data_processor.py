@@ -289,7 +289,6 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
                         time.sleep(0.01)
                     else:
                         buf_frame_id = cfg_dict["curr_frame_id"] 
-                        print(f"curr_frame_id = {buf_frame_id}")
                         coarse_grid_dict_in = frame_buffer[buf_frame_id]
                         #(frame_out, aux_data_out, new_frame_flag, frame_id_out, 
                         # coarse_grid_dict_out) = proc_obj.postproc_data(
@@ -524,7 +523,6 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
             # send frame
             if new_frame_flag:
                 data_src_out = cfg_dict["data_src"]
-                print(f"frame_id_out = {frame_id_out}")
                 data_out_pipe.send([frame_out, frame_id_out, data_src_out, 
                                     aux_data_out])
 
