@@ -138,7 +138,7 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
     proc_obj    = mpf.CoverProc()
 
     # Frame Buffer for holding frames for later reference
-    FRAME_BUF_MAX = 6
+    FRAME_BUF_MAX = 30
     frame_buffer = OrderedDict()
 
     # buffer containing data from most recent fileset
@@ -272,7 +272,13 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
             
             # This is essentially the "paused
             if cfg_dict["data_src"] == "use_buffer":
-                buf_frames_flag = False
+                # only reprocess the frame if something actually changed
+                # otherwise throw in a short pause and do nothing
+                if "reproc_buf" not in cfg_flags:
+                    time.sleep(0.005)
+                    continue
+ 
+                #buf_frames_flag = False
                 coarse_grid_ovr = True
                 turn_flag = "DISABLED"
                 reset_in_array = False
@@ -283,6 +289,7 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
                         time.sleep(0.01)
                     else:
                         buf_frame_id = cfg_dict["curr_frame_id"] 
+                        print(f"curr_frame_id = {buf_frame_id}")
                         coarse_grid_dict_in = frame_buffer[buf_frame_id]
                         #(frame_out, aux_data_out, new_frame_flag, frame_id_out, 
                         # coarse_grid_dict_out) = proc_obj.postproc_data(
@@ -477,8 +484,11 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
                     del ch_array
 
                 else:
-                    #if "reproc_fbuf" not in cfg_flags:
-                    #    continue
+                    # only reprocess the frame if something actually changed
+                    # otherwise throw in a short pause and do nothing
+                    if "reproc_buf" not in cfg_flags:
+                        time.sleep(0.005)
+                        continue
 
                     # grab the stored data of the most recent file and 
                     # re-process it
@@ -514,6 +524,7 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
             # send frame
             if new_frame_flag:
                 data_src_out = cfg_dict["data_src"]
+                print(f"frame_id_out = {frame_id_out}")
                 data_out_pipe.send([frame_out, frame_id_out, data_src_out, 
                                     aux_data_out])
 

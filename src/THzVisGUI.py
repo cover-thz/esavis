@@ -190,6 +190,8 @@ DFLT_CFG_DICT["aux_y_ind"] = 10
 DFLT_CFG_DICT["aux_az_val"] = -1
 DFLT_CFG_DICT["aux_el_val"] = -1
 
+DFLT_CFG_DICT["data0_fpath"] = None
+DFLT_CFG_DICT["data1_fpath"] = None
 
 
 # These values do not appear in the GUI yet
@@ -294,7 +296,7 @@ class MainWindow(QMainWindow):
         s.cfg_dict["flags"] = []
 
         # keys that indicate that a file should be reprocessed:
-        s.reproc_fbuf_keys = ["el_side_0_start","el_side_0_end",
+        s.reproc_buf_keys = ["el_side_0_start","el_side_0_end",
             "el_side_1_start","el_side_1_end","ylen","xlen","fft_len",
             "num_noise_pts","noise_start_frac","chirp_span","chirp_time",
             "dead_pix_val","fs_adc","el_offset0","el_offset1",
@@ -554,9 +556,9 @@ class MainWindow(QMainWindow):
 
             # check to see if anything changed that requires a reprocessing 
             # of the file buffer
-            for rf_key in s.reproc_fbuf_keys:
+            for rf_key in s.reproc_buf_keys:
                 if rf_key in cfg_dict_in.keys():
-                    s.append_if_absent(cfg_flags, "reproc_fbuf")
+                    s.append_if_absent(cfg_flags, "reproc_buf")
 
             # check to see if something significant enough chagned that the 
             # regridded rangelines of the file won't work anymore and the 
@@ -663,9 +665,9 @@ class MainWindow(QMainWindow):
         """
         if new_frame_flag:
             cfg_dict_update = OrderedDict()
-            if s.cfg_dict["data_src"] != "use_buffer":
-                cfg_dict_update["curr_frame_id"] = frame_id
-                s.update_config(cfg_dict_update)
+            #if s.cfg_dict["data_src"] != "use_buffer":
+            cfg_dict_update["curr_frame_id"] = frame_id
+            s.update_config(cfg_dict_update)
 
 
 

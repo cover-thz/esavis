@@ -178,8 +178,8 @@ class THzImageTab(QWidget):
         s.reset_camera_btn.clicked.connect(
             s.reset_camera_btn_clicked)
 
-        #s.frame_pause_btn.clicked.connect(
-        #    s.frame_pause_btn_clicked)
+        s.frame_pause_btn.clicked.connect(
+            s.frame_pause_btn_clicked)
 
 
         ####################################################################
@@ -311,6 +311,10 @@ class THzImageTab(QWidget):
             json.dump(cfg_dict, file)
 
     def frame_pause_btn_clicked(s):
+        # if the daq is providing data, then switch to "use buffer"
+        # otherwise this button does nothing
+        if s.cfg_dict["data_src"] == "daq":
+            s.use_buf_src_rbut.setChecked(True)
         #if not s.cfg_dict["paused"]:
         #    new_cfg_dict = OrderedDict()
         #    new_cfg_dict["paused"] = True
@@ -323,7 +327,7 @@ class THzImageTab(QWidget):
         #    #s.update_config(new_cfg_dict)
         #    s.update_config(new_cfg_dict, ["force_update"])
         #    s.frame_pause_btn.setText("Pause Capture")
-        pass
+        #pass
 
 
 
@@ -434,6 +438,7 @@ class THzImageTab(QWidget):
             plot_style = s.cfg_dict["plot_style"]
             data_fpath_0 = s.cfg_dict["data0_fpath"]
             data_fpath_1 = s.cfg_dict["data1_fpath"]
+            image_desc = s.ld_save_image_desc_ledit.text()
 
             # use the pixel 0 filename to generate the image file if pixel 0 is 
             # in the dataset
@@ -447,7 +452,7 @@ class THzImageTab(QWidget):
             fname = data_fpath.split("/")[-1]
             fprefix = fname[0:16]
             DFLT_DATA_DIR_unix = conv_fpath_to_unix(s.cfg_dict["default_data_dir"]) 
-            fpath = DFLT_DATA_DIR_unix + fprefix + image_desc + plot_style + ".png"
+            fpath = DFLT_DATA_DIR_unix + fprefix + image_desc + "__" + plot_style + ".png"
             s.thz_image_obj.save_cur_image(fpath, fprefix)
 
             msgbox = QMessageBox()
