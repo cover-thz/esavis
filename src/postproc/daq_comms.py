@@ -413,6 +413,7 @@ class SimpRadar:
                 # of a gap in the center
                 # for now ch0 contains the largest encoder values, and ch1 
                 # contains the smallest encoder values
+
                 #min_ch = 1
                 #max_ch = 0
                 #channel_val_adj = channel_val

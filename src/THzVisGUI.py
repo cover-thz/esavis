@@ -112,110 +112,112 @@ def sigint_handler(*_):
 # DEFAULT CONFIG SET
 ##############################################################################
 
-DFLT_CFG_DICT = OrderedDict()
-DFLT_CFG_DICT["el_side_0_start"] = 0
-DFLT_CFG_DICT["el_side_0_end"] = 0
-DFLT_CFG_DICT["el_side_1_start"] = 0
-DFLT_CFG_DICT["el_side_1_end"] = 0
 
-DFLT_CFG_DICT["ylen"] = 1 
-DFLT_CFG_DICT["xlen"] = 1
+def get_default_cfgs():
+    DFLT_CFG_DICT = OrderedDict()
+    DFLT_CFG_DICT["el_side_0_start"] = 0
+    DFLT_CFG_DICT["el_side_0_end"] = 0
+    DFLT_CFG_DICT["el_side_1_start"] = 0
+    DFLT_CFG_DICT["el_side_1_end"] = 0
 
-DFLT_CFG_DICT["fft_len"] = 1
-DFLT_CFG_DICT["num_noise_pts"] = 1
-DFLT_CFG_DICT["noise_start_frac"] = 0.
-DFLT_CFG_DICT["chirp_span"] = 0.
-DFLT_CFG_DICT["chirp_time"] = 0.
+    DFLT_CFG_DICT["ylen"] = 1 
+    DFLT_CFG_DICT["xlen"] = 1
 
-DFLT_CFG_DICT["dead_pix_val"] = 0.
-DFLT_CFG_DICT["fs_adc"] = 0.
+    DFLT_CFG_DICT["fft_len"] = 1
+    DFLT_CFG_DICT["num_noise_pts"] = 1
+    DFLT_CFG_DICT["noise_start_frac"] = 0.
+    DFLT_CFG_DICT["chirp_span"] = 0.
+    DFLT_CFG_DICT["chirp_time"] = 0.
 
-DFLT_CFG_DICT["el_offset0"] = 0.
-DFLT_CFG_DICT["el_offset1"] = 0.
+    DFLT_CFG_DICT["dead_pix_val"] = 0.
+    DFLT_CFG_DICT["fs_adc"] = 0.
 
-DFLT_CFG_DICT["center_rangeval"] = 0.
-DFLT_CFG_DICT["dec_val"] = 1
-DFLT_CFG_DICT["ch0_offset"] = 0.
-DFLT_CFG_DICT["ch1_offset"] = 0.
+    DFLT_CFG_DICT["el_offset0"] = 0.
+    DFLT_CFG_DICT["el_offset1"] = 0.
 
-DFLT_CFG_DICT["disable_el_side0"] = 0.
-DFLT_CFG_DICT["disable_el_side1"] = 0.
+    DFLT_CFG_DICT["center_rangeval"] = 0.
+    DFLT_CFG_DICT["dec_val"] = 1
+    DFLT_CFG_DICT["ch0_offset"] = 0.
+    DFLT_CFG_DICT["ch1_offset"] = 0.
 
-DFLT_CFG_DICT["calc_weighted_sum"] = True
-DFLT_CFG_DICT["ch0_en"] = True
-DFLT_CFG_DICT["ch1_en"] = True
+    DFLT_CFG_DICT["disable_el_side0"] = 0.
+    DFLT_CFG_DICT["disable_el_side1"] = 0.
 
-DFLT_CFG_DICT["data_format_in"] = "time_domain"
+    DFLT_CFG_DICT["calc_weighted_sum"] = True
+    DFLT_CFG_DICT["ch0_en"] = True
+    DFLT_CFG_DICT["ch1_en"] = True
 
-DFLT_CFG_DICT["turn_hyst"]  = 0.
-DFLT_CFG_DICT["turn_az_margin"]  = 0.
-DFLT_CFG_DICT["daq_num_rangelines"]  = 0
-DFLT_CFG_DICT["fraction_filled_thresh"]  = 0.1
-DFLT_CFG_DICT["save_image_desc"] = "NONE"
+    DFLT_CFG_DICT["data_format_in"] = "time_domain"
 
-DFLT_CFG_DICT["threshold_db"] = 0.
-DFLT_CFG_DICT["contrast_db"] = 0.
-DFLT_CFG_DICT["half_peak_width"] = 1
+    DFLT_CFG_DICT["turn_hyst"]  = 0.
+    DFLT_CFG_DICT["turn_az_margin"]  = 0.
+    DFLT_CFG_DICT["daq_num_rangelines"]  = 0
+    DFLT_CFG_DICT["fraction_filled_thresh"]  = 0.1
+    DFLT_CFG_DICT["save_image_desc"] = "NONE"
 
-DFLT_CFG_DICT["min_range"] = 0.
-DFLT_CFG_DICT["max_range"] = 7000.
+    DFLT_CFG_DICT["threshold_db"] = 0.
+    DFLT_CFG_DICT["contrast_db"] = 0.
+    DFLT_CFG_DICT["half_peak_width"] = 1
 
-DFLT_CFG_DICT["autoscale_color"] = False
-DFLT_CFG_DICT["color_scale_min"] = 0.
-DFLT_CFG_DICT["color_scale_max"] = 7000.
+    DFLT_CFG_DICT["min_range"] = 0.
+    DFLT_CFG_DICT["max_range"] = 7000.
 
-DFLT_CFG_DICT["min_az"] = 0.
-DFLT_CFG_DICT["max_az"] = 1.
-DFLT_CFG_DICT["min_el"] = 0.
-DFLT_CFG_DICT["max_el"] = 1.
+    DFLT_CFG_DICT["autoscale_color"] = False
+    DFLT_CFG_DICT["color_scale_min"] = 0.
+    DFLT_CFG_DICT["color_scale_max"] = 7000.
 
-DFLT_CFG_DICT["colormap"]        = "jet"
-DFLT_CFG_DICT["data_src"]        = "disabled"
-DFLT_CFG_DICT["plot_style"]      = "front_peak_range"
-DFLT_CFG_DICT["peak_selection"]  = "front"
-DFLT_CFG_DICT["fname_list"]  = None
-DFLT_CFG_DICT["paused"]     = False
-DFLT_CFG_DICT["invert_range"] = False
+    DFLT_CFG_DICT["min_az"] = 0.
+    DFLT_CFG_DICT["max_az"] = 1.
+    DFLT_CFG_DICT["min_el"] = 0.
+    DFLT_CFG_DICT["max_el"] = 1.
 
-# Visible light camera stuff
-DFLT_CFG_DICT["camera_x"] = -3920.0
-DFLT_CFG_DICT["camera_y"] = -1122.0
-DFLT_CFG_DICT["camera_h_scale"] = 11.0
-DFLT_CFG_DICT["camera_v_scale"] = 8.0
-DFLT_CFG_DICT["camera_step_int"] = 10
-DFLT_CFG_DICT["camera_opacity"] = 0.3
+    DFLT_CFG_DICT["colormap"]        = "jet"
+    DFLT_CFG_DICT["data_src"]        = "disabled"
+    DFLT_CFG_DICT["plot_style"]      = "front_peak_range"
+    DFLT_CFG_DICT["peak_selection"]  = "front"
+    DFLT_CFG_DICT["paused"]     = False
+    DFLT_CFG_DICT["invert_range"] = False
 
-DFLT_CFG_DICT["aux_x_ind"] = 10
-DFLT_CFG_DICT["aux_y_ind"] = 10
-DFLT_CFG_DICT["aux_az_val"] = -1
-DFLT_CFG_DICT["aux_el_val"] = -1
+    # Visible light camera stuff
+    DFLT_CFG_DICT["camera_x"] = -3920.0
+    DFLT_CFG_DICT["camera_y"] = -1122.0
+    DFLT_CFG_DICT["camera_h_scale"] = 11.0
+    DFLT_CFG_DICT["camera_v_scale"] = 8.0
+    DFLT_CFG_DICT["camera_step_int"] = 10
+    DFLT_CFG_DICT["camera_opacity"] = 0.3
 
-DFLT_CFG_DICT["data0_fpath"] = None
-DFLT_CFG_DICT["data1_fpath"] = None
+    DFLT_CFG_DICT["aux_x_ind"] = 10
+    DFLT_CFG_DICT["aux_y_ind"] = 10
+    DFLT_CFG_DICT["aux_az_val"] = -1
+    DFLT_CFG_DICT["aux_el_val"] = -1
 
-
-# These values do not appear in the GUI yet
-# so they are "hard-coded"
-DFLT_CFG_DICT["daq_timeout"]  = 2.
-DFLT_CFG_DICT["el_encoder_to_cm"]  = 16/500
-DFLT_CFG_DICT["az_encoder_to_cm"]  = 16/500
-DFLT_CFG_DICT["daq_addr"]  = "localhost"
-
-DFLT_CFG_DICT["data_src_ovr"] = "None"
-
-DFLT_CFG_DICT["flags"] = []
+    DFLT_CFG_DICT["data0_fpath"] = None
+    DFLT_CFG_DICT["data1_fpath"] = None
 
 
-# NOTE Debug dictionary objects for use with the debug tab
-DFLT_CFG_DICT["dbg_0"] = False
-DFLT_CFG_DICT["dbg_1"] = False
-DFLT_CFG_DICT["dbg_2"] = False
-DFLT_CFG_DICT["profiler"] = False
-#DFLT_CFG_DICT["daq_debug"] = False
-DFLT_CFG_DICT["daq_debug"] = True
-DFLT_CFG_DICT["acq_dbg"] = False
+    # These values do not appear in the GUI yet
+    # so they are "hard-coded"
+    DFLT_CFG_DICT["daq_timeout"]  = 2.
+    DFLT_CFG_DICT["el_encoder_to_cm"]  = 16/500
+    DFLT_CFG_DICT["az_encoder_to_cm"]  = 16/500
+    DFLT_CFG_DICT["daq_addr"]  = "localhost"
 
-DFLT_CFG_DICT["frame_update_dbg"] = False
+    DFLT_CFG_DICT["data_src_ovr"] = "None"
+
+    DFLT_CFG_DICT["flags"] = []
+
+
+    # NOTE Debug dictionary objects for use with the debug tab
+    DFLT_CFG_DICT["dbg_0"] = False
+    DFLT_CFG_DICT["dbg_1"] = False
+    DFLT_CFG_DICT["dbg_2"] = False
+    DFLT_CFG_DICT["profiler"] = False
+    #DFLT_CFG_DICT["daq_debug"] = False
+    DFLT_CFG_DICT["daq_debug"] = True
+    DFLT_CFG_DICT["acq_dbg"] = False
+
+    DFLT_CFG_DICT["frame_update_dbg"] = False
+    return DFLT_CFG_DICT
 
 
 ##############################################################################
@@ -258,6 +260,12 @@ class MainWindow(QMainWindow):
         s.last_update_time  = None
         s.lock_pipes = False
 
+        # hard-coded default configs
+        # used to construct the cfg_dict prior to loading the default file
+        # and to override defaults in any loaded config file that need 
+        # overriding
+        s.DFLT_CFG_DICT = get_default_cfgs()
+
         # Config data transfer handshaking flags
         s.cfg_pipe_count    = 0
         s.cfg_pipe_maxcount = 1
@@ -270,7 +278,17 @@ class MainWindow(QMainWindow):
         s.SLOW_UPDATES  = 3.0
         s.FAST_UPDATES  = 0.1
 
-        s.min_update_period     = s.NO_DAQ_PERIOD
+        # maximum length of time without a real frame coming through 
+        # before pushing an empty or "null" frame through the GUI to 
+        # update all the objects
+        s.max_null_frame_update_period     = s.NO_DAQ_PERIOD
+
+        # maximum length of time without a frame update when data source is 
+        # dat_file or use_buffer before forcing a frame update so we can 
+        # properly update all the GUI objects.
+        # NOTE TODO HERE 5/22/2025!!!! 
+        #s.max_buf_frame_update_period = 0.1
+        #s.last_buf_frame_update = time.time()
 
         # used for seeing the frame-to-frame "rate"
         s.prev_frame_time = None
@@ -291,7 +309,7 @@ class MainWindow(QMainWindow):
         s.layout = QVBoxLayout(s.central_widget)
 
         # Construct the default configuration dictionary
-        s.cfg_dict = copy.deepcopy(DFLT_CFG_DICT)
+        s.cfg_dict = copy.deepcopy(s.DFLT_CFG_DICT)
         s.cfg_dict["default_data_dir"] = DFLT_DATA_DIR
         s.cfg_dict["flags"] = []
 
@@ -322,6 +340,9 @@ class MainWindow(QMainWindow):
             "max_el"]
             
             
+        # these are the keys that are excluded from being saved to 
+        # config files and when loading config files
+        s.excluded_keys = ["data0_fpath", "data1_fpath"]
 
         # create the tab widget which contains pretty much the remainder of
         # the GUI objects
@@ -453,8 +474,17 @@ class MainWindow(QMainWindow):
         ret_val = False
         try:
             with open(fpath, "r", encoding="utf-8") as file:
-                cfg_dict = json.load(file, object_pairs_hook=OrderedDict)
-            s.update_config(cfg_dict)
+                cfg_dict_in = json.load(file, object_pairs_hook=OrderedDict)
+
+            # exclude the excluded keys
+            cfg_dict_out = OrderedDict()
+            for key in cfg_dict_in.keys():
+                if key not in s.excluded_keys:
+                    cfg_dict_out[key] = cfg_dict_in[key]
+                else:
+                    cfg_dict_out[key] = s.DFLT_CFG_DICT[key]
+            s.update_config(cfg_dict_out)
+
         except:
             print("load_config failed")
             ret_val = True
@@ -469,14 +499,23 @@ class MainWindow(QMainWindow):
 
 
 
-
     # central function that saves our config dict to a file
     def save_config(s, fpath):
         """
         saves a config file with the current configuration dictionary
+        excluding the excluded keys
         """
+        # exclude the excluded keys
+        cfg_dict_out = OrderedDict()
+        for key in s.cfg_dict.keys():
+            if key not in s.excluded_keys:
+                cfg_dict_out[key] = s.cfg_dict[key]
+            else:
+                cfg_dict_out[key] = s.DFLT_CFG_DICT[key]
+
         with open(fpath, 'w') as file:
-            json.dump(s.cfg_dict, file)
+            json.dump(cfg_dict_out, file)
+
 
     @staticmethod
     def append_if_absent(cfg_flags, new_flag):
@@ -551,8 +590,13 @@ class MainWindow(QMainWindow):
                 cfg_dict[key] = cfg_dict_in[key]
 
             # flag checks
-            if cfg_dict["fname_list"] != old_cfg_dict["fname_list"]:
+            if cfg_dict["data0_fpath"] != old_cfg_dict["data0_fpath"]:
                 s.append_if_absent(cfg_flags, "fname_changed")
+
+            # flag checks
+            elif cfg_dict["data1_fpath"] != old_cfg_dict["data1_fpath"]:
+                s.append_if_absent(cfg_flags, "fname_changed")
+
 
             # check to see if anything changed that requires a reprocessing 
             # of the file buffer
@@ -763,14 +807,12 @@ class MainWindow(QMainWindow):
                     if not s.daq_connected:
                         print(f"stat_id = {stat_id}")
                     s.daq_connected = True
-                    #s.min_update_period = s.DAQ_CONNECTED_PERIOD
                     s.main_thz_tab.update_data_src_status(stat_id)
                 else:
                     stat_id = "NOT_CONNECTED"
                     if s.daq_connected:
                         print(f"stat_id = {stat_id}")
                     s.daq_connected = False
-                    #s.min_update_period = s.NO_DAQ_PERIOD
                     s.main_thz_tab.update_data_src_status(stat_id)
             elif "CFG_ACK" in query_in_dict.keys():
                 s.cfg_pipe_count -= 1
@@ -789,19 +831,19 @@ class MainWindow(QMainWindow):
         # data_src, and the daq connection
         if s.cfg_dict["data_src"] == "daq":
             if s.daq_connected:
-                s.min_update_period = s.FAST_UPDATES 
+                s.max_null_frame_update_period = s.FAST_UPDATES 
             else:
-                s.min_update_period = s.SLOW_UPDATES 
+                s.max_null_frame_update_period = s.SLOW_UPDATES 
 
         elif s.cfg_dict["data_src"] == "use_buffer":
-            s.min_update_period = s.FAST_UPDATES 
+            s.max_null_frame_update_period = s.FAST_UPDATES 
 
 
         elif s.cfg_dict["data_src"] == "dat_file":
-            s.min_update_period = s.FAST_UPDATES 
+            s.max_null_frame_update_period = s.FAST_UPDATES 
 
         else: # "disabled" or others
-            s.min_update_period = s.SLOW_UPDATES 
+            s.max_null_frame_update_period = s.SLOW_UPDATES 
 
 
         if _dbg:
@@ -826,9 +868,9 @@ class MainWindow(QMainWindow):
         # 
         # first check if it's been a while
         if s.last_update_time != None:
-            if ((time.time() - s.last_update_time) > s.min_update_period):
+            if ((time.time() - s.last_update_time) > s.max_null_frame_update_period):
                 s.update_cfg_flag = True
-                s.update_config(None)
+                s.update_config(None, ["reproc_buf"])
                 s.frame_update(None, None, None, False)
 
         if _dbg:

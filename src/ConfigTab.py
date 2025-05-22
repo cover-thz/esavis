@@ -327,19 +327,15 @@ class ConfigTab(QScrollArea):
         if fpath:
             fpath = fix_data_path(fpath)
             cfg_dict_updates = collections.OrderedDict()
-            fname_list = []
             if channel==0:
                 cfg_dict_updates["data0_fpath"] = fpath
-                fname_list.append(fpath)
                 s.curr_loaded0_val_ledit.setText(str(fpath))
             elif channel==1:
                 cfg_dict_updates["data1_fpath"] = fpath
-                fname_list.append(fpath)
                 s.curr_loaded1_val_ledit.setText(str(fpath))
             else:
                 raise Exception("Invalid Channel")
 
-            cfg_dict_updates["fname_list"] = fname_list
             # update the configuration
             s.update_config(cfg_dict_updates, ["fname_changed"])
 
@@ -360,19 +356,15 @@ class ConfigTab(QScrollArea):
             if fpath:
                 fpath = fix_data_path(fpath)
                 cfg_dict_updates = collections.OrderedDict()
-                fname_list = []
                 if channel==0:
                     cfg_dict_updates["data0_fpath"] = fpath
-                    fname_list.append(fpath)
                     s.curr_loaded0_val_ledit.setText(str(fpath))
                 elif channel==1:
                     cfg_dict_updates["data1_fpath"] = fpath
-                    fname_list.append(fpath)
                     s.curr_loaded1_val_ledit.setText(str(fpath))
                 else:
                     raise Exception("Invalid Channel")
 
-                cfg_dict_updates["fname_list"] = fname_list
                 # update the configuration
                 s.update_config(cfg_dict_updates, ["fname_changed"])
 

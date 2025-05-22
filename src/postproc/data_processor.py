@@ -425,7 +425,9 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
                     
 
             elif cfg_dict["data_src"] == "dat_file":
-                if cfg_dict["fname_list"] == None:
+
+                if ((cfg_dict["data0_fpath"] == None) and 
+                    (cfg_dict["data1_fpath"] == None)):
                     time.sleep(0.01)
                     continue
 
@@ -434,16 +436,16 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
                    (file_params["buf_initialized"] == False) or
                    ("reload_file" in cfg_flags)):
 
-                    if "fname_list" not in cfg_dict.keys():
-                        error_pipe.send("FNAME_LIST_EMPTY")
-                        continue
-
                     query_out_dict = OrderedDict()
                     query_out_dict["FILE_PROCESSING"] = True
                     query_out_pipe.send(query_out_dict)
 
                     fs_adc = cfg_dict["fs_adc"]
-                    fname_list = cfg_dict["fname_list"]
+                    fname_list = []
+                    if cfg_dict["data0_fpath"] != None:
+                        fname_list.append(cfg_dict["data0_fpath"])
+                    if cfg_dict["data1_fpath"] != None:
+                        fname_list.append(cfg_dict["data1_fpath"])
 
                     # grab the initial file data
                     # this can produce a massive amount of memory usage
@@ -463,24 +465,38 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
 
                     # process the file directly and store the resulting 
                     # coarse grid in the file buffer
-                    coarse_grid_ovr = False
-                    coarse_grid_dict_in = None
-                    reset_in_array = False
-                    (frame_out, aux_data_out, new_frame_flag, frame_id_out, 
-                     file_coarse_grid_dict) = proc_obj.postproc_data(
-                                         rangelines_array, 
-                                         az_array, el_array, ch_array, 
-                                         turn_flag, reset_in_array, 
-                                         cfg_dict, cfg_flags, file_params, 
-                                         update_id, coarse_grid_dict_in, 
-                                         coarse_grid_ovr, dbg_prof)
-                    
-                    # delete these objects to minimize memory consumption
-                    # when the files are massive 
-                    del rangelines_array
-                    del el_array
-                    del az_array
-                    del ch_array
+                    try:
+                        coarse_grid_ovr = False
+                        coarse_grid_dict_in = None
+                        reset_in_array = False
+                        (frame_out, aux_data_out, new_frame_flag, frame_id_out, 
+                         file_coarse_grid_dict) = proc_obj.postproc_data(
+                                             rangelines_array, 
+                                             az_array, el_array, ch_array, 
+                                             turn_flag, reset_in_array, 
+                                             cfg_dict, cfg_flags, file_params, 
+                                             update_id, coarse_grid_dict_in, 
+                                             coarse_grid_ovr, dbg_prof)
+                        
+                        # delete these objects to minimize memory consumption
+                        # when the files are massive 
+                        del rangelines_array
+                        del el_array
+                        del az_array
+                        del ch_array
+
+                    except Exception as err_file_postproc:
+                        print(err_file_postproc)
+                        print("got to err_file_postproc")
+                        ipdb.set_trace()
+                        print("")
+                        print("")
+                        print("")
+                        print("")
+                        print("")
+
+
+
 
                 else:
                     # only reprocess the frame if something actually changed
