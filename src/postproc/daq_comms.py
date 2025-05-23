@@ -68,7 +68,7 @@ class SimpRadar:
         s.tot_rangelines    = 0
         s.en_channels       = []
         s.cdh_msg_id        = 0
-        s.acq_timeout       = 10.0
+        s.acq_timeout       = 15.0
 
         # buffer of radar data samples
         s.rangeline_buffer = None
@@ -85,6 +85,11 @@ class SimpRadar:
 
         s.constr_acq_proc()
         s.prev_chunk_count = -1
+        
+        # debug
+        s.DBG_min_az = 0
+        s.DBG_max_az = 0
+        s.DBG_minmax_rng = 7 
     
     # construct the aquisition process 
     def constr_acq_proc(s):
@@ -196,6 +201,7 @@ class SimpRadar:
         return s.daq_connected
 
     def get_true_conn_status(s):
+        #print(f"Querying DAQ Core....")
         status = s.ack_cdh_handshake_trans("CONN_STATUS", None) 
         # update the daq_connected variable
         s.daq_connected = status
@@ -203,7 +209,14 @@ class SimpRadar:
 
 
     def disconnect(s):
-        ack = s.ack_cdh_handshake_trans("DISCONNECT", None)
+        if s.get_conn_status():
+            ack = s.ack_cdh_handshake_trans("DISCONNECT", None)
+            
+            # if we get a "true" back that means the dissconnect was 
+            # successful
+            if ack:
+                s.daq_connected = False
+
     
 
     # need to call this at the beginning and whenever we change the number of 
@@ -264,14 +277,11 @@ class SimpRadar:
     # of changes, but the method by which reangelines are iterated through
     # to detect turnaround is inefficient now that we grab many rangelines
     # at once
-    def get_daq_data(s, num_rangelines, turnaround_mode, turn_hyst, min_az_in, 
-                     max_az_in, ch0_offset, ch1_offset, timeout=3, debug=False):
+    def get_daq_data(s, num_rangelines, turnaround_mode, turn_hyst, min_az, 
+                     max_az, ch0_offset, ch1_offset, timeout=3, debug=False):
                                               
         start_time = time.time()
 
-        min_az = min_az_in + ch0_offset
-        max_az = max_az_in + ch1_offset
-        
         if not turnaround_mode:
             s.state = "RESET"
             turn_flag = "DISABLED"
@@ -339,7 +349,6 @@ class SimpRadar:
                     print("num_rangelines reached")
                     break
 
-
             # this is if there's a timeout
             if time.time() - start_time > timeout:
                 turn_flag = "DISABLED" 
@@ -406,22 +415,25 @@ class SimpRadar:
             # edges
             if turnaround_mode:
 
+                """
+                if az_val < s.DBG_min_az:
+                    s.DBG_min_az = az_val
+
+                elif az_val > s.DBG_max_az:
+                    s.DBG_max_az = az_val
+
+
+                if prev_az != az_val:
+                    prev_az = az_val
+                    if az_val > s.DBG_max_az - s.DBG_minmax_rng:
+                        print(f"az_val = {az_val}")
+                    
+                    elif az_val < s.DBG_min_az + s.DBG_minmax_rng:
+                        print(f"az_val = {az_val}")
+                """
+
+
                 az_val_adj = az_val
-                # here we want to make sure that only the "true" edges
-                # of the image are checked, we want any overlap between
-                # the two channels to be preserved to minimize the likelihood
-                # of a gap in the center
-                # for now ch0 contains the largest encoder values, and ch1 
-                # contains the smallest encoder values
-
-                #min_ch = 1
-                #max_ch = 0
-                #channel_val_adj = channel_val
-
-                min_ch = True
-                max_ch = True
-                channel_val_adj = True
-
                
                 #if channel_val == 0:
                 #    az_val_adj = az_val + ch0_offset
@@ -430,22 +442,18 @@ class SimpRadar:
 
                 if s.state == "RESET":
                     turn_flag = "RESET"
-                    if ((az_val_adj < (min_az - turn_hyst)) and 
-                            (channel_val_adj == min_ch)):
+                    if az_val_adj < (min_az - turn_hyst):
                         s.state = "TURNING_MIN"
-                    elif ((az_val_adj > (max_az + turn_hyst)) and 
-                            (channel_val_adj == max_ch)):
+                    elif az_val_adj > (max_az + turn_hyst):
                         s.state = "TURNING_MAX"
                     else:
                         s.state = "WAITING_FOR_TURN"
 
                 elif s.state == "WAITING_FOR_TURN":
                     turn_flag = "RESET"
-                    if ((az_val_adj < (min_az - turn_hyst)) and
-                            (channel_val_adj == min_ch)):
+                    if az_val_adj < (min_az - turn_hyst):
                         s.state = "TURNING_MIN"
-                    elif ((az_val_adj > (max_az + turn_hyst)) and
-                            (channel_val_adj == max_ch)):
+                    elif az_val_adj > (max_az + turn_hyst):
                         s.state = "TURNING_MAX"
 
                     # else: s.state stays the same
@@ -453,30 +461,26 @@ class SimpRadar:
                 elif s.state == "TURNING_MIN":
                     turn_flag = "RESET"
                     # start of frame
-                    if ((az_val_adj > (min_az + turn_hyst)) and
-                            (channel_val_adj == min_ch)):
+                    if az_val_adj > (min_az + turn_hyst):
                         s.state = "RUNNING_TO_MAX"
                         turn_flag = "START_FRAME"
 
                 elif s.state == "TURNING_MAX":
                     turn_flag = "RESET"
                     # start of frame
-                    if ((az_val_adj < (max_az - turn_hyst)) and
-                            (channel_val_adj == max_ch)):
+                    if az_val_adj < (max_az - turn_hyst):
                         s.state = "RUNNING_TO_MIN"
                         turn_flag = "START_FRAME"
 
                 elif s.state == "RUNNING_TO_MAX":
                     turn_flag = "RUNNING"
-                    if ((az_val_adj > (max_az + turn_hyst)) and
-                            (channel_val_adj == max_ch)):
+                    if az_val_adj > (max_az + turn_hyst):
                         s.state = "TURNING_MAX"
                         turn_flag = "END_FRAME"
 
                 elif s.state == "RUNNING_TO_MIN":
                     turn_flag = "RUNNING"
-                    if ((az_val_adj < (min_az - turn_hyst)) and
-                            (channel_val_adj == min_ch)):
+                    if az_val_adj < (min_az - turn_hyst):
                         s.state = "TURNING_MIN"
                         turn_flag = "END_FRAME"
 

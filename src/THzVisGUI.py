@@ -155,6 +155,9 @@ def get_default_cfgs():
     DFLT_CFG_DICT["fraction_filled_thresh"]  = 0.1
     DFLT_CFG_DICT["save_image_desc"] = "NONE"
 
+    DFLT_CFG_DICT["turn_min_az"]    = -205
+    DFLT_CFG_DICT["turn_max_az"]    = 205
+
     DFLT_CFG_DICT["threshold_db"] = 0.
     DFLT_CFG_DICT["contrast_db"] = 0.
     DFLT_CFG_DICT["half_peak_width"] = 1

@@ -200,6 +200,9 @@ class THzImageTab(QWidget):
         s.tot_frac_fs_ledit.setText(str(cfg_dict["fraction_filled_thresh"])) 
         s.ld_save_image_desc_ledit.setText(str(cfg_dict["save_image_desc"])) 
 
+        s.turn_min_az_ledit.setText(str(cfg_dict["turn_min_az"])) 
+        s.turn_max_az_ledit.setText(str(cfg_dict["turn_max_az"])) 
+
         s.thresh_ledit.setText(str(cfg_dict["threshold_db"])) 
         s.contr_ledit.setText(str(cfg_dict["contrast_db"]) )
         s.pkwdth_ledit.setText(str(cfg_dict["half_peak_width"]))
@@ -505,39 +508,45 @@ class THzImageTab(QWidget):
     def update_data_src_status(s, stat_id):
         #print(f"got here with {stat_id}")
         if s.cfg_dict["data_src"] == "daq":
-            style_options = "background-color: gray; color: white"
-            s.file_status_ledit.setStyleSheet(style_options)
-            s.file_status_ledit.setText("INACTIVE")
+            #style_options = "background-color: gray; color: white"
+            #s.file_status_ledit.setStyleSheet(style_options)
+            #s.file_status_ledit.setText("INACTIVE")
 
             if stat_id == "NOT_CONNECTED":
                 style_options = "background-color: yellow; color: black"
-                s.daq_status_ledit.setStyleSheet(style_options)
-                s.daq_status_ledit.setText("CONNECTING...")
+                s.data_src_status_ledit.setStyleSheet(style_options)
+                s.data_src_status_ledit.setText("CONNECTING TO DAQ...")
             elif stat_id == "CONNECTED":
                 style_options = "background-color: green; color: white"
-                s.daq_status_ledit.setStyleSheet(style_options)
-                s.daq_status_ledit.setText("CONNECTED")
+                s.data_src_status_ledit.setStyleSheet(style_options)
+                s.data_src_status_ledit.setText("DAQ CONNECTED")
         elif s.cfg_dict["data_src"] == "dat_file":
-            style_options = "background-color: gray; color: white"
-            s.daq_status_ledit.setStyleSheet(style_options)
-            s.daq_status_ledit.setText("INACTIVE")
+            #style_options = "background-color: gray; color: white"
+            #s.data_src_status_ledit.setStyleSheet(style_options)
+            #s.data_src_status_ledit.setText("INACTIVE")
 
             if stat_id == "PROC_FILE":
                 style_options = "background-color: yellow; color: black"
-                s.file_status_ledit.setStyleSheet(style_options)
-                s.file_status_ledit.setText("PROCESSING FILE...")
+                s.data_src_status_ledit.setStyleSheet(style_options)
+                s.data_src_status_ledit.setText("PROCESSING FILE...")
             elif stat_id == "FILE_PROC":
                 style_options = "background-color: green; color: white"
-                s.file_status_ledit.setStyleSheet(style_options)
-                s.file_status_ledit.setText("FILE PROCESSED")
+                s.data_src_status_ledit.setStyleSheet(style_options)
+                s.data_src_status_ledit.setText("FILE PROCESSED")
+
+        elif s.cfg_dict["data_src"] == "use_buffer":
+            style_options = "background-color: green; color: white"
+            s.data_src_status_ledit.setStyleSheet(style_options)
+            s.data_src_status_ledit.setText("MOST RECENT FRAME")
 
 
+        elif s.cfg_dict["data_src"] == "disabled":
+            style_options = "background-color: gray; color: white"
+            s.data_src_status_ledit.setStyleSheet(style_options)
+            s.data_src_status_ledit.setText("DISABLED")
 
         else:
             print("Warning: unknown data_src value")
-
-
-
 
 
 

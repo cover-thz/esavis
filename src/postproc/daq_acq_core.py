@@ -491,10 +491,11 @@ def main_acq_loop(cdh_queue_in, cdh_queue_out, data_queue):
                     cdh_queue_out.put(new_dict_out)
 
                 elif "DISCONNECT" in command_keys:
+                    print("daq_acq_core Disconnecting...")
                     (msg_id, _) = command_in["DISCONNECT"] 
                     daq_sock.close()
                     new_dict_out = OrderedDict()
-                    new_dict_out["DISCONNECT"] = (msg_id, None)
+                    new_dict_out["DISCONNECT"] = (msg_id, True)
                     #cdh_pipe_out.send(new_dict_out)
                     cdh_queue_out.put(new_dict_out)
 

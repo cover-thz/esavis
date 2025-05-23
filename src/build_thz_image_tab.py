@@ -132,15 +132,15 @@ def build_thz_image_tab(thz_img_tab):
 
     # src_tab_sublayout_row2
     src_tab_sublayout_row2 = QHBoxLayout()
-    daq_status_lbl = QLabel("DAQ Status: ")
-    daq_status_ledit = QLineEdit()
-    daq_status_ledit.setFixedWidth(170)
-    daq_status_ledit.setReadOnly(True)
+    data_src_status_lbl = QLabel("DAQ Status: ")
+    data_src_status_ledit = QLineEdit()
+    data_src_status_ledit.setFixedWidth(170)
+    data_src_status_ledit.setReadOnly(True)
 
-    src_tab_sublayout_row2.addWidget(daq_status_lbl)
-    src_tab_sublayout_row2.addWidget(daq_status_ledit)
+    src_tab_sublayout_row2.addWidget(data_src_status_lbl)
+    src_tab_sublayout_row2.addWidget(data_src_status_ledit)
 
-    # src_tab_sublayout_row3
+    # src_tab_sublayout_row3 [NOTE UNUSED]
     src_tab_sublayout_row3 = QHBoxLayout()
     file_status_lbl = QLabel("File Status: ")
     file_status_ledit = QLineEdit()
@@ -154,7 +154,7 @@ def build_thz_image_tab(thz_img_tab):
     src_tab_top_layout.addLayout(src_tab_sublayout_row1)
     src_tab_top_layout.addLayout(src_tab_sublayout_row1pt5)
     src_tab_top_layout.addLayout(src_tab_sublayout_row2)
-    src_tab_top_layout.addLayout(src_tab_sublayout_row3)
+    #src_tab_top_layout.addLayout(src_tab_sublayout_row3)
 
     # Add member variables
     # (not adding the sublayouts because we probably don't need them)
@@ -163,7 +163,7 @@ def build_thz_image_tab(thz_img_tab):
     thz_img_tab.daq_src_rbut        = daq_src_rbut
     thz_img_tab.disabled_src_rbut   = disabled_src_rbut
     thz_img_tab.use_buf_src_rbut    = use_buf_src_rbut
-    thz_img_tab.daq_status_ledit    = daq_status_ledit
+    thz_img_tab.data_src_status_ledit    = data_src_status_ledit
     thz_img_tab.file_status_ledit   = file_status_ledit
     thz_img_tab.src_tab_top_layout  = src_tab_top_layout
 
@@ -333,6 +333,28 @@ def build_thz_image_tab(thz_img_tab):
     frame_style_sublayout_row4pt1.addWidget(daq_num_rng_fs_ledit)
 
 
+    # frame_style_sublayout_row4pt2
+    frame_style_sublayout_row4pt2  = QHBoxLayout()
+    turn_min_az_lbl         = QLabel("Turnaround Az Min: ")
+    turn_min_az_ledit       = QLineEdit()
+
+    turn_max_az_lbl         = QLabel("    Turnaround Az Max: ")
+    turn_max_az_ledit       = QLineEdit()
+
+    frame_style_sublayout_row4pt2.addWidget(turn_min_az_lbl)
+    frame_style_sublayout_row4pt2.addWidget(turn_min_az_ledit)
+
+    frame_style_sublayout_row4pt2.addWidget(turn_max_az_lbl)
+    frame_style_sublayout_row4pt2.addWidget(turn_max_az_ledit)
+
+    # frame_style_sublayout_row4pt3
+    frame_style_sublayout_row4pt3  = QHBoxLayout()
+    turn_az_note_string = "Turnaround Az vals are in unadjusted\n motor "
+    turn_az_note_string += "encoder units"
+    turn_az_note_lbl = QLabel(turn_az_note_string)
+    frame_style_sublayout_row4pt3.addWidget(turn_az_note_lbl)
+
+
     # frame_style_sublayout_row5
     frame_style_sublayout_row5  = QHBoxLayout()
     frac_fs_lbl                 = QLabel("*Between 0 and 1")
@@ -344,6 +366,8 @@ def build_thz_image_tab(thz_img_tab):
     frame_style_tab_top_layout.addLayout(frame_style_sublayout_row3)
     frame_style_tab_top_layout.addLayout(frame_style_sublayout_row4)
     frame_style_tab_top_layout.addLayout(frame_style_sublayout_row4pt1)
+    frame_style_tab_top_layout.addLayout(frame_style_sublayout_row4pt2)
+    frame_style_tab_top_layout.addLayout(frame_style_sublayout_row4pt3)
     frame_style_tab_top_layout.addLayout(frame_style_sublayout_row5)
 
     # Add member variables
@@ -364,6 +388,14 @@ def build_thz_image_tab(thz_img_tab):
     thz_img_tab.pix_frac_fs_rbut = pix_frac_fs_rbut
     thz_img_tab.tot_frac_fs_lbl = tot_frac_fs_lbl
     thz_img_tab.tot_frac_fs_ledit = tot_frac_fs_ledit
+
+    thz_img_tab.turn_min_az_lbl     = turn_min_az_lbl
+    thz_img_tab.turn_min_az_ledit   = turn_min_az_ledit
+
+    thz_img_tab.turn_max_az_lbl     = turn_max_az_lbl
+    thz_img_tab.turn_max_az_ledit   = turn_max_az_ledit
+    thz_img_tab.turn_az_note_lbl = turn_az_note_lbl
+
     thz_img_tab.frac_fs_lbl = frac_fs_lbl
 
     # final piece
@@ -801,6 +833,16 @@ class setup_thz_tab_callbacks:
             lambda: s.ledit_update(thz_tab.ld_save_image_desc_ledit, 
             "save_image_desc", str))
 
+        thz_tab.turn_min_az_ledit.editingFinished.connect(
+            lambda: s.ledit_update(thz_tab.turn_min_az_ledit, 
+            "turn_min_az", float))
+
+        thz_tab.turn_max_az_ledit.editingFinished.connect(
+            lambda: s.ledit_update(thz_tab.turn_max_az_ledit, 
+            "turn_max_az", float))
+
+
+
         # Setting the signal to textChanged for the slider bound line edits
         # for now
         thz_tab.thresh_ledit.textChanged.connect(
@@ -858,10 +900,15 @@ class setup_thz_tab_callbacks:
             lambda: s.rbut_update(thz_tab.disabled_src_rbut, 
             "disabled", "data_src"))
 
+        thz_tab.disabled_src_rbut.toggled.connect(
+            lambda: thz_tab.update_data_src_status("DISABLED"))
 
         thz_tab.use_buf_src_rbut.toggled.connect(
             lambda: s.rbut_update(thz_tab.use_buf_src_rbut, 
             "use_buffer", "data_src"))
+
+        thz_tab.use_buf_src_rbut.toggled.connect(
+            lambda: thz_tab.update_data_src_status("USE BUFFER"))
 
 
         thz_tab.front_peak_rbut.toggled.connect(
