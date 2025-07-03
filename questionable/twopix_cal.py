@@ -57,7 +57,7 @@ def create_cal_file(dat_fpath, dflt_out_fname, cal_dir):
 
     fidlist = [dat_fpath]
     rdat = parse_data(fidlist)
-    use_all_rangelines = True
+    use_all_rangelines = False
 
     if use_all_rangelines:
         # average across all data collected
