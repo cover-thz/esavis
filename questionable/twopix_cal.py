@@ -68,10 +68,12 @@ def create_cal_file(dat_fpath, dflt_out_fname, cal_dir):
     # pre-normalize it (uncertain if this step is necessary)
     cal_wf /= np.abs(cal_wf).max()
     zero_inds = np.where(cal_wf == 0)
+    cal_wf[zero_inds] = 1 # get rid of undefined values
     cal_wf = 1/cal_wf
     # zero out start and end values
     cal_wf[0:20] = 0
     cal_wf[-20:-1] = 0
+
 
     # apply hann window
     cal_wf *= hann(len(cal_wf))
@@ -80,7 +82,6 @@ def create_cal_file(dat_fpath, dflt_out_fname, cal_dir):
 
     # actually normalize here
     cal_wf /= np.abs(cal_wf).max()
-    cal_wf[zero_inds] = 1 # get rid of undefined values
 
     dest_file = cal_dir + source_file_wo_ext + "_cal.bin"
     default_out_fpath = cal_dir + dflt_out_fname
