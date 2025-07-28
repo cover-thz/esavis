@@ -40,10 +40,10 @@ if __name__ == '__main__':
     CWD = os.getcwd() 
     if os.name == "nt":
         c_funcs_dir = CWD + "\\postproc\\c_funcs"
-        result = subprocess.run(["make"], cwd=c_funcs_dir)
+        #result = subprocess.run(["make"], cwd=c_funcs_dir)
     elif os.name == "posix":
         c_funcs_dir = CWD + "/postproc/c_funcs"
-        result = subprocess.run(["make"], cwd=c_funcs_dir)
+        #result = subprocess.run(["make"], cwd=c_funcs_dir)
     else:
         raise Exception("Invalid OS Name")
 

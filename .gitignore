@@ -82,6 +82,7 @@ src/config/old/
 # virtual environment directories
 venv/
 lite_venv/
+testvenv/
 
 # ignore all config files
 src/config/*.json
