@@ -285,9 +285,35 @@ class THzImageObj(QHBoxLayout):
                 color_min = cfg_dict["color_scale_min"]
                 color_max = cfg_dict["color_scale_max"]
             else:
+                #flat_img = s.pixel_grid_nans.flatten()
+                #color_min = np.nanmin(flat_img)
+                #color_max = np.nanmax(flat_img)
+
                 flat_img = s.pixel_grid_nans.flatten()
-                color_min = np.nanmin(flat_img)
-                color_max = np.nanmax(flat_img)
+                
+                # knock off the top and and bottom 10% before calculating 
+                # average value
+                min_ind = int(len(flat_image)*0.10)
+                max_ind = int(len(flat_image)*0.90)
+                
+                flat_img = np.sort(flat_img)
+
+                # knock off the top and bottommost pixels 
+                flat_img = flat_img[min_ind:max_ind]
+
+                avg_val = flat_img.median()
+                #color_min = np.nanmin(flat_img)
+                #color_max = np.nanmax(flat_img)
+
+                color_max = avg_val + 12 
+                color_min = avg_val - 12 
+                print(f"color_max = {color_max}")
+                print(f"color_min = {color_min}")
+
+
+
+
+
 
 
                 #print(f"color_min = {color_min}")
@@ -353,27 +379,8 @@ class THzImageObj(QHBoxLayout):
             color_max = s.cfg_dict["color_scale_max"]
         else:
             flat_img = s.pixel_grid_nans.flatten()
-            
-            # knock off the top and and bottom 10% before calculating 
-            # average value
-            min_ind = int(len(flat_image)*0.15)
-            max_ind = int(len(flat_image)*0.85)
-            
-            flat_img = np.sort(flat_img)
-
-            # knock off the top and bottommost pixels 
-            flat_img = flat_img[min_ind:max_ind]
-
-            avg_val = flat_img.median()
-            #color_min = np.nanmin(flat_img)
-            #color_max = np.nanmax(flat_img)
-
-            color_max = avg_val + 5
-            color_min = avg_val - 5
-            print(f"color_max = {color_max}")
-            print(f"color_min = {color_min}")
-
-
+            color_min = np.nanmin(flat_img)
+            color_max = np.nanmax(flat_img)
 
         plot_style = cfg_dict["plot_style"]
         cmap_str   = cfg_dict["colormap"]
