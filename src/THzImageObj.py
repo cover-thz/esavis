@@ -285,16 +285,20 @@ class THzImageObj(QHBoxLayout):
                 color_min = cfg_dict["color_scale_min"]
                 color_max = cfg_dict["color_scale_max"]
             else:
+                flat_img = s.pixel_grid_nans.flatten()
+                #color_min = np.nanmin(flat_img)
+                #color_max = np.nanmax(flat_img)
+
                 #flat_img = s.pixel_grid_nans.flatten()
                 #color_min = np.nanmin(flat_img)
                 #color_max = np.nanmax(flat_img)
 
-                flat_img = s.pixel_grid_nans.flatten()
+                #flat_img = s.pixel_grid_nans.flatten()
                 
                 # knock off the top and and bottom 10% before calculating 
                 # average value
-                min_ind = int(len(flat_image)*0.10)
-                max_ind = int(len(flat_image)*0.90)
+                min_ind = int(len(flat_img)*0.10)
+                max_ind = int(len(flat_img)*0.90)
                 
                 flat_img = np.sort(flat_img)
 
@@ -309,9 +313,6 @@ class THzImageObj(QHBoxLayout):
                 color_min = avg_val - 12 
                 print(f"color_max = {color_max}")
                 print(f"color_min = {color_min}")
-
-
-
 
 
 
