@@ -353,8 +353,14 @@ class THzImageObj(QHBoxLayout):
             color_max = s.cfg_dict["color_scale_max"]
         else:
             flat_img = s.pixel_grid_nans.flatten()
-            color_min = np.nanmin(flat_img)
-            color_max = np.nanmax(flat_img)
+            avg_val = flat_img.mean()
+            #color_min = np.nanmin(flat_img)
+            #color_max = np.nanmax(flat_img)
+
+            color_min = avg_val - 13
+            color_max = avg_val + 13
+
+
 
         plot_style = cfg_dict["plot_style"]
         cmap_str   = cfg_dict["colormap"]
