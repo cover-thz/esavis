@@ -312,8 +312,8 @@ class THzImageObj(QHBoxLayout):
 
                 color_max = avg_val + 12 
                 color_min = avg_val - 12 
-                print(f"color_max = {color_max}")
-                print(f"color_min = {color_min}")
+                #print(f"color_max = {color_max}")
+                #print(f"color_min = {color_min}")
 
 
 
