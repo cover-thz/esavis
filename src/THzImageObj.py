@@ -305,7 +305,8 @@ class THzImageObj(QHBoxLayout):
                 # knock off the top and bottommost pixels 
                 flat_img = flat_img[min_ind:max_ind]
 
-                avg_val = flat_img.median()
+                #avg_val = flat_img.mean()
+                avg_val = np.nanmean(flat_img)
                 #color_min = np.nanmin(flat_img)
                 #color_max = np.nanmax(flat_img)
 
