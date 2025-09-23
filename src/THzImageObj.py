@@ -356,20 +356,20 @@ class THzImageObj(QHBoxLayout):
             
             # knock off the top and and bottom 10% before calculating 
             # average value
-            min_ind = int(len(flat_image)*0.05)
-            max_ind = int(len(flat_image)*0.95)
+            min_ind = int(len(flat_image)*0.15)
+            max_ind = int(len(flat_image)*0.85)
             
             flat_img = np.sort(flat_img)
 
             # knock off the top and bottommost pixels 
             flat_img = flat_img[min_ind:max_ind]
 
-            #avg_val = flat_img.median()
-            color_min = np.nanmin(flat_img)
+            avg_val = flat_img.median()
+            #color_min = np.nanmin(flat_img)
             #color_max = np.nanmax(flat_img)
 
-            color_max = color_min + 20
-            color_min = color_min - 2
+            color_max = avg_val + 5
+            color_min = avg_val - 5
 
 
 
