@@ -359,7 +359,7 @@ class THzImageObj(QHBoxLayout):
             min_ind = int(len(flat_image)*0.1)
             max_ind = int(len(flat_image)*0.9)
             
-            np.sort(flat_img)
+            flat_img = np.sort(flat_img)
             flat_img = flat_img[min_ind:max_ind]
 
             avg_val = flat_img.mean()
