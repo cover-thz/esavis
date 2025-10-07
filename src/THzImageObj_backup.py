@@ -310,7 +310,7 @@ class THzImageObj(QHBoxLayout):
                 #color_min = np.nanmin(flat_img)
                 #color_max = np.nanmax(flat_img)
 
-                color_max = avg_val + 12
+                color_max = avg_val + 12 
                 color_min = avg_val - 12 
                 #print(f"color_max = {color_max}")
                 #print(f"color_min = {color_min}")
