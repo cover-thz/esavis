@@ -73,8 +73,6 @@ extract_aux_data.argtypes = [ct.POINTER(ct.c_double),
     ct.POINTER(ct.c_double), ct.POINTER(ct.c_int), ct.POINTER(ct.c_int)]
 extract_aux_data.restype = ct.c_int
 
-
-
 ##############################################################################
 
 def docstring(docstr):
