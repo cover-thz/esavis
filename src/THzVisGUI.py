@@ -649,8 +649,8 @@ class MainWindow(QMainWindow):
             cfg_dict["contrast_lin"]    = 10**(cfg_dict["contrast_db"]/10)
         except OverflowError:
             print("warning - threshold or contrast too high")
-            cfg_dict["threshold_lin"] = 1000.0
-            cfg_dict["contrast_lin"] = 100.0
+            cfg_dict["threshold_lin"]   = 1000.0
+            cfg_dict["contrast_lin"]    = 100.0
 
 
 

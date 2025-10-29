@@ -221,7 +221,7 @@ Arguments:
         maximum range to search for peaks. Used to be index 1 of "rangecut"
 
     (int) num_noise_pts
-        number of points at the start of the array to average and set as the
+        number of points within the array to average and set as the
         "noise floor"
 
     (double) noise_start_frac
