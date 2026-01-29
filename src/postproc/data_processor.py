@@ -20,6 +20,7 @@ import main_proc_fcns as mpf
 import dat_file_fcns as dff
 import time
 import ipdb
+import traceback
 
 # simple method for moving the docstring above the function declaration
 # because having a big docstring underneath the arguments list is annoying
@@ -554,6 +555,7 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
     except Exception as e2:
         print("\n\nGot to e2 exception point")
         print(e2)
+        traceback.print_stack()
         ipdb.set_trace()
         print("")
         print("")
