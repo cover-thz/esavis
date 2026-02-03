@@ -307,9 +307,6 @@ class THzImageObj(QHBoxLayout):
 
                 #avg_val = flat_img.mean()
                 #avg_val = np.nanmean(flat_img)
-
-                # XXX hope this works
-                flat_img = flat_img[~np.isnan(flat_img)]
                 color_max = np.nanpercentile(flat_img, 90)
                 color_min = np.nanpercentile(flat_img, 10)
 
@@ -334,8 +331,7 @@ class THzImageObj(QHBoxLayout):
                     s.thz_image_tab.update_autocolors(color_min, color_max)
 
             # only proceed if the image is not entirely nans
-            #if (flat_img.size!=0) and (not math.isnan(color_min)) and (not math.isnan(color_max)):
-            if (not math.isnan(color_min)) and (not math.isnan(color_max)):
+            if not math.isnan(color_min):
                 plot_style = cfg_dict["plot_style"]
                 if plot_style in ["front_peak_range", "back_peak_range", 
                                   "integ_power_plot", "num_avgs_plot"]:
@@ -359,11 +355,6 @@ class THzImageObj(QHBoxLayout):
                 # I'll need to fix this to show the surface plot colormap
                 cmap = pg.colormap.getFromMatplotlib(cmap_str) 
                 s.color_bar.setColorMap(cmap)
-                #print(f"color_min = {color_min}")
-                #print(f"color_max = {color_max}")
-                #print("")
-                #print("")
-                #print("")
                 s.color_bar.setLevels((color_min, color_max))
 
 
