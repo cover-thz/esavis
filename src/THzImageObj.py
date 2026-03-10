@@ -481,8 +481,8 @@ class THzMeshImage(pg.PlotWidget):
 
 
         s.setTitle("THz Image")
-        s.plot_item.invertX(True)
-        s.plot_item.invertY(True)
+        s.plot_item.invertX(False)
+        s.plot_item.invertY(False)
 
 
     def set_levels(s, min_val, max_val):
