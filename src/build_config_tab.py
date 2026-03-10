@@ -528,6 +528,29 @@ def build_config_tab(cfg_tab):
     main_layout.addLayout(row9pt1_layout)
     #main_layout.addLayout(row9pt3_layout)
 
+    ####################################################################
+    # Row for loading an external HDF5 data cube
+    #
+    row_h5_layout          = QHBoxLayout()
+    load_h5_btn            = QPushButton("Load External\nHDF5 Cube")
+
+    row_h5_sub_layout      = QVBoxLayout()
+    curr_h5_desc_lbl       = QLabel("Current HDF5 file loaded:")
+    curr_h5_val_ledit      = QLineEdit("")
+    curr_h5_val_ledit.setReadOnly(True)
+
+    row_h5_sub_layout.addWidget(curr_h5_desc_lbl)
+    row_h5_sub_layout.addWidget(curr_h5_val_ledit)
+
+    row_h5_layout.addWidget(load_h5_btn)
+    row_h5_layout.addLayout(row_h5_sub_layout)
+
+    cfg_tab.load_h5_btn         = load_h5_btn
+    cfg_tab.curr_h5_desc_lbl    = curr_h5_desc_lbl
+    cfg_tab.curr_h5_val_ledit   = curr_h5_val_ledit
+
+    main_layout.addLayout(row_h5_layout)
+
     
 
     cfg_tab.main_layout = main_layout

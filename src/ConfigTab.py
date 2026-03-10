@@ -183,6 +183,9 @@ class ConfigTab(QScrollArea):
 
         s.autoload_btn.clicked.connect(s.autoload_btn_clicked)
 
+        # external HDF5 load
+        s.load_h5_btn.clicked.connect(s.load_h5_btn_clicked)
+
     ###########################################################################
     #         Central function that sets GUI configuration parameters         #
     ###########################################################################
@@ -378,6 +381,25 @@ class ConfigTab(QScrollArea):
             except_str = "Invalid or non-existent default "
             except_str += "data directory"
             raise Exception(except_str)
+
+
+    def load_h5_btn_clicked(s):
+        """
+        Load an external HDF5 data cube for visualization.
+        """
+        fpath, ok = QFileDialog.getOpenFileName(
+            s,
+            "Select an HDF5 Data Cube",
+            s.cfg_dict["default_data_dir"],
+            "HDF5 Files (*.h5 *.hdf5);;All Files (*)"
+        )
+        if fpath:
+            fpath = fix_data_path(fpath)
+            cfg_dict_updates = collections.OrderedDict()
+            cfg_dict_updates["external_h5_fpath"] = fpath
+            cfg_dict_updates["data_src"] = "external_h5"
+            s.curr_h5_val_ledit.setText(str(fpath))
+            s.update_config(cfg_dict_updates, ["fname_changed"])
 
 
     def autoload_btn_clicked(s):

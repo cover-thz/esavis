@@ -18,6 +18,7 @@ import daq_comms as dc
 #import OLD__daq_comms as dc
 import main_proc_fcns as mpf
 import dat_file_fcns as dff
+import external_loader as extl
 import time
 import ipdb
 import traceback
@@ -534,6 +535,53 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
                                          update_id, file_coarse_grid_dict, 
                                          coarse_grid_ovr, dbg_prof)
                                              
+            elif cfg_dict["data_src"] == "external_h5":
+                h5_fpath = cfg_dict.get("external_h5_fpath")
+                if h5_fpath is None:
+                    time.sleep(0.01)
+                    continue
+
+                buf_frames_flag = False
+
+                # only (re)load / reprocess when triggered
+                if (("fname_changed" in cfg_flags) or
+                    ("reproc_buf" in cfg_flags)):
+
+                    query_out_dict = OrderedDict()
+                    query_out_dict["FILE_PROCESSING"] = True
+                    query_out_pipe.send(query_out_dict)
+
+                    try:
+                        power_cube, h5_meta = extl.load_h5_cube(h5_fpath)
+
+                        # send spatial metadata to GUI so it can
+                        # set up axis grids correctly
+                        x_m = power_cube["x_coords_m"]
+                        y_m = power_cube["y_coords_m"]
+                        meta_dict = OrderedDict()
+                        meta_dict["EXTERNAL_H5_META"] = {
+                            "min_az": float(x_m[0])  * 100.0,
+                            "max_az": float(x_m[-1]) * 100.0,
+                            "min_el": float(y_m[0])  * 100.0,
+                            "max_el": float(y_m[-1]) * 100.0,
+                        }
+                        query_out_pipe.send(meta_dict)
+
+                        (frame_out, aux_data_out,
+                         frame_id_out) = proc_obj.process_power_cube(
+                                             power_cube, cfg_dict,
+                                             update_id, dbg_prof)
+                        new_frame_flag = True
+
+                    except Exception as err_h5:
+                        print(f"external_h5 load error: {err_h5}")
+                        traceback.print_exc()
+                        new_frame_flag = False
+
+                else:
+                    time.sleep(0.005)
+                    continue
+
             else: #cfg_dict["data_src"] == "disabled":
                 pass
 

@@ -196,6 +196,7 @@ def get_default_cfgs():
 
     DFLT_CFG_DICT["data0_fpath"] = None
     DFLT_CFG_DICT["data1_fpath"] = None
+    DFLT_CFG_DICT["external_h5_fpath"] = None
 
 
     # These values do not appear in the GUI yet
@@ -345,7 +346,7 @@ class MainWindow(QMainWindow):
             
         # these are the keys that are excluded from being saved to 
         # config files and when loading config files
-        s.excluded_keys = ["data0_fpath", "data1_fpath"]
+        s.excluded_keys = ["data0_fpath", "data1_fpath", "external_h5_fpath"]
 
         # create the tab widget which contains pretty much the remainder of
         # the GUI objects
@@ -792,8 +793,8 @@ class MainWindow(QMainWindow):
                 print(f"frame_update duration: {((post-pre)/1e6):.4f} ms\n")
 
             s.aux_update(aux_data_in, True)
-            if s.cfg_dict["data_src"] == "dat_file":
-                if data_src_in == "dat_file":
+            if s.cfg_dict["data_src"] in ["dat_file", "external_h5"]:
+                if data_src_in in ["dat_file", "external_h5"]:
                     stat_id = "FILE_PROC"
                     s.main_thz_tab.update_data_src_status(stat_id)
 
@@ -824,9 +825,19 @@ class MainWindow(QMainWindow):
                     print("Warning: config count went negative")
 
             elif "FILE_PROCESSING" in query_in_dict.keys():
-                if s.cfg_dict["data_src"] == "dat_file":
+                if s.cfg_dict["data_src"] in ["dat_file", "external_h5"]:
                     stat_id = "PROC_FILE"
                     s.main_thz_tab.update_data_src_status(stat_id)
+
+            elif "EXTERNAL_H5_META" in query_in_dict.keys():
+                meta = query_in_dict["EXTERNAL_H5_META"]
+                s.cfg_dict["min_az"] = meta["min_az"]
+                s.cfg_dict["max_az"] = meta["max_az"]
+                s.cfg_dict["min_el"] = meta["min_el"]
+                s.cfg_dict["max_el"] = meta["max_el"]
+                s.cfg_dict["az_encoder_to_cm"] = 1.0
+                s.cfg_dict["el_encoder_to_cm"] = 1.0
+
             else:
                 print(f"Warning: invalid query keys: {query_in_dict.keys()}")
 
@@ -843,6 +854,9 @@ class MainWindow(QMainWindow):
 
 
         elif s.cfg_dict["data_src"] == "dat_file":
+            s.max_null_frame_update_period = s.FAST_UPDATES 
+
+        elif s.cfg_dict["data_src"] == "external_h5":
             s.max_null_frame_update_period = s.FAST_UPDATES 
 
         else: # "disabled" or others
