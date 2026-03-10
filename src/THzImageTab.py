@@ -534,6 +534,16 @@ class THzImageTab(QWidget):
                 s.data_src_status_ledit.setStyleSheet(style_options)
                 s.data_src_status_ledit.setText("FILE PROCESSED")
 
+        elif s.cfg_dict["data_src"] == "external_h5":
+            if stat_id == "PROC_FILE":
+                style_options = "background-color: yellow; color: black"
+                s.data_src_status_ledit.setStyleSheet(style_options)
+                s.data_src_status_ledit.setText("PROCESSING FILE...")
+            elif stat_id == "FILE_PROC":
+                style_options = "background-color: green; color: white"
+                s.data_src_status_ledit.setStyleSheet(style_options)
+                s.data_src_status_ledit.setText("FILE PROCESSED")
+
         elif s.cfg_dict["data_src"] == "use_buffer":
             style_options = "background-color: green; color: white"
             s.data_src_status_ledit.setStyleSheet(style_options)
