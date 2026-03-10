@@ -97,87 +97,46 @@ def build_thz_image_tab(thz_img_tab):
 
 
     ####################################################################
-    # "Source" tab
+    # "Source" tab — HDF5 loader + status
     #
     src_tab = QWidget()
     proc_cfg_tab_widget.addTab(src_tab, "Source")
     src_tab_top_layout = QVBoxLayout()
-    src_tab_lbl_1 = QLabel("Data Source:")
 
-    # src_tab_sublayout_row1
-    src_tab_sublayout_row1 = QHBoxLayout()
-    disabled_src_rbut       = QRadioButton()
-    disabled_src_rbut.setText("Disabled")
-    src_tab_sublayout_row1.addWidget(disabled_src_rbut)
+    # HDF5 load button + filepath display
+    src_h5_layout = QHBoxLayout()
+    load_h5_btn = QPushButton("Load HDF5\nCube")
+    src_h5_sub_layout = QVBoxLayout()
+    curr_h5_desc_lbl = QLabel("Current HDF5 file loaded:")
+    curr_h5_val_ledit = QLineEdit("")
+    curr_h5_val_ledit.setReadOnly(True)
+    src_h5_sub_layout.addWidget(curr_h5_desc_lbl)
+    src_h5_sub_layout.addWidget(curr_h5_val_ledit)
+    src_h5_layout.addWidget(load_h5_btn)
+    src_h5_layout.addLayout(src_h5_sub_layout)
 
-    # src_tab_sublayout_row2
-    src_tab_sublayout_row2 = QHBoxLayout()
+    # Status display
+    src_status_layout = QHBoxLayout()
     data_src_status_lbl = QLabel("Status: ")
     data_src_status_ledit = QLineEdit()
     data_src_status_ledit.setFixedWidth(170)
     data_src_status_ledit.setReadOnly(True)
-
-    src_tab_sublayout_row2.addWidget(data_src_status_lbl)
-    src_tab_sublayout_row2.addWidget(data_src_status_ledit)
+    src_status_layout.addWidget(data_src_status_lbl)
+    src_status_layout.addWidget(data_src_status_ledit)
 
     # Toplevel layout of "Source" tab
-    src_tab_top_layout.addWidget(src_tab_lbl_1)
-    src_tab_top_layout.addLayout(src_tab_sublayout_row1)
-    src_tab_top_layout.addLayout(src_tab_sublayout_row2)
+    src_tab_top_layout.addLayout(src_h5_layout)
+    src_tab_top_layout.addLayout(src_status_layout)
+    src_tab_top_layout.addStretch()
 
     # Add member variables
-    # (not adding the sublayouts because we probably don't need them)
-    thz_img_tab.src_tab             = src_tab
-    thz_img_tab.disabled_src_rbut   = disabled_src_rbut
-    thz_img_tab.data_src_status_ledit    = data_src_status_ledit
-    thz_img_tab.src_tab_top_layout  = src_tab_top_layout
+    thz_img_tab.src_tab               = src_tab
+    thz_img_tab.load_h5_btn           = load_h5_btn
+    thz_img_tab.curr_h5_val_ledit     = curr_h5_val_ledit
+    thz_img_tab.data_src_status_ledit = data_src_status_ledit
 
     # final piece
     src_tab.setLayout(src_tab_top_layout)
-
-
-    ####################################################################
-    # NOTE This currently does nothing as ConfigTab takes care of all 
-    # configuration considerations for now.  
-    #
-    # As a result it is currently not added as a tab and therefore does not
-    # appear in the current layout 
-    # 
-    # "Load/Save Config" tab
-    #
-    ld_sv_cfg_tab = QWidget()
-    #proc_cfg_tab_widget.addTab(ld_sv_cfg_tab, 
-    #    "Load/Save\nConfig")
-    ld_sv_cfg_tab_top_layout = QVBoxLayout()
-
-    # ld_sv_cfg_sublaout_row1
-    ld_sv_cfg_sublayout_row1 = QHBoxLayout()
-    load_cfg_btn = QPushButton("Load Config\nFile")
-    load_dflt_cfg_btn = QPushButton("Load Config\nDefaults")
-    ld_sv_cfg_sublayout_row1.addWidget(load_cfg_btn)
-    ld_sv_cfg_sublayout_row1.addWidget(load_dflt_cfg_btn)
-
-    # ld_sv_cfg_sublaout_row2
-    ld_sv_cfg_sublayout_row2 = QHBoxLayout()
-    save_cfg_btn = QPushButton("Save Config\nFile")
-    save_dflt_cfg_btn = QPushButton("Save New\nDefault Config")
-    ld_sv_cfg_sublayout_row2.addWidget(save_cfg_btn)
-    ld_sv_cfg_sublayout_row2.addWidget(save_dflt_cfg_btn)
-
-    # Toplevel layout of "Load/Save Config" tab
-    ld_sv_cfg_tab_top_layout.addLayout(ld_sv_cfg_sublayout_row1)
-    ld_sv_cfg_tab_top_layout.addLayout(ld_sv_cfg_sublayout_row2)
-
-    # Add member variables
-    # (not adding the sublayouts because we probably don't need them)
-    thz_img_tab.load_cfg_btn        = load_cfg_btn
-    thz_img_tab.load_dflt_cfg_btn   = load_dflt_cfg_btn
-    thz_img_tab.save_cfg_btn        = save_cfg_btn
-    thz_img_tab.save_dflt_cfg_btn   = save_dflt_cfg_btn
-    thz_img_tab.ld_sv_cfg_tab_top_layout = ld_sv_cfg_tab_top_layout
-
-    # final piece
-    #ld_sv_cfg_tab.setLayout(ld_sv_cfg_tab_top_layout)
 
 
     ####################################################################
@@ -695,13 +654,6 @@ class setup_thz_tab_callbacks:
 
 
         # QRadioButtons
-        thz_tab.disabled_src_rbut.toggled.connect(
-            lambda: s.rbut_update(thz_tab.disabled_src_rbut, 
-            "disabled", "data_src"))
-
-        thz_tab.disabled_src_rbut.toggled.connect(
-            lambda: thz_tab.update_data_src_status("DISABLED"))
-
         thz_tab.front_peak_rbut.toggled.connect(
             lambda: s.rbut_update(thz_tab.front_peak_rbut, 
             "front", "peak_selection"))

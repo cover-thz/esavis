@@ -47,9 +47,7 @@ if __name__ == '__main__':
         raise Exception("Invalid OS Name")
 
 #from dataclasses import dataclass, field
-from ConfigTab import ConfigTab
 from THzImageTab import THzImageTab
-from DebugTab import DebugTab
 from SingPixTab import SingPixTab
 
 # crude but effective way of getting the postprocessing directory in here
@@ -265,6 +263,10 @@ class MainWindow(QMainWindow):
         # used for seeing the frame-to-frame "rate"
         s.prev_frame_time = None
 
+        # store last received frame/aux data so we can replay on tab switch
+        s.last_frame_data = None
+        s.last_aux_data   = None
+
         # sets ths title and default size of the window
         s.setWindowTitle('THz Vizualizer GUI')
         #s.setGeometry(100, 100, 400, 300)
@@ -303,10 +305,6 @@ class MainWindow(QMainWindow):
         # create the tab widget which contains pretty much the remainder of
         # the GUI objects
         s.tab_widget = QTabWidget()
-        s.cfg_tab    = ConfigTab(CFG_DFLT_PATH, CONFIG_DIR, 
-                                    s.load_config, 
-                                    s.save_config, s.update_config,
-                                    s.cfg_dict)
 
         s.sing_pix_tab = SingPixTab(CFG_DFLT_PATH, CONFIG_DIR, 
                                         s.update_config, s.cfg_dict)
@@ -314,28 +312,19 @@ class MainWindow(QMainWindow):
         s.main_thz_tab = THzImageTab(CFG_DFLT_PATH, CONFIG_DIR, 
                                         s.update_config, s.cfg_dict, 
                                         s.sing_pix_tab) 
-                                        
-
-        s.debug_tab = DebugTab(CFG_DFLT_PATH, CONFIG_DIR, 
-                                        s.update_config, 
-                                        s.cfg_dict)
 
         # add the tabs to the tab widget 
-        s.tab_widget.addTab(s.cfg_tab, "Config")
         s.tab_widget.addTab(s.main_thz_tab, "Main THz Image")
         s.tab_widget.addTab(s.sing_pix_tab, "Single Pixel")
-        s.tab_widget.addTab(s.debug_tab, "Debug")
 
         s.layout.addWidget(s.tab_widget)
 
 
-        # set the GUI to view the config tab
         s.tab_index_dict = {}
-        s.tab_index_dict[0] = "Config"
-        s.tab_index_dict[1] = "Main THz Image"
-        s.tab_index_dict[2] = "Single Pixel"
-        s.tab_index_dict[3] = "Debug"
+        s.tab_index_dict[0] = "Main THz Image"
+        s.tab_index_dict[1] = "Single Pixel"
         s.tab_widget.setCurrentIndex(0)
+        s.tab_widget.currentChanged.connect(s.tab_switch_callback)
 
 
         # check for default postprocessing config and execute configuration 
@@ -357,7 +346,15 @@ class MainWindow(QMainWindow):
 
 
     def tab_switch_callback(s, index):
-        pass
+        tab_name = s.tab_index_dict.get(index)
+        if tab_name == "Single Pixel":
+            if s.last_frame_data is not None:
+                s.sing_pix_tab.update_image(s.last_frame_data, True)
+            if s.last_aux_data is not None:
+                s.sing_pix_tab.aux_update(s.last_aux_data, True)
+        elif tab_name == "Main THz Image":
+            if s.last_frame_data is not None:
+                s.main_thz_tab.update_image(s.last_frame_data, True)
 
 
 
@@ -419,7 +416,6 @@ class MainWindow(QMainWindow):
         # pass the config to the various functions that set the appropriate 
         # GUI objects
         if s.cfg_dict != None:
-            s.cfg_tab.set_gui_config_params(s.cfg_dict)
             s.main_thz_tab.set_gui_config_params(s.cfg_dict)
         return ret_val
 
@@ -585,11 +581,7 @@ class MainWindow(QMainWindow):
         cfg_dict["flags"] = cfg_flags
 
 
-        # flag that data is currently being reprocessed
-        if s.cfg_dict["data_src"] == "external_h5":
-            if "reproc_file" in cfg_flags:
-                stat_id = "PROC_FILE"
-                s.main_thz_tab.update_data_src_status(stat_id)
+
 
 
         update = False
@@ -640,10 +632,15 @@ class MainWindow(QMainWindow):
                 print(f"frame_period_ms = {frame_period_ms:.4f}")
                 s.prev_frame_time = curr_time
         
-        if s.tab_index_dict[s.tab_widget.currentIndex()] == "Main THz Image":
+        if new_frame_flag and frame_in is not None:
+            s.last_frame_data = frame_in
             s.main_thz_tab.update_image(frame_in, new_frame_flag)
-        elif s.tab_index_dict[s.tab_widget.currentIndex()] == "Single Pixel":
             s.sing_pix_tab.update_image(frame_in, new_frame_flag)
+        else:
+            if s.tab_index_dict[s.tab_widget.currentIndex()] == "Main THz Image":
+                s.main_thz_tab.update_image(frame_in, new_frame_flag)
+            elif s.tab_index_dict[s.tab_widget.currentIndex()] == "Single Pixel":
+                s.sing_pix_tab.update_image(frame_in, new_frame_flag)
 
 
     def aux_update(s, aux_data_in, new_frame_flag):
@@ -651,6 +648,8 @@ class MainWindow(QMainWindow):
         this updates all the appropriate auxilary plot objects when a new 
         frame ( + auxiliary data) comes in
         """
+        if new_frame_flag and aux_data_in is not None:
+            s.last_aux_data = aux_data_in
         if s.tab_index_dict[s.tab_widget.currentIndex()] == "Single Pixel":
             s.sing_pix_tab.aux_update(aux_data_in, new_frame_flag)
 
@@ -755,7 +754,6 @@ class MainWindow(QMainWindow):
         if s.last_update_time != None:
             if ((time.time() - s.last_update_time) > s.max_null_frame_update_period):
                 s.update_cfg_flag = True
-                s.update_config(None, ["reproc_buf"])
                 s.frame_update(None, None, None, False)
 
         if _dbg:

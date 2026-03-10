@@ -3,6 +3,7 @@ from PySide6 import QtCore, QtWidgets, QtGui
 from PySide6.QtCore import Qt
 import os
 import json
+import collections
 import math
 from math import nan
 #import sys
@@ -46,8 +47,6 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QFileDialog,
     QMessageBox,
-    QDialog,
-    QDialogButtonBox,
 )
 
 
@@ -60,31 +59,6 @@ def conv_fpath_to_unix(fpath):
             fpath_out += char
 
     return fpath_out
-
-
-
-##############################################################################
-# Simple Dialog Box Class
-##############################################################################
-
-class SimpDialog(QDialog):
-    def __init__(s):
-        super().__init__()
-
-        s.setWindowTitle("Confirm Default Config Change Dialog")
-
-        buttons = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
-        s.button_box = QDialogButtonBox(buttons)
-        s.button_box.accepted.connect(s.accept)
-        s.button_box.rejected.connect(s.reject)
-
-        s.layout = QVBoxLayout()
-        msg_str  = "Are you sure you want to change "
-        msg_str += "the default configuration file?"
-        message = QLabel(msg_str)
-        s.layout.addWidget(message)
-        s.layout.addWidget(s.button_box)
-        s.setLayout(s.layout)
 
 
 
@@ -164,6 +138,9 @@ class THzImageTab(QWidget):
         # assign some callbacks
         #
         # Button callbacks
+        s.load_h5_btn.clicked.connect(
+            s.load_h5_btn_clicked)
+
         s.ld_save_image_save_btn.clicked.connect(
             s.ld_save_image_save_btn_clicked)
 
@@ -371,6 +348,25 @@ class THzImageTab(QWidget):
     ################# END SLIDER-RELATED CALLBACK FUNCTIONS #################
     #########################################################################
 
+    def load_h5_btn_clicked(s):
+        """
+        Load an external HDF5 data cube for visualization.
+        """
+        fpath, ok = QFileDialog.getOpenFileName(
+            s,
+            "Select an HDF5 Data Cube",
+            s.cfg_dict["default_data_dir"],
+            "HDF5 Files (*.h5 *.hdf5);;All Files (*)"
+        )
+        if fpath:
+            fpath = conv_fpath_to_unix(fpath)
+            cfg_dict_updates = collections.OrderedDict()
+            cfg_dict_updates["external_h5_fpath"] = fpath
+            cfg_dict_updates["data_src"] = "external_h5"
+            s.curr_h5_val_ledit.setText(str(fpath))
+            s.update_config(cfg_dict_updates, ["fname_changed"])
+
+
     def ld_save_image_save_btn_clicked(s):
         fpath, ok = QFileDialog.getSaveFileName(
             s,
@@ -431,13 +427,10 @@ class THzImageTab(QWidget):
                 s.data_src_status_ledit.setStyleSheet(style_options)
                 s.data_src_status_ledit.setText("FILE PROCESSED")
 
-        elif s.cfg_dict["data_src"] == "disabled":
+        else:
             style_options = "background-color: gray; color: white"
             s.data_src_status_ledit.setStyleSheet(style_options)
-            s.data_src_status_ledit.setText("DISABLED")
-
-        else:
-            print("Warning: unknown data_src value")
+            s.data_src_status_ledit.setText("NO FILE LOADED")
 
 
 
