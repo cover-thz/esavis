@@ -102,7 +102,7 @@ class THzImageTab(QWidget):
     # not to be modified outside of the MainWindow, it is only provided
     # to be read
     def __init__(s, CFG_DFLT_PATH, CONFIG_DIR, 
-                 update_config, cfg_dict, camera_tab, sing_pix_tab):
+                 update_config, cfg_dict, sing_pix_tab):
         super().__init__()
 
         
@@ -110,7 +110,6 @@ class THzImageTab(QWidget):
         s.CONFIG_DIR     = CONFIG_DIR
         s.update_config  = update_config
         s.cfg_dict       = cfg_dict
-        s.camera_tab     = camera_tab
         s.sing_pix_tab   = sing_pix_tab
 
         # builds up all the widgets and layout adds them to s
@@ -416,7 +415,6 @@ class THzImageTab(QWidget):
         Resets the camera position for the 3D plots
         """
         s.update_image(None, False,reset_camera=True)
-        s.camera_tab.update_image(None, False,reset_camera=True)
         s.sing_pix_tab.update_image(None, False,reset_camera=True)
 
 

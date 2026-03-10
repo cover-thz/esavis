@@ -50,7 +50,6 @@ if __name__ == '__main__':
 from ConfigTab import ConfigTab
 from THzImageTab import THzImageTab
 from DebugTab import DebugTab
-from CameraTab import CameraTab
 from SingPixTab import SingPixTab
 
 # crude but effective way of getting the postprocessing directory in here
@@ -172,14 +171,6 @@ def get_default_cfgs():
     DFLT_CFG_DICT["peak_selection"]  = "front"
     DFLT_CFG_DICT["paused"]     = False
     DFLT_CFG_DICT["invert_range"] = False
-
-    # Visible light camera stuff
-    DFLT_CFG_DICT["camera_x"] = -3920.0
-    DFLT_CFG_DICT["camera_y"] = -1122.0
-    DFLT_CFG_DICT["camera_h_scale"] = 11.0
-    DFLT_CFG_DICT["camera_v_scale"] = 8.0
-    DFLT_CFG_DICT["camera_step_int"] = 10
-    DFLT_CFG_DICT["camera_opacity"] = 0.3
 
     DFLT_CFG_DICT["aux_x_ind"] = 10
     DFLT_CFG_DICT["aux_y_ind"] = 10
@@ -317,19 +308,12 @@ class MainWindow(QMainWindow):
                                     s.save_config, s.update_config,
                                     s.cfg_dict)
 
-        s.camera_tab   = CameraTab(CFG_DFLT_PATH, CONFIG_DIR, 
-                                        s.update_config, s.cfg_dict)
-
         s.sing_pix_tab = SingPixTab(CFG_DFLT_PATH, CONFIG_DIR, 
                                         s.update_config, s.cfg_dict)
-                                        
 
-        # unfortunately I needed to give the camera tab and the 
-        # single_pixel object to this main tab so the reset plot camera 
-        # button would work
         s.main_thz_tab = THzImageTab(CFG_DFLT_PATH, CONFIG_DIR, 
                                         s.update_config, s.cfg_dict, 
-                                        s.camera_tab, s.sing_pix_tab) 
+                                        s.sing_pix_tab) 
                                         
 
         s.debug_tab = DebugTab(CFG_DFLT_PATH, CONFIG_DIR, 
@@ -339,7 +323,6 @@ class MainWindow(QMainWindow):
         # add the tabs to the tab widget 
         s.tab_widget.addTab(s.cfg_tab, "Config")
         s.tab_widget.addTab(s.main_thz_tab, "Main THz Image")
-        s.tab_widget.addTab(s.camera_tab, "Camera Overlay")
         s.tab_widget.addTab(s.sing_pix_tab, "Single Pixel")
         s.tab_widget.addTab(s.debug_tab, "Debug")
 
@@ -350,9 +333,8 @@ class MainWindow(QMainWindow):
         s.tab_index_dict = {}
         s.tab_index_dict[0] = "Config"
         s.tab_index_dict[1] = "Main THz Image"
-        s.tab_index_dict[2] = "Camera Overlay"
-        s.tab_index_dict[3] = "Single Pixel"
-        s.tab_index_dict[4] = "Debug"
+        s.tab_index_dict[2] = "Single Pixel"
+        s.tab_index_dict[3] = "Debug"
         s.tab_widget.setCurrentIndex(0)
 
 
@@ -375,17 +357,7 @@ class MainWindow(QMainWindow):
 
 
     def tab_switch_callback(s, index):
-        # Main THz image
-        if index == 1:
-            thz_image_obj = s.main_thz_tab.thz_image_obj
-            s.camera_tab.remove_thz_image(thz_image_obj)
-            s.main_thz_tab.add_thz_image(thz_image_obj)
-        elif index == 2:
-            thz_image_obj = s.main_thz_tab.thz_image_obj
-            s.main_thz_tab.remove_thz_image(thz_image_obj)
-            s.camera_tab.add_thz_image(thz_image_obj)
-
-        # Large Viewer / CameraTab
+        pass
 
 
 
@@ -421,16 +393,6 @@ class MainWindow(QMainWindow):
         event.accept()
 
 
-    def init_camera_tab(s):
-        """
-        This is just a placeholder for Tab 3 until I actually create GUI 
-        content for the camera overlay
-        """
-        layout = QVBoxLayout(s.camera_tab)
-        label = QLabel("Camera Overlay goes here")
-        layout.addWidget(label)
-
-
     # central function that loads files into our config dict
     def load_config(s, fpath):
         """
@@ -459,7 +421,6 @@ class MainWindow(QMainWindow):
         if s.cfg_dict != None:
             s.cfg_tab.set_gui_config_params(s.cfg_dict)
             s.main_thz_tab.set_gui_config_params(s.cfg_dict)
-            s.camera_tab.set_gui_config_params(s.cfg_dict)
         return ret_val
 
 
@@ -681,8 +642,6 @@ class MainWindow(QMainWindow):
         
         if s.tab_index_dict[s.tab_widget.currentIndex()] == "Main THz Image":
             s.main_thz_tab.update_image(frame_in, new_frame_flag)
-        elif s.tab_index_dict[s.tab_widget.currentIndex()] == "Camera Overlay":
-            s.camera_tab.update_image(frame_in, new_frame_flag)
         elif s.tab_index_dict[s.tab_widget.currentIndex()] == "Single Pixel":
             s.sing_pix_tab.update_image(frame_in, new_frame_flag)
 
