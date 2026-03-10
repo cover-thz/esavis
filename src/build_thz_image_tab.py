@@ -106,33 +106,13 @@ def build_thz_image_tab(thz_img_tab):
 
     # src_tab_sublayout_row1
     src_tab_sublayout_row1 = QHBoxLayout()
-    file_src_rbut       = QRadioButton()
-    file_src_rbut.setText("File")
-    blank1_src_lbl       = QLabel("")
-    blank2_src_lbl       = QLabel("")
-    daq_src_rbut       = QRadioButton()
-    daq_src_rbut.setText("DAQ")
-    src_tab_sublayout_row1.addWidget(file_src_rbut)
-    src_tab_sublayout_row1.addWidget(blank1_src_lbl)
-    src_tab_sublayout_row1.addWidget(blank2_src_lbl)
-    src_tab_sublayout_row1.addWidget(daq_src_rbut)
-
-    # src_tab_sublayout_row1pt5
-    src_tab_sublayout_row1pt5 = QHBoxLayout()
     disabled_src_rbut       = QRadioButton()
     disabled_src_rbut.setText("Disabled")
-    blank3_src_lbl       = QLabel("")
-    blank4_src_lbl       = QLabel("")
-    use_buf_src_rbut       = QRadioButton()
-    use_buf_src_rbut.setText("Most Recent Frame")
-    src_tab_sublayout_row1pt5.addWidget(disabled_src_rbut)
-    src_tab_sublayout_row1pt5.addWidget(blank3_src_lbl)
-    src_tab_sublayout_row1pt5.addWidget(blank4_src_lbl)
-    src_tab_sublayout_row1pt5.addWidget(use_buf_src_rbut)
+    src_tab_sublayout_row1.addWidget(disabled_src_rbut)
 
     # src_tab_sublayout_row2
     src_tab_sublayout_row2 = QHBoxLayout()
-    data_src_status_lbl = QLabel("DAQ Status: ")
+    data_src_status_lbl = QLabel("Status: ")
     data_src_status_ledit = QLineEdit()
     data_src_status_ledit.setFixedWidth(170)
     data_src_status_ledit.setReadOnly(True)
@@ -140,31 +120,16 @@ def build_thz_image_tab(thz_img_tab):
     src_tab_sublayout_row2.addWidget(data_src_status_lbl)
     src_tab_sublayout_row2.addWidget(data_src_status_ledit)
 
-    # src_tab_sublayout_row3 [NOTE UNUSED]
-    src_tab_sublayout_row3 = QHBoxLayout()
-    file_status_lbl = QLabel("File Status: ")
-    file_status_ledit = QLineEdit()
-    file_status_ledit.setFixedWidth(170)
-    file_status_ledit.setReadOnly(True)
-    src_tab_sublayout_row3.addWidget(file_status_lbl)
-    src_tab_sublayout_row3.addWidget(file_status_ledit)
-
     # Toplevel layout of "Source" tab
     src_tab_top_layout.addWidget(src_tab_lbl_1)
     src_tab_top_layout.addLayout(src_tab_sublayout_row1)
-    src_tab_top_layout.addLayout(src_tab_sublayout_row1pt5)
     src_tab_top_layout.addLayout(src_tab_sublayout_row2)
-    #src_tab_top_layout.addLayout(src_tab_sublayout_row3)
 
     # Add member variables
     # (not adding the sublayouts because we probably don't need them)
     thz_img_tab.src_tab             = src_tab
-    thz_img_tab.file_src_rbut       = file_src_rbut
-    thz_img_tab.daq_src_rbut        = daq_src_rbut
     thz_img_tab.disabled_src_rbut   = disabled_src_rbut
-    thz_img_tab.use_buf_src_rbut    = use_buf_src_rbut
     thz_img_tab.data_src_status_ledit    = data_src_status_ledit
-    thz_img_tab.file_status_ledit   = file_status_ledit
     thz_img_tab.src_tab_top_layout  = src_tab_top_layout
 
     # final piece
@@ -278,131 +243,6 @@ def build_thz_image_tab(thz_img_tab):
 
 
     ####################################################################
-    # "Frame Style" tab
-    #
-    frame_style_tab = QWidget()
-    proc_cfg_tab_widget.addTab(frame_style_tab, "Frame Style")
-    frame_style_tab_top_layout = QVBoxLayout()
-
-    # frame_style_sublayout_row1
-    frame_style_sublayout_row1  = QHBoxLayout()
-    azi_turn_fs_rbut               = QRadioButton()
-    azi_turn_fs_rbut.setText("Azimuth Turnaround")
-    azi_hyst_fs_lbl               = QLabel("Az Hysteresis:")
-    azi_hyst_fs_ledit             = QLineEdit()
-    frame_style_sublayout_row1.addWidget(azi_turn_fs_rbut)
-    frame_style_sublayout_row1.addWidget(azi_hyst_fs_lbl)
-    frame_style_sublayout_row1.addWidget(azi_hyst_fs_ledit)
-
-    # frame_style_sublayout_row2
-    frame_style_sublayout_row2  = QHBoxLayout()
-    num_rng_fs_rbut             = QRadioButton()
-    num_rng_fs_rbut.setText("Number of Rangelines")
-    azi_marg_fs_lbl             = QLabel("Az Margin:")
-    azi_marg_fs_ledit           = QLineEdit()
-    frame_style_sublayout_row2.addWidget(num_rng_fs_rbut)
-    frame_style_sublayout_row2.addWidget(azi_marg_fs_lbl)
-    frame_style_sublayout_row2.addWidget(azi_marg_fs_ledit)
-
-    # frame_style_sublayout_row3
-    frame_style_sublayout_row3  = QHBoxLayout()
-    col_frac_fs_rbut               = QRadioButton()
-    col_frac_fs_rbut.setText("Col Fraction Filled")
-    num_rng_fs_lbl              = QLabel("Rangelines Thresh:")
-    num_rng_fs_ledit            = QLineEdit()
-    frame_style_sublayout_row3.addWidget(col_frac_fs_rbut)
-    frame_style_sublayout_row3.addWidget(num_rng_fs_lbl)
-    frame_style_sublayout_row3.addWidget(num_rng_fs_ledit)
-
-    # frame_style_sublayout_row4
-    frame_style_sublayout_row4  = QHBoxLayout()
-    pix_frac_fs_rbut            = QRadioButton()
-    pix_frac_fs_rbut.setText("Pixel Fraction Filled")
-    tot_frac_fs_lbl              = QLabel("Col/Pix Fraction*:")
-    tot_frac_fs_ledit            = QLineEdit()
-    frame_style_sublayout_row4.addWidget(pix_frac_fs_rbut)
-    frame_style_sublayout_row4.addWidget(tot_frac_fs_lbl)
-    frame_style_sublayout_row4.addWidget(tot_frac_fs_ledit)
-
-
-    # frame_style_sublayout_row4pt1
-    frame_style_sublayout_row4pt1  = QHBoxLayout()
-    daq_num_rng_fs_lbl        = QLabel("Num Rangelines Per\nDAQ Grab:")
-    daq_num_rng_fs_ledit      = QLineEdit()
-    frame_style_sublayout_row4pt1.addWidget(daq_num_rng_fs_lbl)
-    frame_style_sublayout_row4pt1.addWidget(daq_num_rng_fs_ledit)
-
-
-    # frame_style_sublayout_row4pt2
-    frame_style_sublayout_row4pt2  = QHBoxLayout()
-    turn_min_az_lbl         = QLabel("Turnaround Az Min: ")
-    turn_min_az_ledit       = QLineEdit()
-
-    turn_max_az_lbl         = QLabel("    Turnaround Az Max: ")
-    turn_max_az_ledit       = QLineEdit()
-
-    frame_style_sublayout_row4pt2.addWidget(turn_min_az_lbl)
-    frame_style_sublayout_row4pt2.addWidget(turn_min_az_ledit)
-
-    frame_style_sublayout_row4pt2.addWidget(turn_max_az_lbl)
-    frame_style_sublayout_row4pt2.addWidget(turn_max_az_ledit)
-
-    # frame_style_sublayout_row4pt3
-    frame_style_sublayout_row4pt3  = QHBoxLayout()
-    turn_az_note_string = "Turnaround Az vals are in unadjusted\n motor "
-    turn_az_note_string += "encoder units"
-    turn_az_note_lbl = QLabel(turn_az_note_string)
-    frame_style_sublayout_row4pt3.addWidget(turn_az_note_lbl)
-
-
-    # frame_style_sublayout_row5
-    frame_style_sublayout_row5  = QHBoxLayout()
-    frac_fs_lbl                 = QLabel("*Between 0 and 1")
-    frame_style_sublayout_row5.addWidget(frac_fs_lbl)
-
-    # Toplevel layout of "Frame Style" tab
-    frame_style_tab_top_layout.addLayout(frame_style_sublayout_row1)
-    frame_style_tab_top_layout.addLayout(frame_style_sublayout_row2)
-    frame_style_tab_top_layout.addLayout(frame_style_sublayout_row3)
-    frame_style_tab_top_layout.addLayout(frame_style_sublayout_row4)
-    frame_style_tab_top_layout.addLayout(frame_style_sublayout_row4pt1)
-    frame_style_tab_top_layout.addLayout(frame_style_sublayout_row4pt2)
-    frame_style_tab_top_layout.addLayout(frame_style_sublayout_row4pt3)
-    frame_style_tab_top_layout.addLayout(frame_style_sublayout_row5)
-
-    # Add member variables
-    # (not adding the sublayouts because we probably don't need them)
-    thz_img_tab.azi_turn_fs_rbut = azi_turn_fs_rbut
-    thz_img_tab.azi_hyst_fs_lbl = azi_hyst_fs_lbl
-    thz_img_tab.azi_hyst_fs_ledit = azi_hyst_fs_ledit
-    thz_img_tab.num_rng_fs_rbut = num_rng_fs_rbut
-    thz_img_tab.azi_marg_fs_lbl = azi_marg_fs_lbl
-    thz_img_tab.azi_marg_fs_ledit = azi_marg_fs_ledit
-    thz_img_tab.col_frac_fs_rbut = col_frac_fs_rbut
-    thz_img_tab.num_rng_fs_lbl = num_rng_fs_lbl
-    thz_img_tab.daq_num_rng_fs_lbl   = daq_num_rng_fs_lbl
-    thz_img_tab.daq_num_rng_fs_ledit = daq_num_rng_fs_ledit
-
-
-    thz_img_tab.num_rng_fs_ledit = num_rng_fs_ledit
-    thz_img_tab.pix_frac_fs_rbut = pix_frac_fs_rbut
-    thz_img_tab.tot_frac_fs_lbl = tot_frac_fs_lbl
-    thz_img_tab.tot_frac_fs_ledit = tot_frac_fs_ledit
-
-    thz_img_tab.turn_min_az_lbl     = turn_min_az_lbl
-    thz_img_tab.turn_min_az_ledit   = turn_min_az_ledit
-
-    thz_img_tab.turn_max_az_lbl     = turn_max_az_lbl
-    thz_img_tab.turn_max_az_ledit   = turn_max_az_ledit
-    thz_img_tab.turn_az_note_lbl = turn_az_note_lbl
-
-    thz_img_tab.frac_fs_lbl = frac_fs_lbl
-
-    # final piece
-    frame_style_tab.setLayout(frame_style_tab_top_layout)
-
-
-    ####################################################################
     # "Load Save Image" tab
     #
     ld_sv_image_tab = QWidget()
@@ -441,7 +281,6 @@ def build_thz_image_tab(thz_img_tab):
 
     # Add member variables
     # (not adding the sublayouts because we probably don't need them)
-    thz_img_tab.azi_turn_fs_rbut = azi_turn_fs_rbut
     thz_img_tab.ld_save_image_autosave_btn = ld_save_image_autosave_btn
     thz_img_tab.ld_save_image_chng_dir_btn = ld_save_image_chng_dir_btn
     thz_img_tab.ld_save_image_save_btn = ld_save_image_save_btn
@@ -811,35 +650,9 @@ class setup_thz_tab_callbacks:
         s.update_config = update_config
 
         # QLineEdits
-        thz_tab.azi_hyst_fs_ledit.editingFinished.connect(
-            lambda: s.ledit_update(thz_tab.azi_hyst_fs_ledit, 
-            "turn_hyst", float))
-        thz_tab.azi_marg_fs_ledit.editingFinished.connect(
-            lambda: s.ledit_update(thz_tab.azi_marg_fs_ledit, 
-            "turn_az_margin", float))
-        thz_tab.num_rng_fs_ledit.editingFinished.connect(
-            lambda: s.ledit_update(thz_tab.num_rng_fs_ledit, 
-            "accum_rangelines_thresh", int))
-
-        thz_tab.daq_num_rng_fs_ledit.editingFinished.connect(
-            lambda: s.ledit_update(thz_tab.daq_num_rng_fs_ledit, 
-            "daq_num_rangelines", int))
-
-        thz_tab.tot_frac_fs_ledit.editingFinished.connect(
-            lambda: s.ledit_update(thz_tab.tot_frac_fs_ledit, 
-            "fraction_filled_thresh", float))
-
         thz_tab.ld_save_image_desc_ledit.editingFinished.connect(
             lambda: s.ledit_update(thz_tab.ld_save_image_desc_ledit, 
             "save_image_desc", str))
-
-        thz_tab.turn_min_az_ledit.editingFinished.connect(
-            lambda: s.ledit_update(thz_tab.turn_min_az_ledit, 
-            "turn_min_az", float))
-
-        thz_tab.turn_max_az_ledit.editingFinished.connect(
-            lambda: s.ledit_update(thz_tab.turn_max_az_ledit, 
-            "turn_max_az", float))
 
 
 
@@ -882,34 +695,12 @@ class setup_thz_tab_callbacks:
 
 
         # QRadioButtons
-        thz_tab.file_src_rbut.toggled.connect(
-            lambda: s.rbut_update(thz_tab.file_src_rbut, 
-            "dat_file", "data_src"))
-
-        thz_tab.file_src_rbut.toggled.connect(
-            lambda: thz_tab.update_data_src_status("PROC_FILE"))
-
-        thz_tab.daq_src_rbut.toggled.connect(
-            lambda: s.rbut_update(thz_tab.daq_src_rbut, 
-            "daq", "data_src"))
-
-        thz_tab.daq_src_rbut.toggled.connect(
-            lambda: thz_tab.update_data_src_status("NOT_CONNECTED"))
-
         thz_tab.disabled_src_rbut.toggled.connect(
             lambda: s.rbut_update(thz_tab.disabled_src_rbut, 
             "disabled", "data_src"))
 
         thz_tab.disabled_src_rbut.toggled.connect(
             lambda: thz_tab.update_data_src_status("DISABLED"))
-
-        thz_tab.use_buf_src_rbut.toggled.connect(
-            lambda: s.rbut_update(thz_tab.use_buf_src_rbut, 
-            "use_buffer", "data_src"))
-
-        thz_tab.use_buf_src_rbut.toggled.connect(
-            lambda: thz_tab.update_data_src_status("USE BUFFER"))
-
 
         thz_tab.front_peak_rbut.toggled.connect(
             lambda: s.rbut_update(thz_tab.front_peak_rbut, 
@@ -959,19 +750,6 @@ class setup_thz_tab_callbacks:
         thz_tab.point_cloud_rbut.toggled.connect(
             lambda: s.rbut_update(thz_tab.point_cloud_rbut, 
             "point_cloud_plot", "plot_style"))
-
-        thz_tab.azi_turn_fs_rbut.toggled.connect(
-            lambda: s.rbut_update(thz_tab.azi_turn_fs_rbut, 
-            "azimuth_turnaround", "frame_style"))
-        thz_tab.num_rng_fs_rbut.toggled.connect(
-            lambda: s.rbut_update(thz_tab.num_rng_fs_rbut, 
-            "accum_rangelines", "frame_style"))
-        thz_tab.col_frac_fs_rbut.toggled.connect(
-            lambda: s.rbut_update(thz_tab.col_frac_fs_rbut, 
-            "fraction_col_filled", "frame_style"))
-        thz_tab.pix_frac_fs_rbut.toggled.connect(
-            lambda: s.rbut_update(thz_tab.pix_frac_fs_rbut, 
-            "fraction_pix_filled", "frame_style"))
 
         # QPushButtons
         # any config updates occur in their respective callback functions

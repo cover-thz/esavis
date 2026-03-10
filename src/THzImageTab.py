@@ -2,7 +2,6 @@
 from PySide6 import QtCore, QtWidgets, QtGui
 from PySide6.QtCore import Qt
 import os
-import ipdb # NOTE REMOVE
 import json
 import math
 from math import nan
@@ -193,15 +192,7 @@ class THzImageTab(QWidget):
         takes the passed postprocessing config dictionary and distributes 
         the values  to the relevent GUI objects
         """
-        s.azi_hyst_fs_ledit.setText(str(cfg_dict["turn_hyst"])) 
-        s.azi_marg_fs_ledit.setText(str(cfg_dict["turn_az_margin"])) 
-        s.daq_num_rng_fs_ledit.setText(str(cfg_dict["daq_num_rangelines"])) 
-        s.num_rng_fs_ledit.setText(str(cfg_dict["accum_rangelines_thresh"])) 
-        s.tot_frac_fs_ledit.setText(str(cfg_dict["fraction_filled_thresh"])) 
         s.ld_save_image_desc_ledit.setText(str(cfg_dict["save_image_desc"])) 
-
-        s.turn_min_az_ledit.setText(str(cfg_dict["turn_min_az"])) 
-        s.turn_max_az_ledit.setText(str(cfg_dict["turn_max_az"])) 
 
         s.thresh_ledit.setText(str(cfg_dict["threshold_db"])) 
         s.contr_ledit.setText(str(cfg_dict["contrast_db"]) )
@@ -224,9 +215,6 @@ class THzImageTab(QWidget):
         s.cmap_cbox.setCurrentIndex(colormap_ind)
 
 
-        s.file_src_rbut.setChecked(False)
-        s.daq_src_rbut.setChecked(False)
-
         s.front_peak_rbut.setChecked(False)
         s.back_peak_rbut.setChecked(False)
         s.front_surface_plot_rbut.setChecked(False)
@@ -235,17 +223,6 @@ class THzImageTab(QWidget):
         s.integ_pwr_rbut.setChecked(False)
         s.point_cloud_rbut.setChecked(False)
 
-        s.azi_turn_fs_rbut.setChecked(False)
-        s.num_rng_fs_rbut.setChecked(False)
-        s.col_frac_fs_rbut.setChecked(False)
-        s.pix_frac_fs_rbut.setChecked(False)
-
-
-        if cfg_dict["data_src"] == "dat_file":
-            s.file_src_rbut.setChecked(True)
-        elif cfg_dict["data_src"] == "daq":
-            s.daq_src_rbut.setChecked(True)
-            
 
         if cfg_dict["plot_style"] == "front_peak_range":
             s.front_peak_rbut.setChecked(True)
@@ -262,16 +239,6 @@ class THzImageTab(QWidget):
         elif cfg_dict["plot_style"] == "point_cloud_plot":
             s.point_cloud_rbut.setChecked(True)
 
-
-        if cfg_dict["frame_style"]  == "azimuth_turnaround":
-            s.azi_turn_fs_rbut.setChecked(True)
-        elif cfg_dict["frame_style"] == "accum_rangelines":
-            s.num_rng_fs_rbut.setChecked(True)
-        elif cfg_dict["frame_style"] == "fraction_col_filled":
-            s.col_frac_fs_rbut.setChecked(True)
-        elif cfg_dict["frame_style"] == "fraction_pix_filled":
-            s.pix_frac_fs_rbut.setChecked(True)
-        
 
         # need to update these because the proper signals won't be generated 
         # with automatic editing
@@ -314,23 +281,7 @@ class THzImageTab(QWidget):
             json.dump(cfg_dict, file)
 
     def frame_pause_btn_clicked(s):
-        # if the daq is providing data, then switch to "use buffer"
-        # otherwise this button does nothing
-        if s.cfg_dict["data_src"] == "daq":
-            s.use_buf_src_rbut.setChecked(True)
-        #if not s.cfg_dict["paused"]:
-        #    new_cfg_dict = OrderedDict()
-        #    new_cfg_dict["paused"] = True
-        #    #s.update_config(new_cfg_dict)
-        #    s.update_config(new_cfg_dict, ["force_update"])
-        #    s.frame_pause_btn.setText("Resume Capture")
-        #else:
-        #    new_cfg_dict = OrderedDict()
-        #    new_cfg_dict["paused"] = False
-        #    #s.update_config(new_cfg_dict)
-        #    s.update_config(new_cfg_dict, ["force_update"])
-        #    s.frame_pause_btn.setText("Pause Capture")
-        #pass
+        pass
 
 
 
@@ -436,49 +387,15 @@ class THzImageTab(QWidget):
     # NOTE TODO need to add saving of surface plots functionality
     # NOTE TODO THIS NEEDS MAJOR WORK NOW THAT WE HAVE DAQ CAPABILITIES 
     def ld_save_image_autosave_btn_clicked(s):
-        if s.cfg_dict["data_src"] == "dat_file":
-            #frame_style = s.cfg_dict["frame_style"]
-            plot_style = s.cfg_dict["plot_style"]
-            data_fpath_0 = s.cfg_dict["data0_fpath"]
-            data_fpath_1 = s.cfg_dict["data1_fpath"]
-            image_desc = s.ld_save_image_desc_ledit.text()
+        plot_style = s.cfg_dict["plot_style"]
+        image_desc = s.ld_save_image_desc_ledit.text()
+        DFLT_DATA_DIR_unix = conv_fpath_to_unix(s.cfg_dict["default_data_dir"]) 
+        fpath = DFLT_DATA_DIR_unix + image_desc + "_" + plot_style + ".png"
+        s.thz_image_obj.save_cur_image(fpath, image_desc)
 
-            # use the pixel 0 filename to generate the image file if pixel 0 is 
-            # in the dataset
-            if data_fpath_0 != None:
-                data_fpath = conv_fpath_to_unix(data_fpath_0)
-
-            # use the pixel 1 filename to generate the image file if pixel 0 is 
-            # not in the dataset
-            elif data_fpath_1 != None:
-                data_fpath = conv_fpath_to_unix(data_fpath_1)
-            fname = data_fpath.split("/")[-1]
-            fprefix = fname[0:16]
-            DFLT_DATA_DIR_unix = conv_fpath_to_unix(s.cfg_dict["default_data_dir"]) 
-            fpath = DFLT_DATA_DIR_unix + fprefix + image_desc + "__" + plot_style + ".png"
-            s.thz_image_obj.save_cur_image(fpath, fprefix)
-
-            msgbox = QMessageBox()
-            msgbox.setText("The Image has been Saved!")
-            msgbox.exec()
-
-        elif s.cfg_dict["data_src"] == "daq":
-            plot_style = s.cfg_dict["plot_style"]
-            image_desc = s.ld_save_image_desc_ledit.text()
-
-            DFLT_DATA_DIR_unix = conv_fpath_to_unix(s.cfg_dict["default_data_dir"]) 
-            fpath = DFLT_DATA_DIR_unix + image_desc + "_" + plot_style + ".png"
-            s.thz_image_obj.save_cur_image(fpath, image_desc)
-
-            msgbox = QMessageBox()
-            msgbox.setText("The Image has been Saved!")
-            msgbox.exec()
-
-
-        else:
-            msgbox = QMessageBox()
-            msgbox.setText("Invalid data source for image saving")
-            msgbox.exec()
+        msgbox = QMessageBox()
+        msgbox.setText("The Image has been Saved!")
+        msgbox.exec()
 
 
 
@@ -506,25 +423,7 @@ class THzImageTab(QWidget):
 
 
     def update_data_src_status(s, stat_id):
-        #print(f"got here with {stat_id}")
-        if s.cfg_dict["data_src"] == "daq":
-            #style_options = "background-color: gray; color: white"
-            #s.file_status_ledit.setStyleSheet(style_options)
-            #s.file_status_ledit.setText("INACTIVE")
-
-            if stat_id == "NOT_CONNECTED":
-                style_options = "background-color: yellow; color: black"
-                s.data_src_status_ledit.setStyleSheet(style_options)
-                s.data_src_status_ledit.setText("CONNECTING TO DAQ...")
-            elif stat_id == "CONNECTED":
-                style_options = "background-color: green; color: white"
-                s.data_src_status_ledit.setStyleSheet(style_options)
-                s.data_src_status_ledit.setText("DAQ CONNECTED")
-        elif s.cfg_dict["data_src"] == "dat_file":
-            #style_options = "background-color: gray; color: white"
-            #s.data_src_status_ledit.setStyleSheet(style_options)
-            #s.data_src_status_ledit.setText("INACTIVE")
-
+        if s.cfg_dict["data_src"] == "external_h5":
             if stat_id == "PROC_FILE":
                 style_options = "background-color: yellow; color: black"
                 s.data_src_status_ledit.setStyleSheet(style_options)
@@ -533,22 +432,6 @@ class THzImageTab(QWidget):
                 style_options = "background-color: green; color: white"
                 s.data_src_status_ledit.setStyleSheet(style_options)
                 s.data_src_status_ledit.setText("FILE PROCESSED")
-
-        elif s.cfg_dict["data_src"] == "external_h5":
-            if stat_id == "PROC_FILE":
-                style_options = "background-color: yellow; color: black"
-                s.data_src_status_ledit.setStyleSheet(style_options)
-                s.data_src_status_ledit.setText("PROCESSING FILE...")
-            elif stat_id == "FILE_PROC":
-                style_options = "background-color: green; color: white"
-                s.data_src_status_ledit.setStyleSheet(style_options)
-                s.data_src_status_ledit.setText("FILE PROCESSED")
-
-        elif s.cfg_dict["data_src"] == "use_buffer":
-            style_options = "background-color: green; color: white"
-            s.data_src_status_ledit.setStyleSheet(style_options)
-            s.data_src_status_ledit.setText("MOST RECENT FRAME")
-
 
         elif s.cfg_dict["data_src"] == "disabled":
             style_options = "background-color: gray; color: white"

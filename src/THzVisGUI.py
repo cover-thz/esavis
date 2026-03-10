@@ -23,7 +23,6 @@ from PySide6 import QtCore, QtWidgets, QtGui
 from PySide6.QtCore import Qt, QTimer
 import os
 import sys
-import ipdb # NOTE REMOVE
 import json
 #from math import nan
 import signal
@@ -147,16 +146,9 @@ def get_default_cfgs():
     DFLT_CFG_DICT["ch0_en"] = True
     DFLT_CFG_DICT["ch1_en"] = True
 
-    DFLT_CFG_DICT["data_format_in"] = "time_domain"
+    DFLT_CFG_DICT["data_format_in"] = "power_spectrum"
 
-    DFLT_CFG_DICT["turn_hyst"]  = 0.
-    DFLT_CFG_DICT["turn_az_margin"]  = 0.
-    DFLT_CFG_DICT["daq_num_rangelines"]  = 0
-    DFLT_CFG_DICT["fraction_filled_thresh"]  = 0.1
     DFLT_CFG_DICT["save_image_desc"] = "NONE"
-
-    DFLT_CFG_DICT["turn_min_az"]    = -205
-    DFLT_CFG_DICT["turn_max_az"]    = 205
 
     DFLT_CFG_DICT["threshold_db"] = 0.
     DFLT_CFG_DICT["contrast_db"] = 0.
@@ -194,19 +186,13 @@ def get_default_cfgs():
     DFLT_CFG_DICT["aux_az_val"] = -1
     DFLT_CFG_DICT["aux_el_val"] = -1
 
-    DFLT_CFG_DICT["data0_fpath"] = None
-    DFLT_CFG_DICT["data1_fpath"] = None
     DFLT_CFG_DICT["external_h5_fpath"] = None
 
 
     # These values do not appear in the GUI yet
     # so they are "hard-coded"
-    DFLT_CFG_DICT["daq_timeout"]  = 2.
     DFLT_CFG_DICT["el_encoder_to_cm"]  = 16/500
     DFLT_CFG_DICT["az_encoder_to_cm"]  = 16/500
-    DFLT_CFG_DICT["daq_addr"]  = "localhost"
-
-    DFLT_CFG_DICT["data_src_ovr"] = "None"
 
     DFLT_CFG_DICT["flags"] = []
 
@@ -216,10 +202,6 @@ def get_default_cfgs():
     DFLT_CFG_DICT["dbg_1"] = False
     DFLT_CFG_DICT["dbg_2"] = False
     DFLT_CFG_DICT["profiler"] = False
-    #DFLT_CFG_DICT["daq_debug"] = False
-    DFLT_CFG_DICT["daq_debug"] = True
-    DFLT_CFG_DICT["acq_dbg"] = False
-
     DFLT_CFG_DICT["frame_update_dbg"] = False
     return DFLT_CFG_DICT
 
@@ -250,7 +232,6 @@ class MainWindow(QMainWindow):
     cur_proc_data_file_0 = None
     cur_proc_data_file_1 = None
     proc_pipes = None
-    daq_connected = False
 
 
     def __init__(s, DFLT_DATA_DIR, CFG_DFLT_PATH, CONFIG_DIR, proc_pipes):
@@ -275,17 +256,13 @@ class MainWindow(QMainWindow):
         s.cfg_pipe_maxcount = 1
         s.update_cfg_flag   = False
 
-        # starts out at 2 seconds when the daq is not connected, changes t
-        s.NO_DAQ_PERIOD         = 3.0
-        s.DAQ_CONNECTED_PERIOD  = 0.1
-
         s.SLOW_UPDATES  = 3.0
         s.FAST_UPDATES  = 0.1
 
         # maximum length of time without a real frame coming through 
         # before pushing an empty or "null" frame through the GUI to 
         # update all the objects
-        s.max_null_frame_update_period     = s.NO_DAQ_PERIOD
+        s.max_null_frame_update_period     = s.SLOW_UPDATES
 
         # maximum length of time without a frame update when data source is 
         # dat_file or use_buffer before forcing a frame update so we can 
@@ -296,11 +273,6 @@ class MainWindow(QMainWindow):
 
         # used for seeing the frame-to-frame "rate"
         s.prev_frame_time = None
-
-        # this is used to mark time for how often we're querying the processing
-        # core to see if the DAQ is connected
-        s.last_daq_query_time   = None
-        s.daq_query_period      = 2.
 
         # sets ths title and default size of the window
         s.setWindowTitle('THz Vizualizer GUI')
@@ -317,36 +289,25 @@ class MainWindow(QMainWindow):
         s.cfg_dict["default_data_dir"] = DFLT_DATA_DIR
         s.cfg_dict["flags"] = []
 
-        # keys that indicate that a file should be reprocessed:
-        s.reproc_buf_keys = ["el_side_0_start","el_side_0_end",
-            "el_side_1_start","el_side_1_end","ylen","xlen","fft_len",
-            "num_noise_pts","noise_start_frac","chirp_span","chirp_time",
-            "dead_pix_val","fs_adc","el_offset0","el_offset1",
-            "center_rangeval","dec_val","ch0_offset","ch1_offset",
-            "disable_el_side0","disable_el_side1","calc_weighted_sum",
-            "ch0_en","ch1_en","data_format_in","turn_hyst","turn_az_margin",
-            "daq_num_rangelines","fraction_filled_thresh","threshold_db",
+        # keys that indicate that a reprocessing is needed:
+        s.reproc_buf_keys = ["ylen","xlen","fft_len",
+            "num_noise_pts","noise_start_frac",
+            "dead_pix_val",
+            "calc_weighted_sum",
+            "threshold_db",
             "contrast_db","half_peak_width","min_range","max_range",
             "min_az","max_az","min_el","max_el","plot_style",
             "peak_selection","aux_x_ind","aux_y_ind"]
 
 
         # config keys that if changed indicate that a file should be reloaded
-        # because the regridded version in the data processor isn't enough.  
-        # this usually means that the grid dimensions have changed or the 
-        # base rangeline extraction parameters like the elevation mirror 
-        # starting encoder value have changeed.
-        s.reload_file_keys = ["el_side_0_start","el_side_0_end",
-            "el_side_1_start","el_side_1_end","ylen","xlen","fft_len",
-            "fs_adc","el_offset0","el_offset1", "dec_val","ch0_offset",
-            "ch1_offset","disable_el_side0","disable_el_side1",
-            "ch0_en","ch1_en","data_format_in","min_az","max_az","min_el",
-            "max_el"]
+        s.reload_file_keys = ["ylen","xlen","fft_len",
+            "min_az","max_az","min_el","max_el"]
             
             
         # these are the keys that are excluded from being saved to 
         # config files and when loading config files
-        s.excluded_keys = ["data0_fpath", "data1_fpath", "external_h5_fpath"]
+        s.excluded_keys = ["external_h5_fpath"]
 
         # create the tab widget which contains pretty much the remainder of
         # the GUI objects
@@ -594,11 +555,7 @@ class MainWindow(QMainWindow):
                 cfg_dict[key] = cfg_dict_in[key]
 
             # flag checks
-            if cfg_dict["data0_fpath"] != old_cfg_dict["data0_fpath"]:
-                s.append_if_absent(cfg_flags, "fname_changed")
-
-            # flag checks
-            elif cfg_dict["data1_fpath"] != old_cfg_dict["data1_fpath"]:
+            if cfg_dict["external_h5_fpath"] != old_cfg_dict.get("external_h5_fpath"):
                 s.append_if_absent(cfg_flags, "fname_changed")
 
 
@@ -632,11 +589,6 @@ class MainWindow(QMainWindow):
             elif cfg_dict["ylen"] != old_cfg_dict["ylen"]:
                 cfg_flags = s.append_if_absent(cfg_flags, "recalc_coarse_grid")
 
-            if cfg_dict["data_src"] == "daq":
-                if cfg_dict["ch0_en"] != old_cfg_dict["ch0_en"]:
-                    cfg_flags = s.append_if_absent(cfg_flags, "update_daq_ch")
-                elif cfg_dict["ch1_en"] != old_cfg_dict["ch1_en"]:
-                    cfg_flags = s.append_if_absent(cfg_flags, "update_daq_ch")
 
 
         # calculate fs_post_dec
@@ -656,10 +608,6 @@ class MainWindow(QMainWindow):
 
 
 
-        # always send the "setup_daq" flag if daq is data source
-        if cfg_dict["data_src"] == "daq":
-            cfg_flags = s.append_if_absent(cfg_flags, "setup_daq")
-
         if cfg_dict["profiler"] == True:
             cfg_flags = s.append_if_absent(cfg_flags, "enable_profiler")
         else:
@@ -677,8 +625,7 @@ class MainWindow(QMainWindow):
 
 
         # flag that data is currently being reprocessed
-        # only a small lie
-        if s.cfg_dict["data_src"] == "dat_file":
+        if s.cfg_dict["data_src"] == "external_h5":
             if "reproc_file" in cfg_flags:
                 stat_id = "PROC_FILE"
                 s.main_thz_tab.update_data_src_status(stat_id)
@@ -793,8 +740,8 @@ class MainWindow(QMainWindow):
                 print(f"frame_update duration: {((post-pre)/1e6):.4f} ms\n")
 
             s.aux_update(aux_data_in, True)
-            if s.cfg_dict["data_src"] in ["dat_file", "external_h5"]:
-                if data_src_in in ["dat_file", "external_h5"]:
+            if s.cfg_dict["data_src"] == "external_h5":
+                if data_src_in == "external_h5":
                     stat_id = "FILE_PROC"
                     s.main_thz_tab.update_data_src_status(stat_id)
 
@@ -804,28 +751,14 @@ class MainWindow(QMainWindow):
         # check the input queries
         while query_pipe_in.poll():
             query_in_dict = query_pipe_in.recv()
-            if "DAQ_STATUS" in query_in_dict.keys():
-                s.last_daq_query_time = time.time()
-                if query_in_dict["DAQ_STATUS"] == "CONNECTED":
-                    stat_id = "CONNECTED"
-                    if not s.daq_connected:
-                        print(f"stat_id = {stat_id}")
-                    s.daq_connected = True
-                    s.main_thz_tab.update_data_src_status(stat_id)
-                else:
-                    stat_id = "NOT_CONNECTED"
-                    if s.daq_connected:
-                        print(f"stat_id = {stat_id}")
-                    s.daq_connected = False
-                    s.main_thz_tab.update_data_src_status(stat_id)
-            elif "CFG_ACK" in query_in_dict.keys():
+            if "CFG_ACK" in query_in_dict.keys():
                 s.cfg_pipe_count -= 1
                 if s.cfg_pipe_count < 0:
                     s.cfg_pipe_count  = 0
                     print("Warning: config count went negative")
 
             elif "FILE_PROCESSING" in query_in_dict.keys():
-                if s.cfg_dict["data_src"] in ["dat_file", "external_h5"]:
+                if s.cfg_dict["data_src"] == "external_h5":
                     stat_id = "PROC_FILE"
                     s.main_thz_tab.update_data_src_status(stat_id)
 
@@ -841,39 +774,15 @@ class MainWindow(QMainWindow):
             else:
                 print(f"Warning: invalid query keys: {query_in_dict.keys()}")
 
-        # set the update period based on the most recent set of queries, the 
-        # data_src, and the daq connection
-        if s.cfg_dict["data_src"] == "daq":
-            if s.daq_connected:
-                s.max_null_frame_update_period = s.FAST_UPDATES 
-            else:
-                s.max_null_frame_update_period = s.SLOW_UPDATES 
-
-        elif s.cfg_dict["data_src"] == "use_buffer":
-            s.max_null_frame_update_period = s.FAST_UPDATES 
-
-
-        elif s.cfg_dict["data_src"] == "dat_file":
-            s.max_null_frame_update_period = s.FAST_UPDATES 
-
-        elif s.cfg_dict["data_src"] == "external_h5":
-            s.max_null_frame_update_period = s.FAST_UPDATES 
-
+        # set the update period based on the data_src
+        if s.cfg_dict["data_src"] == "external_h5":
+            s.max_null_frame_update_period = s.FAST_UPDATES
         else: # "disabled" or others
-            s.max_null_frame_update_period = s.SLOW_UPDATES 
+            s.max_null_frame_update_period = s.SLOW_UPDATES
 
 
         if _dbg:
             print("finished query_pipe_in handling")
-
-        # check for DAQ connected
-        if s.cfg_dict["data_src"] == "daq":
-            if s.last_daq_query_time == None:
-                query_pipe_out.send(["DAQ_STATUS"])
-                s.last_daq_query_time = time.time()
-            elif (time.time() - s.last_daq_query_time) > s.daq_query_period:
-                query_pipe_out.send(["DAQ_STATUS"])
-                s.last_daq_query_time = time.time()
 
         if _dbg:
             print("finished query_pipe_out handling")
@@ -955,7 +864,6 @@ if __name__ == '__main__':
     # this should be all we need for the initial configuration dictionary
     cfg_dict = OrderedDict()
     cfg_dict["data_src"] = "disabled"
-    cfg_dict["data_src_ovr"] = "None"
     cfg_dict["default_data_dir"] = DFLT_DATA_DIR
 
     # construct the multiprocessing system

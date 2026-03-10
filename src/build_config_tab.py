@@ -54,24 +54,6 @@ def build_config_tab(cfg_tab):
     cfg_tab_contents    = QWidget()
     main_layout         = QVBoxLayout()
 
-    ####################################################################
-    # First row of widgets on this tab page
-    #
-    row1_layout = QHBoxLayout()
-    autoload_btn = QPushButton("Autoload")
-    autoload_desc_text  = "Automatically loads\n"
-    autoload_desc_text += "the latest dat file saved"
-    autoload_desc_label = QLabel(autoload_desc_text)
-
-    # layout
-    row1_layout.addWidget(autoload_btn)
-    row1_layout.addWidget(autoload_desc_label)
-
-    # add member variables
-    cfg_tab.autoload_btn = autoload_btn
-    cfg_tab.autoload_desc_text = autoload_desc_text
-    cfg_tab.autoload_desc_label = autoload_desc_label
-
 
     ####################################################################
     # Second row of widgets on this tab page
@@ -447,88 +429,6 @@ def build_config_tab(cfg_tab):
 
 
     ####################################################################
-    # Ninth row of widgets on this tab page
-    # TODO I will need to link all these lineedit objects to an update
-    # function to ensure that the processing flags as "stale" if you 
-    # change one of these things
-    #
-    row9_layout          = QHBoxLayout()
-    load_ch0_btn         = QPushButton("Load Ch 0 Data")
-    load_latest_ch0_btn  = QPushButton("Load Latest\nCh 0 Data")
-
-    # sub-layout to group these objects in the same row
-    row9_sub_layout         = QVBoxLayout()
-    curr_loaded0_desc_lbl   = QLabel("Current Ch 0 file loaded:")
-    curr_loaded0_val_ledit  = QLineEdit("")
-    curr_loaded0_val_ledit.setReadOnly(True)
-
-    # layout
-    row9_sub_layout.addWidget(curr_loaded0_desc_lbl)
-    row9_sub_layout.addWidget(curr_loaded0_val_ledit)
-
-    row9_layout.addWidget(load_ch0_btn)
-    row9_layout.addWidget(load_latest_ch0_btn)
-    row9_layout.addLayout(row9_sub_layout)
-
-    # add member variables
-    cfg_tab.load_ch0_btn           = load_ch0_btn
-    cfg_tab.load_latest_ch0_btn    = load_latest_ch0_btn
-    cfg_tab.curr_loaded0_desc_lbl  = curr_loaded0_desc_lbl
-    cfg_tab.curr_loaded0_val_ledit = curr_loaded0_val_ledit
-
-
-    ####################################################################
-    # 9 point 1th row of widgets on this tab page
-    #
-    row9pt1_layout      = QHBoxLayout()
-    load_ch1_btn         = QPushButton("Load Ch 1 Data")
-    load_latest_ch1_btn  = QPushButton("Load Latest\nCh 1 Data")
-
-    # sub-layout to group these objects in the same row
-    row9pt1_sub_layout         = QVBoxLayout()
-    curr_loaded1_desc_lbl   = QLabel("Current Ch 1 file loaded:")
-    curr_loaded1_val_ledit  = QLineEdit("")
-    curr_loaded1_val_ledit.setReadOnly(True)
-
-    # layout
-    row9pt1_sub_layout.addWidget(curr_loaded1_desc_lbl)
-    row9pt1_sub_layout.addWidget(curr_loaded1_val_ledit)
-
-    row9pt1_layout.addWidget(load_ch1_btn)
-    row9pt1_layout.addWidget(load_latest_ch1_btn)
-    row9pt1_layout.addLayout(row9pt1_sub_layout)
-
-    # add member variables
-    cfg_tab.load_ch1_btn           = load_ch1_btn
-    cfg_tab.load_latest_ch1_btn    = load_latest_ch1_btn
-    cfg_tab.curr_loaded1_desc_lbl  = curr_loaded1_desc_lbl
-    cfg_tab.curr_loaded1_val_ledit = curr_loaded1_val_ledit
-
-
-    ####################################################################
-    # final layout structure
-    #
-    main_layout.addLayout(row1_layout)
-    main_layout.addLayout(row2_layout)
-    main_layout.addLayout(row2pt5_layout)
-    main_layout.addLayout(row3_layout)
-    main_layout.addLayout(row4_layout)
-    main_layout.addLayout(row5_layout)
-    main_layout.addLayout(row6_layout)
-    main_layout.addLayout(row7_layout)
-    main_layout.addLayout(row8_layout)
-    main_layout.addLayout(row8pt3_layout)
-    main_layout.addLayout(row8pt4_layout)
-    main_layout.addLayout(row8pt5_layout)
-    main_layout.addLayout(row8pt6_layout)
-    main_layout.addLayout(row8pt7_layout)
-    main_layout.addLayout(row8pt8_layout)
-    main_layout.addLayout(row8pt9_layout)
-    main_layout.addLayout(row9_layout)
-    main_layout.addLayout(row9pt1_layout)
-    #main_layout.addLayout(row9pt3_layout)
-
-    ####################################################################
     # Row for loading an external HDF5 data cube
     #
     row_h5_layout          = QHBoxLayout()
@@ -551,10 +451,26 @@ def build_config_tab(cfg_tab):
 
     main_layout.addLayout(row_h5_layout)
 
+    # final layout structure
+    main_layout.addLayout(row2_layout)
+    main_layout.addLayout(row2pt5_layout)
+    main_layout.addLayout(row3_layout)
+    main_layout.addLayout(row4_layout)
+    main_layout.addLayout(row5_layout)
+    main_layout.addLayout(row6_layout)
+    main_layout.addLayout(row7_layout)
+    main_layout.addLayout(row8_layout)
+    main_layout.addLayout(row8pt3_layout)
+    main_layout.addLayout(row8pt4_layout)
+    main_layout.addLayout(row8pt5_layout)
+    main_layout.addLayout(row8pt6_layout)
+    main_layout.addLayout(row8pt7_layout)
+    main_layout.addLayout(row8pt8_layout)
+    main_layout.addLayout(row8pt9_layout)
+
     
 
     cfg_tab.main_layout = main_layout
-    cfg_tab.row1_layout = row1_layout
     cfg_tab.row2_layout = row2_layout
     cfg_tab.row2pt5_layout = row2pt5_layout
     cfg_tab.row3_layout = row3_layout
@@ -570,9 +486,6 @@ def build_config_tab(cfg_tab):
     cfg_tab.row8pt7_layout = row8pt7_layout
     cfg_tab.row8pt8_layout = row8pt8_layout
     cfg_tab.row8pt9_layout = row8pt9_layout
-    cfg_tab.row9_layout = row9_layout
-    cfg_tab.row9pt1_layout = row9pt1_layout
-    #cfg_tab.row9pt3_layout = row9pt3_layout
 
     cfg_tab_contents.setLayout(main_layout)
 

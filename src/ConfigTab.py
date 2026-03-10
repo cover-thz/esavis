@@ -3,7 +3,6 @@
 from PySide6 import QtCore, QtWidgets, QtGui
 from PySide6.QtCore import Qt
 import os
-import ipdb # NOTE REMOVE
 import json
 import collections
 #from math import nan
@@ -52,41 +51,6 @@ from PySide6.QtWidgets import (
 ##############################################################################
 # Simple Helper Functions
 ##############################################################################
-
-def get_last_modified_file(dir_val, extension, channel=None):
-    """
-    returns the filename of the most recently modified file in dir_val with
-    the passed 'extension'.  Note that 'extension' should not include the '.'
-    """
-    fnames = []
-    path_prefix = f"{dir_val}/"
-    for val in os.listdir(dir_val):
-        if os.path.isfile(path_prefix+val):
-           fnames.append(val)
-
-    best_last_mod_time = 0
-    for fname in fnames:
-        curr_ext = fname.split(".")[-1]
-        if curr_ext == extension:
-            if channel == 0:
-                # check specific portion of file to see if it matches the string
-                # associated with channel 0 files 
-                if fname[-17:-9] != "Channel0":
-                    continue
-
-            elif channel == 1:
-                # check specific portion of file to see if it matches the string
-                # associated with channel 0 files 
-                if fname[-17:-9] != "Channel1":
-                    continue
-
-            last_mod_time = os.stat(path_prefix+fname).st_mtime
-            if last_mod_time > best_last_mod_time:
-                best_last_mod_time = last_mod_time
-                last_mod_fname = fname
-
-    return last_mod_fname
-
 
 def fix_data_path(data_path_in):
     """
@@ -171,18 +135,6 @@ class ConfigTab(QScrollArea):
 
 
         # radar data related callbacks
-        s.load_ch0_btn.clicked.connect(lambda: 
-            s.load_dat_btn_clicked(0))
-        s.load_latest_ch0_btn.clicked.connect(lambda: 
-            s.load_latest_dat_btn_clicked(0))
-
-        s.load_ch1_btn.clicked.connect(lambda: 
-            s.load_dat_btn_clicked(1))
-        s.load_latest_ch1_btn.clicked.connect(lambda: 
-            s.load_latest_dat_btn_clicked(1))
-
-        s.autoload_btn.clicked.connect(s.autoload_btn_clicked)
-
         # external HDF5 load
         s.load_h5_btn.clicked.connect(s.load_h5_btn_clicked)
 
@@ -317,72 +269,6 @@ class ConfigTab(QScrollArea):
 
 
 
-    def load_dat_btn_clicked(s, channel):
-        """
-        clicking the load data button will load the data
-        """
-        fpath, ok = QFileDialog.getOpenFileName(
-            s,
-            "Select a Radar Data File", 
-            s.cfg_dict["default_data_dir"],
-            ""
-        )
-        if fpath:
-            fpath = fix_data_path(fpath)
-            cfg_dict_updates = collections.OrderedDict()
-            if channel==0:
-                cfg_dict_updates["data0_fpath"] = fpath
-                s.curr_loaded0_val_ledit.setText(str(fpath))
-            elif channel==1:
-                cfg_dict_updates["data1_fpath"] = fpath
-                s.curr_loaded1_val_ledit.setText(str(fpath))
-            else:
-                raise Exception("Invalid Channel")
-
-            # update the configuration
-            s.update_config(cfg_dict_updates, ["fname_changed"])
-
-
-
-    def load_latest_dat_btn_clicked(s, channel):
-        """
-        clicking this button will load the last modified data file from the 
-        default data directory
-        """
-        # grab the last modified file from the default data dir
-        try: 
-            data_dir = s.cfg_dict["default_data_dir"]
-            extension = "dat"
-            last_mod_fname = get_last_modified_file(data_dir, extension, channel)
-            fpath = data_dir + last_mod_fname
-
-            if fpath:
-                fpath = fix_data_path(fpath)
-                cfg_dict_updates = collections.OrderedDict()
-                if channel==0:
-                    cfg_dict_updates["data0_fpath"] = fpath
-                    s.curr_loaded0_val_ledit.setText(str(fpath))
-                elif channel==1:
-                    cfg_dict_updates["data1_fpath"] = fpath
-                    s.curr_loaded1_val_ledit.setText(str(fpath))
-                else:
-                    raise Exception("Invalid Channel")
-
-                # update the configuration
-                s.update_config(cfg_dict_updates, ["fname_changed"])
-
-
-            else:
-                except_str = "Invalid or non-existent default "
-                except_str += "data directory"
-                raise Exception(except_str)
-
-        except:
-            except_str = "Invalid or non-existent default "
-            except_str += "data directory"
-            raise Exception(except_str)
-
-
     def load_h5_btn_clicked(s):
         """
         Load an external HDF5 data cube for visualization.
@@ -400,17 +286,5 @@ class ConfigTab(QScrollArea):
             cfg_dict_updates["data_src"] = "external_h5"
             s.curr_h5_val_ledit.setText(str(fpath))
             s.update_config(cfg_dict_updates, ["fname_changed"])
-
-
-    def autoload_btn_clicked(s):
-        """
-        callback for when autoload button is clicked.  It will process
-        the data files for the enabled channels (if the corresponding files 
-        are also loaded
-        """
-        if (s.cfg_dict["ch0_en"]):
-            s.load_latest_dat_btn_clicked(0)
-        if (s.cfg_dict["ch1_en"]):
-            s.load_latest_dat_btn_clicked(1)
 
 
