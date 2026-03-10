@@ -428,6 +428,7 @@ def build_thz_image_tab(thz_img_tab):
     cs_lbl_title = QLabel("Color Scaling")
     cs_autoscale_chkb  = QCheckBox()
     cs_autoscale_chkb.setText("Auto Color Scale:")
+    cs_autoscale_chkb.setChecked(True)
 
     cs_lbl_min   = QLabel("Min:")
     cs_lbl_min.setFixedWidth(30)

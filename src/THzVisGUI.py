@@ -154,7 +154,7 @@ def get_default_cfgs():
     DFLT_CFG_DICT["min_range"] = 0.
     DFLT_CFG_DICT["max_range"] = 7000.
 
-    DFLT_CFG_DICT["autoscale_color"] = False
+    DFLT_CFG_DICT["autoscale_color"] = True
     DFLT_CFG_DICT["color_scale_min"] = 0.
     DFLT_CFG_DICT["color_scale_max"] = 7000.
 
@@ -270,7 +270,7 @@ class MainWindow(QMainWindow):
         # sets ths title and default size of the window
         s.setWindowTitle('THz Vizualizer GUI')
         #s.setGeometry(100, 100, 400, 300)
-        s.setGeometry(100, 100, 500, 700)
+        s.setGeometry(100, 100, 1000, 700)
 
         # central widget needs to be defined
         s.central_widget = QWidget()
@@ -806,17 +806,12 @@ if __name__ == '__main__':
     #icon = QtGui.QIcon("Cover_Symbol_RGB_Black.svg")
     #app.setWindowIcon(icon)
 
-    # disabling command-line parsing options for now because nobody will 
-    # actually use them
-    parser = QtCore.QCommandLineParser()
-    parser.addHelpOption()
-    parser.addVersionOption()
-
-    #config_file_option = QtCore.QCommandLineOption(
-    #    ["c", "config"], "Config file path to load", "file")
-    #parser.addOption(config_file_option)
-    parser.process(app)
-    #config_file = parser.value(config_file_option)
+    import argparse
+    ap = argparse.ArgumentParser(description="THz Visualizer")
+    ap.add_argument("h5file", nargs="?", default="",
+                    help="HDF5 data cube file path to load on startup")
+    args, _qt_remaining = ap.parse_known_args()
+    h5_file_arg = args.h5file
 
     # this should be all we need for the initial configuration dictionary
     cfg_dict = OrderedDict()
@@ -839,10 +834,22 @@ if __name__ == '__main__':
                            query_pipe_out)
 
     # Defining and showing the main window
-    #window = MainWindow(config_file)
     window = MainWindow(DFLT_DATA_DIR, CFG_DFLT_PATH, CONFIG_DIR, proc_pipes)
                 
     window.show()
+
+    # If an HDF5 file was passed via command line, load it
+    if h5_file_arg:
+        h5_path = os.path.abspath(h5_file_arg)
+        if os.path.isfile(h5_path):
+            h5_path = h5_path.replace("\\", "/")
+            cfg_update = OrderedDict()
+            cfg_update["external_h5_fpath"] = h5_path
+            cfg_update["data_src"] = "external_h5"
+            window.main_thz_tab.curr_h5_val_ledit.setText(h5_path)
+            window.update_config(cfg_update, ["fname_changed"])
+        else:
+            print(f"Warning: HDF5 file not found: {h5_path}")
     sys.exit(app.exec())
 
     # NOTE the following line of code doesn't actually work properly 

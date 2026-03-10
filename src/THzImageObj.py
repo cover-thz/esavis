@@ -483,6 +483,7 @@ class THzMeshImage(pg.PlotWidget):
         s.setTitle("THz Image")
         s.plot_item.invertX(False)
         s.plot_item.invertY(False)
+        s.plot_item.setAspectLocked(True)
 
 
     def set_levels(s, min_val, max_val):

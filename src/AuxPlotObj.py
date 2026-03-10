@@ -418,7 +418,8 @@ class AuxPlotObj(QWidget):
                 if type(legend) != type(None):
                     s.plt_axes.get_legend().remove()
 
+            s.plt_axes.set_xlim(range_lut_cm[0], range_lut_cm[-1])
             s.plt_axes.relim()
-            s.plt_axes.autoscale_view()
+            s.plt_axes.autoscale_view(axis='y')
             s.canvas.draw()
 
