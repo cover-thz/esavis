@@ -149,9 +149,6 @@ class THzImageTab(QWidget):
         s.ld_save_image_chng_dir_btn.clicked.connect(
             s.ld_save_image_chng_dir_btn_clicked)
 
-        s.reset_camera_btn.clicked.connect(
-            s.reset_camera_btn_clicked)
-
         # pixel click signal from the image
         s.thz_image_obj.new_pix_clicked.connect(s.new_pix_clicked)
 
@@ -351,7 +348,7 @@ class THzImageTab(QWidget):
             cfg_dict_updates = collections.OrderedDict()
             cfg_dict_updates["external_h5_fpath"] = fpath
             cfg_dict_updates["data_src"] = "external_h5"
-            s.curr_h5_val_ledit.setText(str(fpath))
+            s.window().setWindowTitle('THz Visualizer — ' + fpath)
             s.update_config(cfg_dict_updates, ["fname_changed"])
 
 
@@ -393,31 +390,6 @@ class THzImageTab(QWidget):
             s.update_config(new_cfg_dict)
             s.ld_save_image_curr_dir_ledit.setText(s.cfg_dict["default_data_dir"])
 
-
-    def reset_camera_btn_clicked(s):
-        """
-        Resets the camera position for the 3D plots
-        """
-        s.update_image(None, False,reset_camera=True)
-
-
-
-
-    def update_data_src_status(s, stat_id):
-        if s.cfg_dict["data_src"] == "external_h5":
-            if stat_id == "PROC_FILE":
-                style_options = "background-color: yellow; color: black"
-                s.data_src_status_ledit.setStyleSheet(style_options)
-                s.data_src_status_ledit.setText("PROCESSING FILE...")
-            elif stat_id == "FILE_PROC":
-                style_options = "background-color: green; color: white"
-                s.data_src_status_ledit.setStyleSheet(style_options)
-                s.data_src_status_ledit.setText("FILE PROCESSED")
-
-        else:
-            style_options = "background-color: gray; color: white"
-            s.data_src_status_ledit.setStyleSheet(style_options)
-            s.data_src_status_ledit.setText("NO FILE LOADED")
 
 
 

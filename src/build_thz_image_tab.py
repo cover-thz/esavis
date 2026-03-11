@@ -90,105 +90,25 @@ def build_thz_image_tab(thz_img_tab):
 
     
     ####################################################################
-    # Processing config stuff.  This is a rather long section as it 
-    # contains all the associated tabs
+    # Load HDF5 button — goes at top of right column
     #
-    #
-    proc_cfg_tab_widget = QTabWidget()
-    thz_img_tab.proc_cfg_tab_widget = proc_cfg_tab_widget
+    load_h5_btn = QPushButton("Load HDF5 Cube")
+    thz_img_tab.load_h5_btn = load_h5_btn
 
 
     ####################################################################
-    # "Source" tab — HDF5 loader + status
+    # Plot Style radio buttons — will go below main image
     #
-    src_tab = QWidget()
-    proc_cfg_tab_widget.addTab(src_tab, "Source")
-    src_tab_top_layout = QVBoxLayout()
-
-    # HDF5 load button + filepath display
-    src_h5_layout = QHBoxLayout()
-    load_h5_btn = QPushButton("Load HDF5\nCube")
-    src_h5_sub_layout = QVBoxLayout()
-    curr_h5_desc_lbl = QLabel("Current HDF5 file loaded:")
-    curr_h5_val_ledit = QLineEdit("")
-    curr_h5_val_ledit.setReadOnly(True)
-    src_h5_sub_layout.addWidget(curr_h5_desc_lbl)
-    src_h5_sub_layout.addWidget(curr_h5_val_ledit)
-    src_h5_layout.addWidget(load_h5_btn)
-    src_h5_layout.addLayout(src_h5_sub_layout)
-
-    # Status display
-    src_status_layout = QHBoxLayout()
-    data_src_status_lbl = QLabel("Status: ")
-    data_src_status_ledit = QLineEdit()
-    data_src_status_ledit.setFixedWidth(170)
-    data_src_status_ledit.setReadOnly(True)
-    src_status_layout.addWidget(data_src_status_lbl)
-    src_status_layout.addWidget(data_src_status_ledit)
-
-    # Toplevel layout of "Source" tab
-    src_tab_top_layout.addLayout(src_h5_layout)
-    src_tab_top_layout.addLayout(src_status_layout)
-
-    # Add member variables
-    thz_img_tab.src_tab               = src_tab
-    thz_img_tab.load_h5_btn           = load_h5_btn
-    thz_img_tab.curr_h5_val_ledit     = curr_h5_val_ledit
-    thz_img_tab.data_src_status_ledit = data_src_status_ledit
-
-    # final piece
-    src_tab.setLayout(src_tab_top_layout)
-
-
-    ####################################################################
-    # "Plot Style" tab
-    #
-    plot_style_tab = QWidget()
-    proc_cfg_tab_widget.addTab(plot_style_tab, "Plot Style")
-    plot_style_tab_top_layout = QHBoxLayout()
-    plot_style_lbl      = QLabel("Plot Style:")
-
-    # plot_style_sublayout_col1
-    plot_style_sublayout_col1 = QVBoxLayout()
-    plot_style_sublayout_col1.addWidget(plot_style_lbl)
-    front_peak_rbut     = QRadioButton()
-    front_peak_rbut.setText("Front Peak Range")
-    plot_style_sublayout_col1.addWidget(front_peak_rbut)
-    back_peak_rbut      = QRadioButton()
-    back_peak_rbut.setText("Back Peak Range")
-    plot_style_sublayout_col1.addWidget(back_peak_rbut)
-    front_surface_plot_rbut   = QRadioButton()
-    front_surface_plot_rbut.setText("Front Surface Plot")
-    plot_style_sublayout_col1.addWidget(front_surface_plot_rbut)
-    back_surface_plot_rbut   = QRadioButton()
-    back_surface_plot_rbut.setText("Back Surface Plot")
-    plot_style_sublayout_col1.addWidget(back_surface_plot_rbut)
-    num_oversamp_rbut     = QRadioButton()
-    #num_oversamp_rbut.setText("Show Degree of Oversampling") 
+    front_peak_rbut     = QRadioButton("Front Peak Range")
+    back_peak_rbut      = QRadioButton("Back Peak Range")
+    front_surface_plot_rbut = QRadioButton("Front Surface Plot")
+    back_surface_plot_rbut  = QRadioButton("Back Surface Plot")
+    num_oversamp_rbut   = QRadioButton("RESERVED")
     num_oversamp_rbut.setEnabled(False)
-    num_oversamp_rbut.setText("RESERVED")
-    plot_style_sublayout_col1.addWidget(num_oversamp_rbut)
-    integ_pwr_rbut     = QRadioButton()
-    integ_pwr_rbut.setText("Integrated Power")
-    plot_style_sublayout_col1.addWidget(integ_pwr_rbut)
-    point_cloud_rbut  = QRadioButton()
-    #point_cloud_rbut.setText("Point Cloud")
+    integ_pwr_rbut      = QRadioButton("Integrated Power")
+    point_cloud_rbut    = QRadioButton("RESERVED")
     point_cloud_rbut.setEnabled(False)
-    point_cloud_rbut.setText("RESERVED")
-    plot_style_sublayout_col1.addWidget(point_cloud_rbut)
 
-    #  plot_style_sublayout_col2
-    # (might want to add more stuff here, we have the space)
-    plot_style_sublayout_col2 = QVBoxLayout()
-    reset_camera_btn    = QPushButton("Reset Plot\nCamera")
-    plot_style_sublayout_col2.addWidget(reset_camera_btn)
-
-    # Toplevel layout of "Plot Style" tab
-    plot_style_tab_top_layout.addLayout(plot_style_sublayout_col1)
-    plot_style_tab_top_layout.addLayout(plot_style_sublayout_col2)
-
-    # Add member variables
-    # (not adding the sublayouts because we probably don't need them)
     thz_img_tab.front_peak_rbut         = front_peak_rbut
     thz_img_tab.back_peak_rbut          = back_peak_rbut
     thz_img_tab.front_surface_plot_rbut = front_surface_plot_rbut
@@ -196,21 +116,11 @@ def build_thz_image_tab(thz_img_tab):
     thz_img_tab.num_oversamp_rbut       = num_oversamp_rbut
     thz_img_tab.integ_pwr_rbut          = integ_pwr_rbut
     thz_img_tab.point_cloud_rbut        = point_cloud_rbut
-    thz_img_tab.reset_camera_btn        = reset_camera_btn
-
-    # final piece
-    plot_style_tab.setLayout(plot_style_tab_top_layout)
 
 
     ####################################################################
-    # "Load Save Image" tab
+    # "Load/Save Image" widgets — will go at bottom of right column
     #
-    ld_sv_image_tab = QWidget()
-    proc_cfg_tab_widget.addTab(ld_sv_image_tab, 
-                                             "Load/Save\nImage")
-    ld_save_image_tab_top_layout = QVBoxLayout()
-
-    # ld_save_image_sublayout_row1
     ld_save_image_sublayout_row1  = QHBoxLayout()
     ld_save_image_autosave_btn  = QPushButton("Autosave\nImage")
     ld_save_image_chng_dir_btn  = QPushButton("Change Save\nDirectory")
@@ -219,7 +129,6 @@ def build_thz_image_tab(thz_img_tab):
     ld_save_image_sublayout_row1.addWidget(ld_save_image_chng_dir_btn)
     ld_save_image_sublayout_row1.addWidget(ld_save_image_save_btn)
 
-    # ld_save_image_sublayout_row2
     ld_save_image_sublayout_row2 = QHBoxLayout()
     ld_save_image_curr_dir_lbl    = QLabel("Current Save Dir:")
     ld_save_image_curr_dir_ledit  = QLineEdit()
@@ -227,20 +136,12 @@ def build_thz_image_tab(thz_img_tab):
     ld_save_image_sublayout_row2.addWidget(ld_save_image_curr_dir_lbl)
     ld_save_image_sublayout_row2.addWidget(ld_save_image_curr_dir_ledit)
 
-    # ld_save_image_sublayout_row3
     ld_save_image_sublayout_row3 = QHBoxLayout()
     ld_save_image_desc_lbl    = QLabel("Image Description:")
     ld_save_image_desc_ledit  = QLineEdit()
     ld_save_image_sublayout_row3.addWidget(ld_save_image_desc_lbl)
     ld_save_image_sublayout_row3.addWidget(ld_save_image_desc_ledit)
 
-    # Toplevel layout of "Framae Style" tab
-    ld_save_image_tab_top_layout.addLayout(ld_save_image_sublayout_row1)
-    ld_save_image_tab_top_layout.addLayout(ld_save_image_sublayout_row2)
-    ld_save_image_tab_top_layout.addLayout(ld_save_image_sublayout_row3)
-
-    # Add member variables
-    # (not adding the sublayouts because we probably don't need them)
     thz_img_tab.ld_save_image_autosave_btn = ld_save_image_autosave_btn
     thz_img_tab.ld_save_image_chng_dir_btn = ld_save_image_chng_dir_btn
     thz_img_tab.ld_save_image_save_btn = ld_save_image_save_btn
@@ -248,9 +149,6 @@ def build_thz_image_tab(thz_img_tab):
     thz_img_tab.ld_save_image_curr_dir_ledit = ld_save_image_curr_dir_ledit
     thz_img_tab.ld_save_image_desc_lbl = ld_save_image_desc_lbl
     thz_img_tab.ld_save_image_desc_ledit = ld_save_image_desc_ledit
-
-    # final piece
-    ld_sv_image_tab.setLayout(ld_save_image_tab_top_layout)
 
 
 
@@ -571,28 +469,29 @@ def build_thz_image_tab(thz_img_tab):
 
 
     ####################################################################
-    # Final layout structure (3 columns upper + checkbox row lower)
+    # Final layout structure
+    # Left col: image + plot style radio buttons below
+    # Center col: aux plot + aux checkboxes below
+    # Right col: load btn, sliders, colormap, load/save image
     ####################################################################
 
     main_layout = QVBoxLayout(thz_img_tab)
     upper_layout = QHBoxLayout()
 
-    # right column: sliders, colormap, then proc cfg tabs at bottom
-    right_layout.addLayout(thresh_grid_layout)
-    right_layout.addLayout(contr_grid_layout)
-    right_layout.addLayout(pkwdth_grid_layout)
-    right_layout.addLayout(rc_grid_layout)
-    right_layout.addLayout(cs_grid_layout)
-    right_layout.addLayout(cmap_layout)
-    right_layout.addWidget(proc_cfg_tab_widget)
-    right_layout.addStretch()
+    # Left column: image + plot style radio buttons
+    left_col = QVBoxLayout()
+    left_col.addLayout(thz_img_tab.thz_image_obj)
+    plot_style_layout = QHBoxLayout()
+    plot_style_layout.addWidget(front_peak_rbut)
+    plot_style_layout.addWidget(back_peak_rbut)
+    plot_style_layout.addWidget(front_surface_plot_rbut)
+    plot_style_layout.addWidget(back_surface_plot_rbut)
+    plot_style_layout.addWidget(integ_pwr_rbut)
+    left_col.addLayout(plot_style_layout)
 
-    # upper row: image | aux plot | right column
-    upper_layout.addLayout(thz_img_tab.thz_image_obj, 3)
-    upper_layout.addWidget(thz_img_tab.aux_plot_obj, 3)
-    upper_layout.addLayout(right_layout, 2)
-
-    # lower row: aux-plot checkboxes
+    # Center column: aux plot + aux checkboxes
+    center_col = QVBoxLayout()
+    center_col.addWidget(thz_img_tab.aux_plot_obj)
     ctrl_box_layout = QGridLayout()
     ctrl_box_layout.addWidget(legend_chkb,       0, 0, 1, 1)
     ctrl_box_layout.addWidget(noise_limits_chkb, 1, 0, 1, 1)
@@ -604,9 +503,26 @@ def build_thz_image_tab(thz_img_tab):
     ctrl_box_layout.addWidget(range_cuts_chkb,   3, 1, 1, 1)
     ctrl_box_layout.addWidget(weight_sum_chkb,   0, 2, 1, 1)
     ctrl_box_layout.addWidget(pt_mrkrs_chkb,     1, 2, 1, 1)
+    center_col.addLayout(ctrl_box_layout)
+
+    # Right column: load button, sliders, colormap, load/save image
+    right_layout.addWidget(load_h5_btn)
+    right_layout.addLayout(thresh_grid_layout)
+    right_layout.addLayout(contr_grid_layout)
+    right_layout.addLayout(pkwdth_grid_layout)
+    right_layout.addLayout(rc_grid_layout)
+    right_layout.addLayout(cs_grid_layout)
+    right_layout.addLayout(cmap_layout)
+    right_layout.addLayout(ld_save_image_sublayout_row1)
+    right_layout.addLayout(ld_save_image_sublayout_row2)
+    right_layout.addLayout(ld_save_image_sublayout_row3)
+    right_layout.addStretch()
+
+    upper_layout.addLayout(left_col, 3)
+    upper_layout.addLayout(center_col, 3)
+    upper_layout.addLayout(right_layout, 2)
 
     main_layout.addLayout(upper_layout)
-    main_layout.addLayout(ctrl_box_layout)
 
     thz_img_tab.right_layout   = right_layout
     thz_img_tab.main_layout    = main_layout

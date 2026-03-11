@@ -649,10 +649,6 @@ class MainWindow(QMainWindow):
                 print(f"frame_update duration: {((post-pre)/1e6):.4f} ms\n")
 
             s.aux_update(aux_data_in, True)
-            if s.cfg_dict["data_src"] == "external_h5":
-                if data_src_in == "external_h5":
-                    stat_id = "FILE_PROC"
-                    s.main_thz_tab.update_data_src_status(stat_id)
 
         if _dbg:
             print("finished data pipe handling")
@@ -667,9 +663,7 @@ class MainWindow(QMainWindow):
                     print("Warning: config count went negative")
 
             elif "FILE_PROCESSING" in query_in_dict.keys():
-                if s.cfg_dict["data_src"] == "external_h5":
-                    stat_id = "PROC_FILE"
-                    s.main_thz_tab.update_data_src_status(stat_id)
+                pass
 
             elif "EXTERNAL_H5_META" in query_in_dict.keys():
                 meta = query_in_dict["EXTERNAL_H5_META"]
@@ -797,7 +791,7 @@ if __name__ == '__main__':
             cfg_update = OrderedDict()
             cfg_update["external_h5_fpath"] = h5_path
             cfg_update["data_src"] = "external_h5"
-            window.main_thz_tab.curr_h5_val_ledit.setText(h5_path)
+            window.setWindowTitle('THz Visualizer \u2014 ' + h5_path)
             window.update_config(cfg_update, ["fname_changed"])
         else:
             print(f"Warning: HDF5 file not found: {h5_path}")
