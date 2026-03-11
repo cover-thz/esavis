@@ -254,8 +254,6 @@ class THzImageTab(QWidget):
             s.thz_image_obj.save_cur_image(fpath, fname)
 
 
-    # NOTE TODO need to add saving of surface plots functionality
-    # NOTE TODO THIS NEEDS MAJOR WORK NOW THAT WE HAVE DAQ CAPABILITIES 
     def ld_save_image_autosave_btn_clicked(s):
         plot_style = s.cfg_dict["plot_style"]
         image_desc = s.ld_save_image_desc_ledit.text()

@@ -77,21 +77,13 @@ def get_default_cfgs():
     DFLT_CFG_DICT["fft_len"] = 1
     DFLT_CFG_DICT["num_noise_pts"] = 1
     DFLT_CFG_DICT["noise_start_frac"] = 0.
-    DFLT_CFG_DICT["chirp_span"] = 0.
-    DFLT_CFG_DICT["chirp_time"] = 0.
 
     DFLT_CFG_DICT["dead_pix_val"] = 0.
     DFLT_CFG_DICT["fs_adc"] = 0.
 
     DFLT_CFG_DICT["dec_val"] = 1
-    DFLT_CFG_DICT["ch0_offset"] = 0.
-    DFLT_CFG_DICT["ch1_offset"] = 0.
 
     DFLT_CFG_DICT["calc_weighted_sum"] = True
-    DFLT_CFG_DICT["ch0_en"] = True
-    DFLT_CFG_DICT["ch1_en"] = True
-
-    DFLT_CFG_DICT["data_format_in"] = "power_spectrum"
 
     DFLT_CFG_DICT["save_image_desc"] = "NONE"
 
@@ -240,8 +232,8 @@ class MainWindow(QMainWindow):
         s.lock_pipes = True
         time.sleep(0.1)
 
-        # NOTE the following 2 lines does not appear to work, but this is 
-        # cleanup, we can defer this problem indefinitely 
+        # NOTE the following 2 lines may not work, but this is cleanup
+        # that can be deferred indefinitely
         s.cfg_dict["data_src"] = "disabled"
         s.proc_pipes.cfg_pipe.send(s.cfg_dict)
 
@@ -274,10 +266,6 @@ class MainWindow(QMainWindow):
         return cfg_flags
 
 
-    # NOTE NOTE NOTE: ACTUALLY WRITE THIS FUNCTION!
-    # NOTE so we need a few more functions to to "centralize" the configuration
-    # and flag generation for the processing core (which is interacted 
-    # with here)
     def update_config(s, cfg_dict_in, cfg_flags_in=None):
         """
         This function is called by lower level objects (the tabs) to "update"
@@ -527,9 +515,6 @@ class MainWindow(QMainWindow):
 
         if _dbg:
             print("finished query_pipe_out handling")
-
-        # NOTE Placeholder
-        # otherwise just trash whatever comes out of the query for now
 
         # here we perform the actual configuration update and handshaking
         # 

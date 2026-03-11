@@ -208,8 +208,7 @@ class THzImageObj(QHBoxLayout):
         return needs_update
 
 
-    def update_image(s, frame_data, new_frame_flag, reset_camera=False, 
-                     set_trace_val=False):
+    def update_image(s, frame_data, new_frame_flag, reset_camera=False):
         """
         This performs the actual image updating.  Replaces update_plot()
         """
@@ -263,14 +262,14 @@ class THzImageObj(QHBoxLayout):
                     s.thz_image_stack.setCurrentIndex(0)
                     s.thz_mesh_obj.update_plot(s.x_grid_2d, s.y_grid_2d, 
                             s.pixel_grid, cmap_str, color_min, color_max, 
-                            reset_camera, set_trace_val)
+                            reset_camera)
                                                   
 
                 elif plot_style in ["front_surface_range", "back_surface_range"]:
                     s.thz_image_stack.setCurrentIndex(1)
                     s.thz_surface_obj.update_plot(s.x_grid_1d_cm, s.y_grid_1d_cm, 
                             s.pixel_grid_nans, cmap_str, 
-                            color_min, color_max, reset_camera, set_trace_val)
+                            color_min, color_max, reset_camera)
                             
 
                 else:
@@ -350,10 +349,6 @@ class THzImageObj(QHBoxLayout):
         fig.savefig(fpath)
 
         plt.close(fig)
-        #if plot_style in ["front_peak_range", "back_peak_range", 
-        #"integ_power_plot", "num_avgs_plot"]:
-
-
 ##############################################################################
 ##############################################################################
 ##############################################################################
@@ -362,8 +357,7 @@ class THzImageObj(QHBoxLayout):
 
 class THzMeshImage(pg.PlotWidget):
     """
-    This is the 
-
+    2D color mesh widget for THz image display.
     """
     thz_image_tab   = None
     
@@ -405,7 +399,7 @@ class THzMeshImage(pg.PlotWidget):
 
 
     def update_plot(s, x_grid_2d, y_grid_2d, image, cmap_str, color_min, 
-                    color_max, reset_camera=False, set_trace_val=False):
+                    color_max, reset_camera=False):
         s.set_levels(color_min, color_max)
 
         s.color_mesh.setData(x_grid_2d, y_grid_2d, image, autoLevels=False)
@@ -418,7 +412,6 @@ class THzMeshImage(pg.PlotWidget):
 ##############################################################################
 ##############################################################################
 
-# NOTE A LOT OF WORK TO DO ON THIS 
 class THzSurfaceObj(gl.GLViewWidget):
     """
     This is a widget that contains a surface plot for the THz data
@@ -444,7 +437,6 @@ class THzSurfaceObj(gl.GLViewWidget):
         s.setCameraParams(center=pos, distance=distance, fov=fov, 
                              elevation=elevation, azimuth=azimuth)
 
-        # NOTE This needs to be upgraded
         # organization is: [min_rgb, max_rgb]
         s.cmap_dict = {}
         s.cmap_dict["jet"]        = [(0.,0.,1.),(1.,0.,0.)]
@@ -463,7 +455,7 @@ class THzSurfaceObj(gl.GLViewWidget):
 
 
     def update_plot(s, x_grid_cm, y_grid_cm, image, cmap_str, color_min, 
-                    color_max, reset_camera=False, set_trace_val=False):
+                    color_max, reset_camera=False):
 
         image_adj = image
         image_adj = np.flip(image, 1)

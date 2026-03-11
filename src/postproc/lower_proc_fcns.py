@@ -39,19 +39,6 @@ extract_single_rangeline_peaks.argtypes = [ct.POINTER(ct.c_double),
     ct.c_bool, ct.POINTER(ct.c_double), ct.POINTER(ct.c_double), 
     ct.POINTER(ct.c_double), ct.POINTER(ct.c_int)]
 extract_single_rangeline_peaks.restype = ct.c_int
-    
-# alternative (that I do not believe would actually work):
-#ct_dbl_ptr = ct.POINTER(ct.c_double)
-#ct_int = ct.c_int
-#ct_dbl = ct.c_double
-#ct_int_ptr = ct.POINTER(ct.c_int)
-#ct_bool = ct.c_bool
-#ct_bool_ptr = ct.POINTER(ct.c_bool)
-# 
-#extract_single_rangeline_peaks.argtypes = [ct_dbl_ptr, ct_int, ct_dbl_ptr, 
-#    ct_dbl, ct_dbl, ct_int_ptr, ct_dbl, ct_dbl, ct_int, ct_dbl, ct_int_ptr, 
-#    ct_bool, ct_dbl_ptr, ct_dbl_ptr, ct_dbl_ptr, ct_int_ptr]
-#    
 
 extract_all_rangeline_peaks.argtypes = [ct.POINTER(ct.c_double), 
     ct.POINTER(ct.c_bool), ct.c_int, ct.c_int, ct.POINTER(ct.c_double), 
