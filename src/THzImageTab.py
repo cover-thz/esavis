@@ -76,7 +76,7 @@ class THzImageTab(QWidget):
     # not to be modified outside of the MainWindow, it is only provided
     # to be read
     def __init__(s, CFG_DFLT_PATH, CONFIG_DIR, 
-                 update_config, cfg_dict, sing_pix_tab):
+                 update_config, cfg_dict):
         super().__init__()
 
         
@@ -84,7 +84,6 @@ class THzImageTab(QWidget):
         s.CONFIG_DIR     = CONFIG_DIR
         s.update_config  = update_config
         s.cfg_dict       = cfg_dict
-        s.sing_pix_tab   = sing_pix_tab
 
         # builds up all the widgets and layout adds them to s
         bti.build_thz_image_tab(s)
@@ -153,9 +152,8 @@ class THzImageTab(QWidget):
         s.reset_camera_btn.clicked.connect(
             s.reset_camera_btn_clicked)
 
-        s.frame_pause_btn.clicked.connect(
-            s.frame_pause_btn_clicked)
-
+        # pixel click signal from the image
+        s.thz_image_obj.new_pix_clicked.connect(s.new_pix_clicked)
 
         ####################################################################
         # set the default save image path
@@ -181,13 +179,8 @@ class THzImageTab(QWidget):
         s.cs_ledit_min.setText(str(cfg_dict["color_scale_min"]))
         s.cs_ledit_max.setText(str(cfg_dict["color_scale_max"]))
 
-        s.az_min_lim_ledit.setText(str(cfg_dict["min_az"]))
-        s.az_max_lim_ledit.setText(str(cfg_dict["max_az"]))
-        s.el_min_lim_ledit.setText(str(cfg_dict["min_el"]))
-        s.el_max_lim_ledit.setText(str(cfg_dict["max_el"]))
-
-        colormap_str = cfg_dict["colormap"] 
-        colormap_ind = s.colormaps.index(colormap_str)
+        colormap_str = cfg_dict["colormap"]
+        colormap_ind = s.colormaps.index(colormap_str) if colormap_str in s.colormaps else 0
         s.cmap_cbox.setCurrentIndex(colormap_ind)
 
 
@@ -255,11 +248,6 @@ class THzImageTab(QWidget):
         """
         with open(cfg_path, 'w') as file:
             json.dump(cfg_dict, file)
-
-    def frame_pause_btn_clicked(s):
-        pass
-
-
 
     #def update_thresh_slider(s):
     #def update_contr_slider(s):
@@ -411,7 +399,6 @@ class THzImageTab(QWidget):
         Resets the camera position for the 3D plots
         """
         s.update_image(None, False,reset_camera=True)
-        s.sing_pix_tab.update_image(None, False,reset_camera=True)
 
 
 
@@ -463,4 +450,40 @@ class THzImageTab(QWidget):
         s.update_cs_max_slider()
 
 
+
+    def aux_update(s, aux_data_in, new_frame_flag):
+        """
+        Updates the auxiliary spectrum plot when new frame data arrives.
+        Reads checkbox states and passes them to AuxPlotObj.
+        """
+        loc_cfg_params = OrderedDict()
+        loc_cfg_params["legend_en"] = bool(s.legend_chkb.isChecked())
+        loc_cfg_params["noise_delim_en"] = bool(s.noise_limits_chkb.isChecked())
+        loc_cfg_params["noise_floor_en"] = bool(s.noise_floor_chkb.isChecked())
+        loc_cfg_params["thresh_en"] = bool(s.thresh_chkb.isChecked())
+        loc_cfg_params["contr_en"] = bool(s.contr_chkb.isChecked())
+        loc_cfg_params["front_peak_en"] = bool(s.front_peak_chkb.isChecked())
+        loc_cfg_params["back_peak_en"] = bool(s.back_peak_chkb.isChecked())
+        loc_cfg_params["range_cuts_en"] = bool(s.range_cuts_chkb.isChecked())
+        loc_cfg_params["weight_sum_en"] = bool(s.weight_sum_chkb.isChecked())
+        loc_cfg_params["pt_mrkrs_en"] = bool(s.pt_mrkrs_chkb.isChecked())
+
+        s.aux_plot_obj.aux_update(aux_data_in, new_frame_flag,
+            loc_cfg_params)
+
+
+    def new_pix_clicked(s, position, az_ind, el_ind):
+        x_click = position.x()
+        y_click = position.y()
+        print(f"clicked at data coords: x={x_click:.2f}, y={y_click:.2f}")
+        print(f"az_ind = {az_ind}, el_ind = {el_ind}")
+        new_cfg_dict = OrderedDict()
+        new_cfg_dict["aux_x_ind"] = int(az_ind)
+        new_cfg_dict["aux_y_ind"] = int(el_ind)
+
+        new_cfg_dict["aux_az_val"] = x_click
+        new_cfg_dict["aux_el_val"] = y_click
+
+        cfg_flags = ["force_update"]
+        s.update_config(new_cfg_dict, cfg_flags)
 

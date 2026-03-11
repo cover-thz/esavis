@@ -420,6 +420,6 @@ class AuxPlotObj(QWidget):
 
             s.plt_axes.set_xlim(range_lut_cm[0], range_lut_cm[-1])
             s.plt_axes.relim()
-            s.plt_axes.autoscale_view(axis='y')
+            s.plt_axes.autoscale_view(scalex=False, scaley=True)
             s.canvas.draw()
 

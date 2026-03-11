@@ -9,6 +9,7 @@
 from PySide6 import QtCore, QtWidgets, QtGui
 from PySide6.QtCore import Qt
 import THzImageObj as tio
+import AuxPlotObj as apo
 from collections import OrderedDict
 
 from PySide6.QtWidgets import (
@@ -62,8 +63,6 @@ def build_thz_image_tab(thz_img_tab):
     # setup layouts
     #
     #layout = QHBoxLayout(thz_img_tab)
-    left_layout     = QVBoxLayout()
-    #center_layout   = QVBoxLayout()
     right_layout    = QVBoxLayout()
 
     # default label
@@ -84,7 +83,10 @@ def build_thz_image_tab(thz_img_tab):
     # NOTE: Giving the cfg_dict to THzImageObj but again it does NOT alter it
     # only reads from it
     thz_img_tab.thz_image_obj = tio.THzImageObj(thz_img_tab, 
-        thz_img_tab.cfg_dict, main_image=True)
+        thz_img_tab.cfg_dict, sing_pix_flag=True, main_image=True)
+
+    # Aux spectrum plot for single pixel view
+    thz_img_tab.aux_plot_obj = apo.AuxPlotObj()
 
     
     ####################################################################
@@ -127,7 +129,6 @@ def build_thz_image_tab(thz_img_tab):
     # Toplevel layout of "Source" tab
     src_tab_top_layout.addLayout(src_h5_layout)
     src_tab_top_layout.addLayout(src_status_layout)
-    src_tab_top_layout.addStretch()
 
     # Add member variables
     thz_img_tab.src_tab               = src_tab
@@ -490,10 +491,13 @@ def build_thz_image_tab(thz_img_tab):
     cmap_lbl_title = QLabel("Colormap")
     cmap_cbox = QComboBox()
 
-    # populate the colormap dropdown menu
-    colormaps = ["jet_r", "jet", "gray", "binary", "Blues", "Greens"]
-    colormaps += ["Reds", "copper", "twilight"]
+    # populate the colormap dropdown menu with all matplotlib colormaps
+    import matplotlib.pyplot as plt
+    colormaps = sorted(plt.colormaps())
     cmap_cbox.addItems(colormaps)
+    dflt_cmap = thz_img_tab.cfg_dict.get("colormap", "turbo")
+    if dflt_cmap in colormaps:
+        cmap_cbox.setCurrentIndex(colormaps.index(dflt_cmap))
 
     cmap_layout = QVBoxLayout()
 
@@ -511,90 +515,99 @@ def build_thz_image_tab(thz_img_tab):
 
 
     ####################################################################
-    # Frame limits line edits
+    # Aux-plot checkboxes
     #
-    frame_limits_layout = QVBoxLayout()
-    frame_pause_btn = QPushButton("Pause Capture")
-    frame_limits_lbl = QLabel("Frame Limits")
+    legend_chkb = QCheckBox()
+    legend_chkb.setText("Legend Visible")
+    legend_chkb.setChecked(True)
 
-    # fl_sublayout_row1
-    fl_sublayout_row1   = QHBoxLayout()
-    az_min_lim_lbl      = QLabel("Az min:")
-    az_min_lim_ledit    = QLineEdit()
-    fl_sublayout_row1.addWidget(az_min_lim_lbl)
-    fl_sublayout_row1.addWidget(az_min_lim_ledit)
+    noise_limits_chkb = QCheckBox()
+    noise_limits_chkb.setText("Noise Delimiters")
+    noise_limits_chkb.setChecked(True)
 
-    # fl_sublayout_row2
-    fl_sublayout_row2   = QHBoxLayout()
-    az_max_lim_lbl      = QLabel("Az max:")
-    az_max_lim_ledit    = QLineEdit()
-    fl_sublayout_row2.addWidget(az_max_lim_lbl)
-    fl_sublayout_row2.addWidget(az_max_lim_ledit)
+    noise_floor_chkb = QCheckBox()
+    noise_floor_chkb.setText("Noise Floor")
+    noise_floor_chkb.setChecked(True)
 
-    # fl_sublayout_row3
-    fl_sublayout_row3   = QHBoxLayout()
-    el_min_lim_lbl      = QLabel("El min:")
-    el_min_lim_ledit    = QLineEdit()
-    fl_sublayout_row3.addWidget(el_min_lim_lbl)
-    fl_sublayout_row3.addWidget(el_min_lim_ledit)
+    thresh_chkb = QCheckBox()
+    thresh_chkb.setText("Threshold")
+    thresh_chkb.setChecked(True)
 
-    # fl_sublayout_row4
-    fl_sublayout_row4   = QHBoxLayout()
-    el_max_lim_lbl      = QLabel("El max:")
-    el_max_lim_ledit    = QLineEdit()
-    fl_sublayout_row4.addWidget(el_max_lim_lbl)
-    fl_sublayout_row4.addWidget(el_max_lim_ledit)
-     
-    # Toplevel layout of frame limits
-    frame_limits_layout.addWidget(frame_limits_lbl)
-    frame_limits_layout.addWidget(frame_pause_btn)
-    frame_limits_layout.addLayout(fl_sublayout_row1)
-    frame_limits_layout.addLayout(fl_sublayout_row2)
-    frame_limits_layout.addLayout(fl_sublayout_row3)
-    frame_limits_layout.addLayout(fl_sublayout_row4)
+    contr_chkb = QCheckBox()
+    contr_chkb.setText("Contrast")
+    contr_chkb.setChecked(True)
+
+    front_peak_chkb = QCheckBox()
+    front_peak_chkb.setText("Front Peak Marker")
+    front_peak_chkb.setChecked(True)
+
+    back_peak_chkb = QCheckBox()
+    back_peak_chkb.setText("Back Peak Marker")
+    back_peak_chkb.setChecked(True)
+
+    range_cuts_chkb = QCheckBox()
+    range_cuts_chkb.setText("Range Cuts")
+    range_cuts_chkb.setChecked(True)
+
+    weight_sum_chkb = QCheckBox()
+    weight_sum_chkb.setText("Weighted Sum")
+    weight_sum_chkb.setChecked(False)
+
+    pt_mrkrs_chkb = QCheckBox()
+    pt_mrkrs_chkb.setText("Plot Point Markers")
+    pt_mrkrs_chkb.setChecked(False)
 
     # Add member variables
-    # (not adding the sublayouts because we probably don't need them)
-    thz_img_tab.frame_limits_lbl    = frame_limits_lbl
-    thz_img_tab.frame_pause_btn     = frame_pause_btn
-    thz_img_tab.az_min_lim_lbl      = az_min_lim_lbl
-    thz_img_tab.az_min_lim_ledit    = az_min_lim_ledit
-    thz_img_tab.az_max_lim_lbl      = az_max_lim_lbl
-    thz_img_tab.az_max_lim_ledit    = az_max_lim_ledit
-    thz_img_tab.el_min_lim_lbl      = el_min_lim_lbl
-    thz_img_tab.el_min_lim_ledit    = el_min_lim_ledit
-    thz_img_tab.el_max_lim_lbl      = el_max_lim_lbl
-    thz_img_tab.el_max_lim_ledit    = el_max_lim_ledit
-
+    thz_img_tab.legend_chkb       = legend_chkb
+    thz_img_tab.noise_limits_chkb = noise_limits_chkb
+    thz_img_tab.noise_floor_chkb  = noise_floor_chkb
+    thz_img_tab.thresh_chkb       = thresh_chkb
+    thz_img_tab.contr_chkb        = contr_chkb
+    thz_img_tab.front_peak_chkb   = front_peak_chkb
+    thz_img_tab.back_peak_chkb    = back_peak_chkb
+    thz_img_tab.range_cuts_chkb   = range_cuts_chkb
+    thz_img_tab.weight_sum_chkb   = weight_sum_chkb
+    thz_img_tab.pt_mrkrs_chkb     = pt_mrkrs_chkb
 
 
     ####################################################################
-    # Final layout structure (two columns)
+    # Final layout structure (3 columns upper + checkbox row lower)
     ####################################################################
 
-    main_layout = QHBoxLayout(thz_img_tab)
+    main_layout = QVBoxLayout(thz_img_tab)
+    upper_layout = QHBoxLayout()
 
-    # left side widgets
-    left_layout.addLayout(thz_img_tab.thz_image_obj) 
-    left_layout.addWidget(proc_cfg_tab_widget)
-
-    # right side widgets 
-    #right_layout.addWidget(update_btn)
+    # right column: sliders, colormap, then proc cfg tabs at bottom
     right_layout.addLayout(thresh_grid_layout)
     right_layout.addLayout(contr_grid_layout)
-    right_layout.addLayout(pkwdth_grid_layout) 
+    right_layout.addLayout(pkwdth_grid_layout)
     right_layout.addLayout(rc_grid_layout)
     right_layout.addLayout(cs_grid_layout)
     right_layout.addLayout(cmap_layout)
-    right_layout.addLayout(frame_limits_layout)
+    right_layout.addWidget(proc_cfg_tab_widget)
+    right_layout.addStretch()
 
-    # the second argument somehow changes the porprtion each layout 
-    # takes in horizontal space.  It is confusing, using the age-old
-    # guess-and-check method
-    main_layout.addLayout(left_layout, 25)
-    main_layout.addLayout(right_layout, 15)
+    # upper row: image | aux plot | right column
+    upper_layout.addLayout(thz_img_tab.thz_image_obj, 3)
+    upper_layout.addWidget(thz_img_tab.aux_plot_obj, 3)
+    upper_layout.addLayout(right_layout, 2)
 
-    thz_img_tab.left_layout    = left_layout
+    # lower row: aux-plot checkboxes
+    ctrl_box_layout = QGridLayout()
+    ctrl_box_layout.addWidget(legend_chkb,       0, 0, 1, 1)
+    ctrl_box_layout.addWidget(noise_limits_chkb, 1, 0, 1, 1)
+    ctrl_box_layout.addWidget(noise_floor_chkb,  2, 0, 1, 1)
+    ctrl_box_layout.addWidget(thresh_chkb,       3, 0, 1, 1)
+    ctrl_box_layout.addWidget(contr_chkb,        0, 1, 1, 1)
+    ctrl_box_layout.addWidget(front_peak_chkb,   1, 1, 1, 1)
+    ctrl_box_layout.addWidget(back_peak_chkb,    2, 1, 1, 1)
+    ctrl_box_layout.addWidget(range_cuts_chkb,   3, 1, 1, 1)
+    ctrl_box_layout.addWidget(weight_sum_chkb,   0, 2, 1, 1)
+    ctrl_box_layout.addWidget(pt_mrkrs_chkb,     1, 2, 1, 1)
+
+    main_layout.addLayout(upper_layout)
+    main_layout.addLayout(ctrl_box_layout)
+
     thz_img_tab.right_layout   = right_layout
     thz_img_tab.main_layout    = main_layout
 
@@ -639,20 +652,6 @@ class setup_thz_tab_callbacks:
         thz_tab.cs_ledit_max.textChanged.connect(
             lambda: s.ledit_update(thz_tab.cs_ledit_max, 
             "color_scale_max", float))
-
-        thz_tab.az_min_lim_ledit.editingFinished.connect(
-            lambda: s.ledit_update(thz_tab.az_min_lim_ledit, 
-            "min_az", float))
-        thz_tab.az_max_lim_ledit.editingFinished.connect(
-            lambda: s.ledit_update(thz_tab.az_max_lim_ledit, 
-            "max_az", float))
-        thz_tab.el_min_lim_ledit.editingFinished.connect(
-            lambda: s.ledit_update(thz_tab.el_min_lim_ledit, 
-            "min_el", float))
-        thz_tab.el_max_lim_ledit.editingFinished.connect(
-            lambda: s.ledit_update(thz_tab.el_max_lim_ledit, 
-            "max_el", float))
-
 
         # QRadioButtons
         thz_tab.front_peak_rbut.toggled.connect(
