@@ -29,14 +29,8 @@ from collections import OrderedDict
 import copy
 import time
 
-from THzImageTab import THzImageTab
-
-# crude but effective way of getting the postprocessing directory in here
-# without playing maddening namespace games with the modules in the that
-# directory
-PROC_DIR    = os.path.abspath(os.path.join(os.getcwd(), 'postproc'))
-sys.path.append(PROC_DIR)
-import data_processor as dp
+from esavis.THzImageTab import THzImageTab
+from esavis.postproc import data_processor as dp
 
 
 from PySide6.QtWidgets import (
@@ -544,16 +538,16 @@ class MainWindow(QMainWindow):
             print("end of event handler\n")
 
 
-if __name__ == '__main__':
-    CWD = os.getcwd() 
+def main():
+    import argparse
+
     if os.name == "nt":
-        DFLT_DATA_DIR  =   os.path.dirname(os.getcwd()) + "\\data\\"
+        DFLT_DATA_DIR = os.path.join(os.getcwd(), "data") + "\\"
     elif os.name == "posix":
         DFLT_DATA_DIR = "/tmp/"
     else:
         raise Exception("Invalid OS Name")
 
-    # this is supposed to allow quitting the app from CTRL-C on console
     signal.signal(signal.SIGINT, sigint_handler)
 
     app = QtWidgets.QApplication(sys.argv)
@@ -561,19 +555,16 @@ if __name__ == '__main__':
     app.setApplicationName("THz Visualizer")
     app.setApplicationVersion("0.0.1")
 
-    import argparse
     ap = argparse.ArgumentParser(description="THz Visualizer")
     ap.add_argument("h5file", nargs="?", default="",
                     help="HDF5 data cube file path to load on startup")
     args, _qt_remaining = ap.parse_known_args()
     h5_file_arg = args.h5file
 
-    # this should be all we need for the initial configuration dictionary
     cfg_dict = OrderedDict()
     cfg_dict["data_src"] = "disabled"
     cfg_dict["default_data_dir"] = DFLT_DATA_DIR
 
-    # construct the multiprocessing system
     mp.set_start_method("spawn")
     (proc_cfg_pipe, cfg_pipe)      = mp.Pipe(duplex=False)
     (err_pipe, proc_err_pipe)      = mp.Pipe(duplex=False)
@@ -588,12 +579,9 @@ if __name__ == '__main__':
     proc_pipes = ProcPipes(cfg_pipe, err_pipe, data_pipe, query_pipe_in, 
                            query_pipe_out)
 
-    # Defining and showing the main window
     window = MainWindow(DFLT_DATA_DIR, proc_pipes)
-                
     window.show()
 
-    # If an HDF5 file was passed via command line, load it
     if h5_file_arg:
         h5_path = os.path.abspath(h5_file_arg)
         if os.path.isfile(h5_path):
@@ -607,7 +595,7 @@ if __name__ == '__main__':
             print(f"Warning: HDF5 file not found: {h5_path}")
     sys.exit(app.exec())
 
-    # NOTE the following line of code doesn't actually work properly 
-    # because we never actually get here even after X-ing out the window
-    proc.join()
+
+if __name__ == '__main__':
+    main()
 

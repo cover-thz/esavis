@@ -11,8 +11,8 @@
 
 import multiprocessing as mp
 from collections import OrderedDict
-import main_proc_fcns as mpf
-import external_loader as extl
+from esavis.postproc import main_proc_fcns as mpf
+from esavis.postproc import external_loader as extl
 import time
 import traceback
 

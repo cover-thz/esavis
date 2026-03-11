@@ -25,7 +25,7 @@
 
 import numpy as np
 import h5py
-from power_cube import make_power_cube
+from esavis.postproc.power_cube import make_power_cube
 
 
 def load_h5_cube(fpath):

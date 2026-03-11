@@ -8,8 +8,8 @@
 
 from PySide6 import QtCore, QtWidgets, QtGui
 from PySide6.QtCore import Qt
-import THzImageObj as tio
-import AuxPlotObj as apo
+from esavis import THzImageObj as tio
+from esavis import AuxPlotObj as apo
 from collections import OrderedDict
 
 from PySide6.QtWidgets import (

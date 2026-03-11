@@ -5,7 +5,7 @@ import os
 import collections
 import math
 from collections import OrderedDict
-import build_thz_image_tab as bti
+from esavis import build_thz_image_tab as bti
 
 from PySide6.QtWidgets import (
     QWidget,

@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "esavis"
+version = "0.1.0"
+description = "THz Visualizer GUI"
+requires-python = ">=3.13"
+dependencies = [
+    "h5py>=3.16",
+    "matplotlib>=3.10",
+    "numpy>=2.4",
+    "PyOpenGL>=3.1",
+    "pyqtgraph>=0.14",
+    "PySide6>=6.10",
+]
+
+[project.scripts]
+esavis = "esavis.THzVisGUI:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"esavis.postproc.c_funcs" = ["*.dll", "*.so"]

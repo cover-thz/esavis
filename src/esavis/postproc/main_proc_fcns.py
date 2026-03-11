@@ -12,10 +12,10 @@
 import ctypes as ct
 import numpy as np
 import time
-import lower_proc_fcns as lpf
+from esavis.postproc import lower_proc_fcns as lpf
 import os
 import collections
-from power_cube import make_power_cube
+from esavis.postproc.power_cube import make_power_cube
 
 
 class CoverProc:
