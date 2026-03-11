@@ -581,7 +581,12 @@ class THzSurfaceObj(gl.GLViewWidget):
         
         # color_min and color_max are acutally the range values for min and 
         # max color, 
-        [cmap_min, cmap_max] = s.cmap_dict[cmap_str]
+        if cmap_str in s.cmap_dict:
+            [cmap_min, cmap_max] = s.cmap_dict[cmap_str]
+        else:
+            cmap = matplotlib.colormaps.get_cmap(cmap_str)
+            cmap_min = cmap(0.0)[:3]
+            cmap_max = cmap(1.0)[:3]
         s.color_map = s.rgb_colormap(cmap_min, cmap_max, color_min, color_max)
 
         color_map = s.color_map

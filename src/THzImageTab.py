@@ -115,17 +115,6 @@ class THzImageTab(QWidget):
         s.pkwdth_ledit.textChanged.connect(s.update_pkwdth_slider)
 
         # Connect the lineEdits(textboxes) and sliders together
-        s.rc_slider_min.valueChanged.connect(s.update_rc_min_ledit)
-        #s.rc_slider_min.sliderReleased.connect(lambda: s.update_rc_min_ledit(
-        #    s.rc_slider_min.value()))
-        s.rc_ledit_min.editingFinished.connect(s.update_rc_min_slider)
-
-        s.rc_slider_max.valueChanged.connect(s.update_rc_max_ledit)
-        #s.rc_slider_max.sliderReleased.connect(lambda: s.update_rc_max_ledit(
-        #    s.rc_slider_max.value()))
-        s.rc_ledit_max.editingFinished.connect(s.update_rc_max_slider)
-
-        # Connect the lineEdits(textboxes) and sliders together
         s.cs_slider_min.valueChanged.connect(s.update_cs_min_ledit)
         s.cs_ledit_min.editingFinished.connect(s.update_cs_min_slider)
 
@@ -152,6 +141,14 @@ class THzImageTab(QWidget):
         # pixel click signal from the image
         s.thz_image_obj.new_pix_clicked.connect(s.new_pix_clicked)
 
+        # aux checkbox changes should immediately redraw the aux plot
+        s.last_aux_data = None
+        for chkb in [s.legend_chkb, s.noise_limits_chkb, s.noise_floor_chkb,
+                      s.thresh_chkb, s.contr_chkb, s.front_peak_chkb,
+                      s.back_peak_chkb, s.weight_sum_chkb,
+                      s.pt_mrkrs_chkb]:
+            chkb.stateChanged.connect(s._on_aux_checkbox_changed)
+
         ####################################################################
         # set the default save image path
         #
@@ -168,9 +165,6 @@ class THzImageTab(QWidget):
         s.thresh_ledit.setText(str(cfg_dict["threshold_db"])) 
         s.contr_ledit.setText(str(cfg_dict["contrast_db"]) )
         s.pkwdth_ledit.setText(str(cfg_dict["half_peak_width"]))
-
-        s.rc_ledit_min.setText(str(cfg_dict["min_range"]))
-        s.rc_ledit_max.setText(str(cfg_dict["max_range"]))
 
         s.cs_autoscale_chkb.setChecked(bool(cfg_dict["autoscale_color"]))
         s.cs_ledit_min.setText(str(cfg_dict["color_scale_min"]))
@@ -211,8 +205,6 @@ class THzImageTab(QWidget):
 
         s.update_thresh_slider()
         s.update_contr_slider()
-        s.update_rc_min_slider()
-        s.update_rc_max_slider()
         s.update_cs_min_slider()
         s.update_cs_max_slider()
 
@@ -248,8 +240,6 @@ class THzImageTab(QWidget):
 
     #def update_thresh_slider(s):
     #def update_contr_slider(s):
-    #def update_rc_min_slider(s):
-    #def update_rc_max_slider(s):
     #def update_cs_min_slider(s):
     #def update_cs_max_slider(s):
 
@@ -285,24 +275,6 @@ class THzImageTab(QWidget):
     def update_pkwdth_slider(s, value):
         if value != "":
             s.pkwdth_slider.setValue(int(value))
-
-    def update_rc_min_ledit(s, value):
-        s.rc_ledit_min.clear()
-        s.rc_ledit_min.insert(str(value))
-    
-    def update_rc_min_slider(s):
-        value = int(float(s.rc_ledit_min.text()))
-        if value != "":
-            s.rc_slider_min.setValue(int(value))
-
-    def update_rc_max_ledit(s, value):
-        s.rc_ledit_max.clear()
-        s.rc_ledit_max.insert(str(value))
-    
-    def update_rc_max_slider(s):
-        value = int(float(s.rc_ledit_max.text()))
-        if value != "":
-            s.rc_slider_max.setValue(int(value))
 
     def update_cs_min_ledit(s, value):
         s.cs_ledit_min.clear()
@@ -428,6 +400,8 @@ class THzImageTab(QWidget):
         Updates the auxiliary spectrum plot when new frame data arrives.
         Reads checkbox states and passes them to AuxPlotObj.
         """
+        if new_frame_flag and aux_data_in is not None:
+            s.last_aux_data = aux_data_in
         loc_cfg_params = OrderedDict()
         loc_cfg_params["legend_en"] = bool(s.legend_chkb.isChecked())
         loc_cfg_params["noise_delim_en"] = bool(s.noise_limits_chkb.isChecked())
@@ -436,7 +410,6 @@ class THzImageTab(QWidget):
         loc_cfg_params["contr_en"] = bool(s.contr_chkb.isChecked())
         loc_cfg_params["front_peak_en"] = bool(s.front_peak_chkb.isChecked())
         loc_cfg_params["back_peak_en"] = bool(s.back_peak_chkb.isChecked())
-        loc_cfg_params["range_cuts_en"] = bool(s.range_cuts_chkb.isChecked())
         loc_cfg_params["weight_sum_en"] = bool(s.weight_sum_chkb.isChecked())
         loc_cfg_params["pt_mrkrs_en"] = bool(s.pt_mrkrs_chkb.isChecked())
 
@@ -444,11 +417,16 @@ class THzImageTab(QWidget):
             loc_cfg_params)
 
 
+    def _on_aux_checkbox_changed(s):
+        if s.last_aux_data is not None:
+            s.aux_update(s.last_aux_data, True)
+
+
     def new_pix_clicked(s, position, az_ind, el_ind):
         x_click = position.x()
         y_click = position.y()
         print(f"clicked at data coords: x={x_click:.2f}, y={y_click:.2f}")
-        print(f"az_ind = {az_ind}, el_ind = {el_ind}")
+        print(f"X_in = {az_ind}, Y_in = {el_ind}")
         new_cfg_dict = OrderedDict()
         new_cfg_dict["aux_x_ind"] = int(az_ind)
         new_cfg_dict["aux_y_ind"] = int(el_ind)

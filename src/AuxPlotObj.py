@@ -53,7 +53,7 @@ class AuxPlotCanvas(FigureCanvas):
         s.plt_axes = s.plt_fig.add_subplot(111)
         super().__init__(s.plt_fig)
 
-        s.plt_axes.set_title("Auxiliary Pixel")
+        s.plt_axes.set_title("Pixel")
 
 
 
@@ -69,7 +69,7 @@ class AuxPlotObj(QWidget):
         # semi-permanent plot settings
         s.plt_axes.grid()
         s.plt_axes.set_ylabel("dB")
-        s.plt_axes.set_xlabel("range [cm]")
+        s.plt_axes.set_xlabel("Z (cm)")
 
 
         # plot handles
@@ -83,9 +83,6 @@ class AuxPlotObj(QWidget):
         s.contrast_plt_hndl = None
         s.front_peak_plt_hndl = None
         s.back_peak_plt_hndl = None
-
-        s.range_cut_plt_hndl_0 = None
-        s.range_cut_plt_hndl_1 = None
 
         s.weight_sum_plt_hndl_0 = None
         s.weight_sum_plt_hndl_1 = None
@@ -126,9 +123,6 @@ class AuxPlotObj(QWidget):
             if weight_sum_start < 0:
                 weight_sum_start = 0
 
-            min_range       = aux_data_in["min_range"]
-            max_range       = aux_data_in["max_range"]
-
             noise_ind_start = aux_data_in["noise_ind_start"]
             noise_ind_end   = aux_data_in["noise_ind_end"]
 
@@ -162,8 +156,8 @@ class AuxPlotObj(QWidget):
                 front_peak_power_db = 0
 
 
-            title = f"Auxiliary Pixel ({x_ind}, {y_ind})\n near encoder vals:"
-            title += f" az={aux_az_val:.2f}, el={aux_el_val:.2f}"
+            title = f"Pixel ({x_ind}, {y_ind})"
+            title += f" X={aux_az_val:.2f}, Y={aux_el_val:.2f}"
             s.plt_axes.set_title(title)
 
             power_spectra_db = 10*np.log10(power_spectra_lin)
@@ -342,35 +336,6 @@ class AuxPlotObj(QWidget):
             # override the front peaks so the marker doesn't show
             if num_peaks == 0:
                 s.back_peak_plt_hndl.set_data([], [])
-
-
-
-            ##################################################################
-            # Range Cut
-            label = "Range Cuts"
-            if s.range_cut_plt_hndl_0 == None:
-                s.range_cut_plt_hndl_0 = s.plt_axes.axvline(x=min_range, 
-                    color="black", label=label, linewidth=lw)
-
-                s.range_cut_plt_hndl_1 = s.plt_axes.axvline(x=max_range, 
-                    color="black", label=label, linewidth=lw)
-
-            if loc_cfg_params["range_cuts_en"]:
-                s.range_cut_plt_hndl_0.set_xdata([min_range, min_range])
-                s.range_cut_plt_hndl_1.set_xdata([max_range, max_range])
-                s.plot_handles.append(s.range_cut_plt_hndl_0)
-                s.labels_list.append(label)
-
-            else:
-                #s.range_cut_plt_hndl_0.set_xdata([])
-                #s.range_cut_plt_hndl_1.set_xdata([])
-
-                s.range_cut_plt_hndl_0.remove()
-                s.range_cut_plt_hndl_1.remove()
-
-                s.range_cut_plt_hndl_0 = None
-                s.range_cut_plt_hndl_1 = None
-
 
 
 

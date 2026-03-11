@@ -264,64 +264,6 @@ def build_thz_image_tab(thz_img_tab):
 
 
     ####################################################################
-    # Range cut adjustment widgets
-    #
-    rc_lbl_title = QLabel("Range Cut (cm)\n(modified)")
-    rc_lbl_min   = QLabel("Min:")
-    rc_lbl_min.setFixedWidth(30)
-    rc_lbl_max   = QLabel("Max:")
-    rc_lbl_max.setFixedWidth(30)
-
-    rc_ledit_min = QLineEdit()
-    rc_ledit_min.setFixedWidth(40)
-    rc_ledit_max = QLineEdit()
-    rc_ledit_max.setFixedWidth(40)
-
-    rc_vmin, rc_vmax = (10,700)
-
-    #rc_ledit_min.setValidator(QtGui.QIntValidator(rc_vmin, rc_vmax))
-    #rc_ledit_max.setValidator(QtGui.QIntValidator(rc_vmin, rc_vmax))
-
-    rc_ledit_min.setMaxLength(5)
-    rc_ledit_max.setMaxLength(5)
-
-    rc_ledit_min.setAlignment(Qt.AlignCenter)
-    rc_ledit_max.setAlignment(Qt.AlignCenter)
-
-    rc_slider_min = QSlider(Qt.Orientation.Horizontal, thz_img_tab)
-    rc_slider_max = QSlider(Qt.Orientation.Horizontal, thz_img_tab)
-
-    rc_slider_min.setRange(rc_vmin, rc_vmax)
-    rc_slider_max.setRange(rc_vmin, rc_vmax)
-
-    # construct a grid layout for the widgets 
-    rc_grid_layout = QGridLayout()
-
-    # Add the range cut widgets 
-    #center_layout.addWidget(rc_lbl_title)
-    #center_layout.addWidget(rc_lbl_min)
-    #center_layout.addWidget(rc_lbl_max)
-
-    rc_lbl_title.setFixedHeight(30)
-    rc_grid_layout.addWidget(rc_lbl_title, 0,0, 1, 4)
-    rc_grid_layout.addWidget(rc_lbl_min, 1, 0)
-    rc_grid_layout.addWidget(rc_ledit_min, 1, 1)
-    rc_grid_layout.addWidget(rc_slider_min, 1, 2)
-    rc_grid_layout.addWidget(rc_lbl_max, 2, 0)
-    rc_grid_layout.addWidget(rc_ledit_max, 2, 1)
-    rc_grid_layout.addWidget(rc_slider_max, 2, 2)
-
-    # Add member variables
-    thz_img_tab.rc_lbl_title  = rc_lbl_title
-    thz_img_tab.rc_lbl_min    = rc_lbl_min
-    thz_img_tab.rc_lbl_max    = rc_lbl_max
-    thz_img_tab.rc_ledit_min  = rc_ledit_min
-    thz_img_tab.rc_ledit_max  = rc_ledit_max
-    thz_img_tab.rc_slider_min = rc_slider_min
-    thz_img_tab.rc_slider_max = rc_slider_max
-
-
-    ####################################################################
     # Color scale adjustment widgets
     #
     cs_lbl_title = QLabel("Color Scaling")
@@ -443,10 +385,6 @@ def build_thz_image_tab(thz_img_tab):
     back_peak_chkb.setText("Back Peak Marker")
     back_peak_chkb.setChecked(True)
 
-    range_cuts_chkb = QCheckBox()
-    range_cuts_chkb.setText("Range Cuts")
-    range_cuts_chkb.setChecked(True)
-
     weight_sum_chkb = QCheckBox()
     weight_sum_chkb.setText("Weighted Sum")
     weight_sum_chkb.setChecked(False)
@@ -463,7 +401,6 @@ def build_thz_image_tab(thz_img_tab):
     thz_img_tab.contr_chkb        = contr_chkb
     thz_img_tab.front_peak_chkb   = front_peak_chkb
     thz_img_tab.back_peak_chkb    = back_peak_chkb
-    thz_img_tab.range_cuts_chkb   = range_cuts_chkb
     thz_img_tab.weight_sum_chkb   = weight_sum_chkb
     thz_img_tab.pt_mrkrs_chkb     = pt_mrkrs_chkb
 
@@ -500,7 +437,6 @@ def build_thz_image_tab(thz_img_tab):
     ctrl_box_layout.addWidget(contr_chkb,        0, 1, 1, 1)
     ctrl_box_layout.addWidget(front_peak_chkb,   1, 1, 1, 1)
     ctrl_box_layout.addWidget(back_peak_chkb,    2, 1, 1, 1)
-    ctrl_box_layout.addWidget(range_cuts_chkb,   3, 1, 1, 1)
     ctrl_box_layout.addWidget(weight_sum_chkb,   0, 2, 1, 1)
     ctrl_box_layout.addWidget(pt_mrkrs_chkb,     1, 2, 1, 1)
     center_col.addLayout(ctrl_box_layout)
@@ -510,7 +446,6 @@ def build_thz_image_tab(thz_img_tab):
     right_layout.addLayout(thresh_grid_layout)
     right_layout.addLayout(contr_grid_layout)
     right_layout.addLayout(pkwdth_grid_layout)
-    right_layout.addLayout(rc_grid_layout)
     right_layout.addLayout(cs_grid_layout)
     right_layout.addLayout(cmap_layout)
     right_layout.addLayout(ld_save_image_sublayout_row1)
@@ -556,12 +491,6 @@ class setup_thz_tab_callbacks:
         thz_tab.pkwdth_ledit.textChanged.connect(
             lambda: s.ledit_update(thz_tab.pkwdth_ledit, 
             "half_peak_width", int))
-        thz_tab.rc_ledit_min.textChanged.connect(
-            lambda: s.ledit_update(thz_tab.rc_ledit_min, 
-            "min_range", float))
-        thz_tab.rc_ledit_max.textChanged.connect(
-            lambda: s.ledit_update(thz_tab.rc_ledit_max, 
-            "max_range", float))
         thz_tab.cs_ledit_min.textChanged.connect(
             lambda: s.ledit_update(thz_tab.cs_ledit_min, 
             "color_scale_min", float))
