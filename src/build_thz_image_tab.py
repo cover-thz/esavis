@@ -13,40 +13,17 @@ import AuxPlotObj as apo
 from collections import OrderedDict
 
 from PySide6.QtWidgets import (
-    QApplication,
     QCheckBox,
     QComboBox,
-    QDateEdit,
-    QDateTimeEdit,
-    QDial,
-    QDoubleSpinBox,
-    QFontComboBox,
     QLabel,
-    QLCDNumber,
     QLineEdit,
-    QMainWindow,
-    QProgressBar,
     QPushButton,
     QRadioButton,
     QSlider,
-    QSpinBox,
-    QTimeEdit,
     QVBoxLayout,
     QHBoxLayout,
-    QFormLayout,
     QGridLayout,
-    QTabWidget,
-    QWidget,
-    QSizePolicy,
-    QFileDialog,
-    QMessageBox,
-    QButtonGroup,
 )
-
-
-class SourceTab(QWidget):
-    def __init__(self):
-        super().__init__()
 
 
 def build_thz_image_tab(thz_img_tab):
@@ -62,12 +39,7 @@ def build_thz_image_tab(thz_img_tab):
     ####################################################################
     # setup layouts
     #
-    #layout = QHBoxLayout(thz_img_tab)
     right_layout    = QVBoxLayout()
-
-    # default label
-    #label = QLabel("Content of Tab 2")
-    #layout.addWidget(label)
 
     ####################################################################
     # Left side widgets
@@ -103,19 +75,13 @@ def build_thz_image_tab(thz_img_tab):
     back_peak_rbut      = QRadioButton("Back Peak Range")
     front_surface_plot_rbut = QRadioButton("Front Surface Plot")
     back_surface_plot_rbut  = QRadioButton("Back Surface Plot")
-    num_oversamp_rbut   = QRadioButton("RESERVED")
-    num_oversamp_rbut.setEnabled(False)
     integ_pwr_rbut      = QRadioButton("Integrated Power")
-    point_cloud_rbut    = QRadioButton("RESERVED")
-    point_cloud_rbut.setEnabled(False)
 
     thz_img_tab.front_peak_rbut         = front_peak_rbut
     thz_img_tab.back_peak_rbut          = back_peak_rbut
     thz_img_tab.front_surface_plot_rbut = front_surface_plot_rbut
     thz_img_tab.back_surface_plot_rbut  = back_surface_plot_rbut
-    thz_img_tab.num_oversamp_rbut       = num_oversamp_rbut
     thz_img_tab.integ_pwr_rbut          = integ_pwr_rbut
-    thz_img_tab.point_cloud_rbut        = point_cloud_rbut
 
 
     ####################################################################
@@ -157,13 +123,8 @@ def build_thz_image_tab(thz_img_tab):
     ####################################################################
 
     ####################################################################
-    # Update button (REMOVED FOR NOW)
+    # Update button (REMOVED)
     #
-    #update_btn = QPushButton("Update\nPlot")
-
-    # Add member variables
-    #thz_img_tab.update_btn = update_btn
-    
 
     ####################################################################
     # Threshold adjustment widgets
@@ -177,17 +138,12 @@ def build_thz_image_tab(thz_img_tab):
 
     # sets the limits of threshold values
     thresh_vmin, thresh_vmax = (0,80)
-    #thresh_ledit.setValidator(QtGui.QIntValidator(thresh_vmin, 
-    #                          thresh_vmax))
     thresh_ledit.setMaxLength(4)
     thresh_ledit.setAlignment(Qt.AlignCenter)
-    #thresh_ledit.setFont(QFont("Arial", 20))
     thresh_slider = QSlider(Qt.Orientation.Horizontal, thz_img_tab)
     thresh_slider.setRange(thresh_vmin, thresh_vmax)
 
     # Add the threshold widgets to the layout
-    #center_layout.addWidget(thresh_lbl)
-    #center_layout.addWidget(thresh_ledit)
     thresh_lbl.setFixedHeight(30)
     thresh_grid_layout.addWidget(thresh_lbl, 0, 0, 1, 4)
     thresh_grid_layout.addWidget(thresh_ledit, 1, 0)
@@ -210,12 +166,8 @@ def build_thz_image_tab(thz_img_tab):
     contr_ledit = QLineEdit()
     contr_ledit.setFixedWidth(50)
     contr_vmin, contr_vmax = (1,80)
-    # limiting the valid text is doing more harm than good
-    #contr_ledit.setValidator(QtGui.QIntValidator(contr_vmin, 
-    #                          contr_vmax))
     contr_ledit.setMaxLength(4)
     contr_ledit.setAlignment(Qt.AlignCenter)
-    #contr_ledit.setFont(QFont("Arial", 20))
     contr_slider = QSlider(Qt.Orientation.Horizontal, thz_img_tab)
     contr_slider.setRange(contr_vmin, contr_vmax)
 
@@ -243,7 +195,6 @@ def build_thz_image_tab(thz_img_tab):
                               pkwdth_vmax))
     pkwdth_ledit.setMaxLength(3)
     pkwdth_ledit.setAlignment(Qt.AlignCenter)
-    #pkwdth_ledit.setFont(QFont("Arial", 20))
     pkwdth_slider = QSlider(Qt.Orientation.Horizontal, thz_img_tab)
     pkwdth_slider.setRange(pkwdth_vmin, pkwdth_vmax)
 
@@ -282,9 +233,6 @@ def build_thz_image_tab(thz_img_tab):
     cs_ledit_max.setFixedWidth(50)
 
     cs_vmin, cs_vmax = (10,700)
-
-    #cs_ledit_min.setValidator(QtGui.QIntValidator(cs_vmin, cs_vmax))
-    #cs_ledit_max.setValidator(QtGui.QIntValidator(cs_vmin, cs_vmax))
 
     cs_ledit_min.setMaxLength(5)
     cs_ledit_max.setMaxLength(5)
@@ -527,26 +475,12 @@ class setup_thz_tab_callbacks:
             lambda: s.rbut_update(thz_tab.back_surface_plot_rbut, 
             "back_surface_range", "plot_style"))
 
-        thz_tab.num_oversamp_rbut.toggled.connect(
-            lambda: s.rbut_update(thz_tab.num_oversamp_rbut, 
-            "num_oversamp_plot", "peak_selection"))
-        thz_tab.num_oversamp_rbut.toggled.connect(
-            lambda: s.rbut_update(thz_tab.num_oversamp_rbut, 
-            "num_oversamp_plot", "plot_style"))
-
         thz_tab.integ_pwr_rbut.toggled.connect(
             lambda: s.rbut_update(thz_tab.integ_pwr_rbut, 
             "integ_power_plot", "peak_selection"))
         thz_tab.integ_pwr_rbut.toggled.connect(
             lambda: s.rbut_update(thz_tab.integ_pwr_rbut, 
             "integ_power_plot", "plot_style"))
-
-        thz_tab.point_cloud_rbut.toggled.connect(
-            lambda: s.rbut_update(thz_tab.point_cloud_rbut, 
-            "point_cloud_plot", "peak_selection"))
-        thz_tab.point_cloud_rbut.toggled.connect(
-            lambda: s.rbut_update(thz_tab.point_cloud_rbut, 
-            "point_cloud_plot", "plot_style"))
 
         # QPushButtons
         # any config updates occur in their respective callback functions

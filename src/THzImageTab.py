@@ -1,50 +1,14 @@
 
-from PySide6 import QtCore, QtWidgets, QtGui
+from PySide6 import QtCore, QtWidgets
 from PySide6.QtCore import Qt
 import os
-import json
 import collections
 import math
-from math import nan
-#import sys
-#import signal
-import copy
-import numpy as np
-import pyqtgraph as pg
-import pyqtgraph.opengl as gl
 from collections import OrderedDict
-import THzImageObj as tio
 import build_thz_image_tab as bti
-#from dataclasses import dataclass, field
-
-#import proc.postproc_fcns_t3 as pft3
 
 from PySide6.QtWidgets import (
-    QApplication,
-    QCheckBox,
-    QComboBox,
-    QDateEdit,
-    QDateTimeEdit,
-    QDial,
-    QDoubleSpinBox,
-    QFontComboBox,
-    QLabel,
-    QLCDNumber,
-    QLineEdit,
-    QMainWindow,
-    QProgressBar,
-    QPushButton,
-    QRadioButton,
-    QSlider,
-    QSpinBox,
-    QTimeEdit,
-    QVBoxLayout,
-    QHBoxLayout,
-    QFormLayout,
-    QGridLayout,
-    QTabWidget,
     QWidget,
-    QSizePolicy,
     QFileDialog,
     QMessageBox,
 )
@@ -70,18 +34,13 @@ class THzImageTab(QWidget):
     This is the first sort of "raw" THz image tab.  It's really for viewing 
     minimially processed data
     """
-    set_trace_val = False
 
     # NOTE: cfg_dict is the global configuration dictionary, it is
     # not to be modified outside of the MainWindow, it is only provided
     # to be read
-    def __init__(s, CFG_DFLT_PATH, CONFIG_DIR, 
-                 update_config, cfg_dict):
+    def __init__(s, update_config, cfg_dict):
         super().__init__()
 
-        
-        s.CFG_DFLT_PATH  = CFG_DFLT_PATH
-        s.CONFIG_DIR     = CONFIG_DIR
         s.update_config  = update_config
         s.cfg_dict       = cfg_dict
 
@@ -98,20 +57,14 @@ class THzImageTab(QWidget):
         #
         # Connect the lineEdit(textbox) and slider together
         s.thresh_slider.valueChanged.connect(s.update_thresh_ledit)
-        #s.thresh_slider.sliderReleased.connect(lambda: s.update_thresh_ledit(
-        #    s.thresh_slider.value()))
         s.thresh_ledit.editingFinished.connect(s.update_thresh_slider)
 
         # Connect the lineEdit(textbox) and slider together
         s.contr_slider.valueChanged.connect(s.update_contr_ledit)
-        #s.contr_slider.sliderReleased.connect(lambda: s.update_contr_ledit(
-        #    s.contr_slider.value()))
         s.contr_ledit.editingFinished.connect(s.update_contr_slider)
 
         # Connect the lineEdit(textbox) and slider together
         s.pkwdth_slider.valueChanged.connect(s.update_pkwdth_ledit)
-        #s.pkwdth_slider.sliderReleased.connect(lambda: s.update_pkwdth_ledit(
-        #    s.pkwdth_slider.value()))
         s.pkwdth_ledit.textChanged.connect(s.update_pkwdth_slider)
 
         # Connect the lineEdits(textboxes) and sliders together
@@ -179,9 +132,7 @@ class THzImageTab(QWidget):
         s.back_peak_rbut.setChecked(False)
         s.front_surface_plot_rbut.setChecked(False)
         s.back_surface_plot_rbut.setChecked(False)
-        s.num_oversamp_rbut.setChecked(False)
         s.integ_pwr_rbut.setChecked(False)
-        s.point_cloud_rbut.setChecked(False)
 
 
         if cfg_dict["plot_style"] == "front_peak_range":
@@ -192,12 +143,8 @@ class THzImageTab(QWidget):
             s.front_surface_plot_rbut.setChecked(True)
         elif cfg_dict["plot_style"] == "back_surface_range":
             s.back_surface_plot_rbut.setChecked(True)
-        elif cfg_dict["plot_style"] == "num_oversamp_plot":
-            s.num_oversamp_rbut.setChecked(True)
         elif cfg_dict["plot_style"] == "integ_power_plot":
             s.integ_pwr_rbut.setChecked(True)
-        elif cfg_dict["plot_style"] == "point_cloud_plot":
-            s.point_cloud_rbut.setChecked(True)
 
 
         # need to update these because the proper signals won't be generated 
@@ -212,36 +159,7 @@ class THzImageTab(QWidget):
 
 
 
-    def load_config_file(s, cfg_path):
-        """
-        This loads the config data into a dictionary.  It's a rather simple
-        function, and may not be necessary to even exist, but in case things
-        change I would like the abstraction
 
-        note that this works for both radar configuration files and postproc 
-        configuration files
-
-        """
-        with open(cfg_path, "r", encoding="utf-8") as file:
-            cfg_dict = json.load(file)
-
-        return cfg_dict
-
-
-
-    def save_config_file(s, cfg_dict, cfg_path):
-        """
-        this saves a dictionary as a json file.  similar to "load_config_file" 
-        it is likely an unnecessary function, but the abstraction might be helpful
-
-        """
-        with open(cfg_path, 'w') as file:
-            json.dump(cfg_dict, file)
-
-    #def update_thresh_slider(s):
-    #def update_contr_slider(s):
-    #def update_cs_min_slider(s):
-    #def update_cs_max_slider(s):
 
     ############## CALLBACK FUNCTIONS ##############
 
@@ -422,17 +340,17 @@ class THzImageTab(QWidget):
             s.aux_update(s.last_aux_data, True)
 
 
-    def new_pix_clicked(s, position, az_ind, el_ind):
+    def new_pix_clicked(s, position, x_ind, y_ind):
         x_click = position.x()
         y_click = position.y()
         print(f"clicked at data coords: x={x_click:.2f}, y={y_click:.2f}")
-        print(f"X_in = {az_ind}, Y_in = {el_ind}")
+        print(f"X_in = {x_ind}, Y_in = {y_ind}")
         new_cfg_dict = OrderedDict()
-        new_cfg_dict["aux_x_ind"] = int(az_ind)
-        new_cfg_dict["aux_y_ind"] = int(el_ind)
+        new_cfg_dict["aux_x_ind"] = int(x_ind)
+        new_cfg_dict["aux_y_ind"] = int(y_ind)
 
-        new_cfg_dict["aux_az_val"] = x_click
-        new_cfg_dict["aux_el_val"] = y_click
+        new_cfg_dict["aux_x_val"] = x_click
+        new_cfg_dict["aux_y_val"] = y_click
 
         cfg_flags = ["force_update"]
         s.update_config(new_cfg_dict, cfg_flags)

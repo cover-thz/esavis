@@ -122,8 +122,8 @@ class CoverProc:
             aux_data_out["data_valid"]      = True
             aux_data_out["x_ind"]           = aux_x_ind
             aux_data_out["y_ind"]           = aux_y_ind
-            aux_data_out["aux_az_val"]      = cfg_dict["aux_az_val"]
-            aux_data_out["aux_el_val"]      = cfg_dict["aux_el_val"]
+            aux_data_out["aux_x_val"]      = cfg_dict["aux_x_val"]
+            aux_data_out["aux_y_val"]      = cfg_dict["aux_y_val"]
             aux_data_out["power_spectra"]   = aux_power_spectra
             aux_data_out["range_lut_cm"]    = range_lut_cm
             aux_data_out["peak_ranges"]     = aux_peak_ranges
@@ -149,8 +149,8 @@ class CoverProc:
             aux_data_out["data_valid"]      = False
             aux_data_out["x_ind"]           = aux_x_ind
             aux_data_out["y_ind"]           = aux_y_ind
-            aux_data_out["aux_az_val"]      = cfg_dict["aux_az_val"]
-            aux_data_out["aux_el_val"]      = cfg_dict["aux_el_val"]
+            aux_data_out["aux_x_val"]      = cfg_dict["aux_x_val"]
+            aux_data_out["aux_y_val"]      = cfg_dict["aux_y_val"]
             aux_data_out["power_spectra"]   = None
             aux_data_out["range_lut_cm"]    = range_lut_cm
             aux_data_out["peak_ranges"]     = None

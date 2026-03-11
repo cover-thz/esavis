@@ -23,30 +23,12 @@ from PySide6 import QtCore, QtWidgets, QtGui
 from PySide6.QtCore import Qt, QTimer
 import os
 import sys
-import json
-#from math import nan
 import signal
-import numpy as np
-import pyqtgraph as pg
 import multiprocessing as mp
 from collections import OrderedDict
 import copy
-import subprocess
 import time
 
-# compile the C functions
-if __name__ == '__main__':
-    CWD = os.getcwd() 
-    if os.name == "nt":
-        c_funcs_dir = CWD + "\\postproc\\c_funcs"
-        #result = subprocess.run(["make"], cwd=c_funcs_dir)
-    elif os.name == "posix":
-        c_funcs_dir = CWD + "/postproc/c_funcs"
-        #result = subprocess.run(["make"], cwd=c_funcs_dir)
-    else:
-        raise Exception("Invalid OS Name")
-
-#from dataclasses import dataclass, field
 from THzImageTab import THzImageTab
 
 # crude but effective way of getting the postprocessing directory in here
@@ -58,31 +40,9 @@ import data_processor as dp
 
 
 from PySide6.QtWidgets import (
-    QApplication,
-    QCheckBox,
-    QComboBox,
-    QDateEdit,
-    QDateTimeEdit,
-    QDial,
-    QDoubleSpinBox,
-    QFontComboBox,
-    QLabel,
-    QLCDNumber,
-    QLineEdit,
     QMainWindow,
-    QProgressBar,
-    QPushButton,
-    QRadioButton,
-    QSlider,
-    QSpinBox,
-    QTimeEdit,
     QVBoxLayout,
-    QHBoxLayout,
-    QFormLayout,
-    QGridLayout,
-    QTabWidget,
     QWidget,
-    QSizePolicy,
 )
 
 
@@ -110,10 +70,6 @@ def sigint_handler(*_):
 
 def get_default_cfgs():
     DFLT_CFG_DICT = OrderedDict()
-    DFLT_CFG_DICT["el_side_0_start"] = 0
-    DFLT_CFG_DICT["el_side_0_end"] = 0
-    DFLT_CFG_DICT["el_side_1_start"] = 0
-    DFLT_CFG_DICT["el_side_1_end"] = 0
 
     DFLT_CFG_DICT["ylen"] = 1 
     DFLT_CFG_DICT["xlen"] = 1
@@ -127,16 +83,9 @@ def get_default_cfgs():
     DFLT_CFG_DICT["dead_pix_val"] = 0.
     DFLT_CFG_DICT["fs_adc"] = 0.
 
-    DFLT_CFG_DICT["el_offset0"] = 0.
-    DFLT_CFG_DICT["el_offset1"] = 0.
-
-    DFLT_CFG_DICT["center_rangeval"] = 0.
     DFLT_CFG_DICT["dec_val"] = 1
     DFLT_CFG_DICT["ch0_offset"] = 0.
     DFLT_CFG_DICT["ch1_offset"] = 0.
-
-    DFLT_CFG_DICT["disable_el_side0"] = 0.
-    DFLT_CFG_DICT["disable_el_side1"] = 0.
 
     DFLT_CFG_DICT["calc_weighted_sum"] = True
     DFLT_CFG_DICT["ch0_en"] = True
@@ -157,10 +106,10 @@ def get_default_cfgs():
     DFLT_CFG_DICT["color_scale_min"] = 0.
     DFLT_CFG_DICT["color_scale_max"] = 7000.
 
-    DFLT_CFG_DICT["min_az"] = 0.
-    DFLT_CFG_DICT["max_az"] = 1.
-    DFLT_CFG_DICT["min_el"] = 0.
-    DFLT_CFG_DICT["max_el"] = 1.
+    DFLT_CFG_DICT["min_x"] = 0.
+    DFLT_CFG_DICT["max_x"] = 1.
+    DFLT_CFG_DICT["min_y"] = 0.
+    DFLT_CFG_DICT["max_y"] = 1.
 
     DFLT_CFG_DICT["colormap"]        = "turbo"
     DFLT_CFG_DICT["data_src"]        = "disabled"
@@ -171,16 +120,16 @@ def get_default_cfgs():
 
     DFLT_CFG_DICT["aux_x_ind"] = 10
     DFLT_CFG_DICT["aux_y_ind"] = 10
-    DFLT_CFG_DICT["aux_az_val"] = -1
-    DFLT_CFG_DICT["aux_el_val"] = -1
+    DFLT_CFG_DICT["aux_x_val"] = -1
+    DFLT_CFG_DICT["aux_y_val"] = -1
 
     DFLT_CFG_DICT["external_h5_fpath"] = None
 
 
     # These values do not appear in the GUI yet
     # so they are "hard-coded"
-    DFLT_CFG_DICT["el_encoder_to_cm"]  = 16/500
-    DFLT_CFG_DICT["az_encoder_to_cm"]  = 16/500
+    DFLT_CFG_DICT["y_encoder_to_cm"]  = 16/500
+    DFLT_CFG_DICT["x_encoder_to_cm"]  = 16/500
 
     DFLT_CFG_DICT["flags"] = []
 
@@ -204,39 +153,18 @@ class MainWindow(QMainWindow):
     the respective tab widget 
     """
     cfg_dict    =   None
-
-    powspec_matrix  = None
-    coarse_azi_lut  = None
-    coarse_elev_lut = None
-    freq_lut        = None
-
-    # tier 2 postprocessing data values
-    peak_indices_matrix = None
-    peak_ranges_matrix  = None
-    peak_powers_matrix  = None
-    num_peaks_matrix    = None
-    noise_floor_matrix  = None
-
-    cur_proc_data_file_0 = None
-    cur_proc_data_file_1 = None
     proc_pipes = None
 
 
-    def __init__(s, DFLT_DATA_DIR, CFG_DFLT_PATH, CONFIG_DIR, proc_pipes):
+    def __init__(s, DFLT_DATA_DIR, proc_pipes):
         super().__init__()
 
-        # going with a single configuration file rather than two
-        s.CFG_DFLT_PATH     = CFG_DFLT_PATH
-        s.CONFIG_DIR        = CONFIG_DIR
         s.proc_pipes        = proc_pipes
         s.pre_first_update  = True
         s.last_update_time  = None
         s.lock_pipes = False
 
         # hard-coded default configs
-        # used to construct the cfg_dict prior to loading the default file
-        # and to override defaults in any loaded config file that need 
-        # overriding
         s.DFLT_CFG_DICT = get_default_cfgs()
 
         # Config data transfer handshaking flags
@@ -251,13 +179,6 @@ class MainWindow(QMainWindow):
         # before pushing an empty or "null" frame through the GUI to 
         # update all the objects
         s.max_null_frame_update_period     = s.SLOW_UPDATES
-
-        # maximum length of time without a frame update when data source is 
-        # dat_file or use_buffer before forcing a frame update so we can 
-        # properly update all the GUI objects.
-        # NOTE TODO HERE 5/22/2025!!!! 
-        #s.max_buf_frame_update_period = 0.1
-        #s.last_buf_frame_update = time.time()
 
         # used for seeing the frame-to-frame "rate"
         s.prev_frame_time = None
@@ -284,34 +205,26 @@ class MainWindow(QMainWindow):
             "calc_weighted_sum",
             "threshold_db",
             "contrast_db","half_peak_width","min_range","max_range",
-            "min_az","max_az","min_el","max_el","plot_style",
+            "min_x","max_x","min_y","max_y","plot_style",
             "peak_selection","aux_x_ind","aux_y_ind"]
 
 
         # config keys that if changed indicate that a file should be reloaded
         s.reload_file_keys = ["ylen","xlen","fft_len",
-            "min_az","max_az","min_el","max_el"]
+            "min_x","max_x","min_y","max_y"]
             
             
-        # these are the keys that are excluded from being saved to 
-        # config files and when loading config files
-        s.excluded_keys = ["external_h5_fpath"]
-
         # create the main widget
-        s.main_thz_tab = THzImageTab(CFG_DFLT_PATH, CONFIG_DIR, 
-                                        s.update_config, s.cfg_dict)
+        s.main_thz_tab = THzImageTab(s.update_config, s.cfg_dict)
 
         s.layout.addWidget(s.main_thz_tab)
 
 
-        # check for default postprocessing config and execute configuration 
-        # sequence if there is a default postprocessing config
-        if os.path.isfile(CFG_DFLT_PATH):
-            s.load_config(CFG_DFLT_PATH)
-        else:
-            new_cfg_dict = OrderedDict()
-            new_cfg_dict["data_src"] = "disabled"
-            s.update_config(new_cfg_dict)
+        # initialize GUI widgets from default config and start disabled
+        s.main_thz_tab.set_gui_config_params(s.cfg_dict)
+        new_cfg_dict = OrderedDict()
+        new_cfg_dict["data_src"] = "disabled"
+        s.update_config(new_cfg_dict)
 
         # finally setup the timer
         s.timer = QTimer()
@@ -354,55 +267,6 @@ class MainWindow(QMainWindow):
         event.accept()
 
 
-    # central function that loads files into our config dict
-    def load_config(s, fpath):
-        """
-        loads a config file creating a config dictionary
-        """
-        ret_val = False
-        try:
-            with open(fpath, "r", encoding="utf-8") as file:
-                cfg_dict_in = json.load(file, object_pairs_hook=OrderedDict)
-
-            # exclude the excluded keys
-            cfg_dict_out = OrderedDict()
-            for key in cfg_dict_in.keys():
-                if key not in s.excluded_keys:
-                    cfg_dict_out[key] = cfg_dict_in[key]
-                else:
-                    cfg_dict_out[key] = s.DFLT_CFG_DICT[key]
-            s.update_config(cfg_dict_out)
-
-        except:
-            print("load_config failed")
-            ret_val = True
-
-        # pass the config to the various functions that set the appropriate 
-        # GUI objects
-        if s.cfg_dict != None:
-            s.main_thz_tab.set_gui_config_params(s.cfg_dict)
-        return ret_val
-
-
-
-    # central function that saves our config dict to a file
-    def save_config(s, fpath):
-        """
-        saves a config file with the current configuration dictionary
-        excluding the excluded keys
-        """
-        # exclude the excluded keys
-        cfg_dict_out = OrderedDict()
-        for key in s.cfg_dict.keys():
-            if key not in s.excluded_keys:
-                cfg_dict_out[key] = s.cfg_dict[key]
-            else:
-                cfg_dict_out[key] = s.DFLT_CFG_DICT[key]
-
-        with open(fpath, 'w') as file:
-            json.dump(cfg_dict_out, file)
-
-
     @staticmethod
     def append_if_absent(cfg_flags, new_flag):
         if new_flag not in cfg_flags:
@@ -443,27 +307,6 @@ class MainWindow(QMainWindow):
         typing values in a textbox it's all to keep the processing system 
         moving quickly.  
         """
-        #if (cfg_dict_in != None) and (cfg_dict_in != {}):
-        #    cfg_flags_none = (cfg_flags_in == None) or (cfg_flags_in != [])
-        #    just_curr_frame_id = ((len(cfg_dict_in.keys()) == 1) and 
-        #                         ("curr_frame_id" in cfg_dict_in.keys()))
-
-        #    if ((not cfg_flags_none) or (not just_curr_frame_id)):
-        #        print("--------------------")
-        #        print("UPDATE CONFIG (apart from just curr_frame_id)!:")
-        #        print(cfg_dict_in)
-        #        print(cfg_flags_in)
-        #        print("--------------------\n")
-
-
-        #else:
-        #    print("--------------------")
-        #    print("UPDATE CONFIG (apart from just curr_frame_id)!:")
-        #    print(cfg_dict_in)
-        #    print(cfg_flags_in)
-        #    print("--------------------\n")
-
-
         cfg_dict = s.cfg_dict
         cfg_flags = []
         if (cfg_dict_in != None) and (cfg_dict_in != {}):
@@ -497,13 +340,13 @@ class MainWindow(QMainWindow):
             # check to see if the pixel grid size/shape has changed
             # which triggers a flag to notify the processor to recalculate
             # those grids
-            if cfg_dict["min_az"] != old_cfg_dict["min_az"]:
+            if cfg_dict["min_x"] != old_cfg_dict["min_x"]:
                 cfg_flags = s.append_if_absent(cfg_flags, "recalc_coarse_grid")
-            elif cfg_dict["max_az"] != old_cfg_dict["max_az"]:
+            elif cfg_dict["max_x"] != old_cfg_dict["max_x"]:
                 cfg_flags = s.append_if_absent(cfg_flags, "recalc_coarse_grid")
-            elif cfg_dict["min_el"] != old_cfg_dict["min_el"]:
+            elif cfg_dict["min_y"] != old_cfg_dict["min_y"]:
                 cfg_flags = s.append_if_absent(cfg_flags, "recalc_coarse_grid")
-            elif cfg_dict["max_el"] != old_cfg_dict["max_el"]:
+            elif cfg_dict["max_y"] != old_cfg_dict["max_y"]:
                 cfg_flags = s.append_if_absent(cfg_flags, "recalc_coarse_grid")
             elif cfg_dict["xlen"] != old_cfg_dict["xlen"]:
                 cfg_flags = s.append_if_absent(cfg_flags, "recalc_coarse_grid")
@@ -577,7 +420,6 @@ class MainWindow(QMainWindow):
         """
         if new_frame_flag:
             cfg_dict_update = OrderedDict()
-            #if s.cfg_dict["data_src"] != "use_buffer":
             cfg_dict_update["curr_frame_id"] = frame_id
             s.update_config(cfg_dict_update)
 
@@ -614,10 +456,6 @@ class MainWindow(QMainWindow):
             _dbg = True
         else:
             _dbg = False
-        #if s.dbg_i > 100:
-        #    s.dbg_i = 0
-        #    _dbg = True
-        #    print("entered timer_handler")
         cfg_pipe    = s.proc_pipes.cfg_pipe
         err_pipe    = s.proc_pipes.err_pipe
         data_pipe   = s.proc_pipes.data_pipe
@@ -642,9 +480,9 @@ class MainWindow(QMainWindow):
             data_src_in = data_in[2]
             aux_data_in = data_in[3]
             
-            pre = time.time_ns() # NOTE TODO DEBUG REMOVE
+            pre = time.time_ns()
             s.frame_update(frame_in, frame_id, data_src_in, True)
-            post = time.time_ns() # NOTE TODO DEBUG REMOVE
+            post = time.time_ns()
             if s.cfg_dict["frame_update_dbg"]:
                 print(f"frame_update duration: {((post-pre)/1e6):.4f} ms\n")
 
@@ -667,12 +505,12 @@ class MainWindow(QMainWindow):
 
             elif "EXTERNAL_H5_META" in query_in_dict.keys():
                 meta = query_in_dict["EXTERNAL_H5_META"]
-                s.cfg_dict["min_az"] = meta["min_az"]
-                s.cfg_dict["max_az"] = meta["max_az"]
-                s.cfg_dict["min_el"] = meta["min_el"]
-                s.cfg_dict["max_el"] = meta["max_el"]
-                s.cfg_dict["az_encoder_to_cm"] = 1.0
-                s.cfg_dict["el_encoder_to_cm"] = 1.0
+                s.cfg_dict["min_x"] = meta["min_x"]
+                s.cfg_dict["max_x"] = meta["max_x"]
+                s.cfg_dict["min_y"] = meta["min_y"]
+                s.cfg_dict["max_y"] = meta["max_y"]
+                s.cfg_dict["x_encoder_to_cm"] = 1.0
+                s.cfg_dict["y_encoder_to_cm"] = 1.0
 
             else:
                 print(f"Warning: invalid query keys: {query_in_dict.keys()}")
@@ -724,20 +562,11 @@ class MainWindow(QMainWindow):
 if __name__ == '__main__':
     CWD = os.getcwd() 
     if os.name == "nt":
-        CONFIG_DIR  = CWD + "\\config\\"
         DFLT_DATA_DIR  =   os.path.dirname(os.getcwd()) + "\\data\\"
     elif os.name == "posix":
-        CONFIG_DIR  = CWD + "/config/"
         DFLT_DATA_DIR = "/tmp/"
     else:
         raise Exception("Invalid OS Name")
-
-    CFG_DFLT_FNAME  = "default_cfg.json"
-    #PLOT_SETTINGS_DFLT_FNAME    = "plot_settings_default.json"
-    #POSTPROC_CFG_DFLT_FNAME     = "postproc_default_cfg.json"
-    #PLOT_SETTINGS_DFLT_PATH     = CONFIG_DIR + PLOT_SETTINGS_DFLT_FNAME
-    #POSTPROC_DFLT_CFG_PATH      = CONFIG_DIR + POSTPROC_CFG_DFLT_FNAME
-    CFG_DFLT_PATH   = CONFIG_DIR + CFG_DFLT_FNAME
 
     # this is supposed to allow quitting the app from CTRL-C on console
     signal.signal(signal.SIGINT, sigint_handler)
@@ -746,10 +575,6 @@ if __name__ == '__main__':
     app.setStyle("Fusion")
     app.setApplicationName("THz Visualizer")
     app.setApplicationVersion("0.0.1")
-
-    # Icon Do I need one? We should get one later
-    #icon = QtGui.QIcon("Cover_Symbol_RGB_Black.svg")
-    #app.setWindowIcon(icon)
 
     import argparse
     ap = argparse.ArgumentParser(description="THz Visualizer")
@@ -779,7 +604,7 @@ if __name__ == '__main__':
                            query_pipe_out)
 
     # Defining and showing the main window
-    window = MainWindow(DFLT_DATA_DIR, CFG_DFLT_PATH, CONFIG_DIR, proc_pipes)
+    window = MainWindow(DFLT_DATA_DIR, proc_pipes)
                 
     window.show()
 

@@ -1,50 +1,19 @@
 # This is the code that creates the spectrum plot object
-# that is used by SingPixTab
-
 
 import os
-import sys
 import numpy as np
-import ipdb
 os.environ["QT_API"] = "PySide6"
 
-from PySide6 import QtCore, QtWidgets, QtGui
+from PySide6 import QtCore, QtWidgets
 from PySide6.QtCore import Qt
-from collections import OrderedDict
 
 from matplotlib.backends.backend_qtagg import FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
-
 from PySide6.QtWidgets import (
-    QApplication,
-    QCheckBox,
-    QComboBox,
-    QDateEdit,
-    QDateTimeEdit,
-    QDial,
-    QDoubleSpinBox,
-    QFontComboBox,
-    QLabel,
-    QLCDNumber,
-    QLineEdit,
-    QMainWindow,
-    QProgressBar,
-    QPushButton,
-    QRadioButton,
-    QSlider,
-    QSpinBox,
-    QTimeEdit,
     QVBoxLayout,
-    QHBoxLayout,
-    QFormLayout,
-    QGridLayout,
-    QTabWidget,
     QWidget,
-    QSizePolicy,
-    QFileDialog,
-    QScrollArea,
 )
 
 class AuxPlotCanvas(FigureCanvas):
@@ -102,8 +71,8 @@ class AuxPlotObj(QWidget):
         if new_frame_flag and aux_data_in["data_valid"]:
             x_ind       = aux_data_in["x_ind"]
             y_ind       = aux_data_in["y_ind"]
-            aux_az_val  = aux_data_in["aux_az_val"]
-            aux_el_val  = aux_data_in["aux_el_val"]
+            aux_x_val  = aux_data_in["aux_x_val"]
+            aux_y_val  = aux_data_in["aux_y_val"]
 
             power_spectra_lin   = aux_data_in["power_spectra"]
             range_lut_cm    = aux_data_in["range_lut_cm"]
@@ -157,15 +126,13 @@ class AuxPlotObj(QWidget):
 
 
             title = f"Pixel ({x_ind}, {y_ind})"
-            title += f" X={aux_az_val:.2f}, Y={aux_el_val:.2f}"
+            title += f" X={aux_x_val:.2f}, Y={aux_y_val:.2f}"
             s.plt_axes.set_title(title)
 
             power_spectra_db = 10*np.log10(power_spectra_lin)
             noise_floor_db = 10*np.log10(noise_floor)
             adj_thresh_db = 10*np.log10(adj_lin_thresh)
             adj_contr_db  = 10*np.log10(adj_lin_contr)
-
-            #ipdb.set_trace()
 
             s.plot_handles = []
             s.labels_list = []
@@ -179,7 +146,6 @@ class AuxPlotObj(QWidget):
                     power_spectra_db, 'r', label=label, linewidth=lw)
 
             else:
-                #s.aux_main_plt_hndl.set_data([], [])
                 s.aux_main_plt_hndl.set_data(range_lut_cm, power_spectra_db)
 
             s.plot_handles.append(s.aux_main_plt_hndl)
@@ -219,8 +185,6 @@ class AuxPlotObj(QWidget):
                 s.labels_list.append(label)
 
             else:
-                #s.noise_plt_hndl_0.set_xdata([])
-                #s.noise_plt_hndl_1.set_xdata([])
                 s.noise_plt_hndl_0.remove()
                 s.noise_plt_hndl_1.remove()
 
@@ -243,7 +207,6 @@ class AuxPlotObj(QWidget):
                 s.plot_handles.append(s.noise_floor_plt_hndl)
                 s.labels_list.append(label)
             else:
-                #s.noise_floor_plt_hndl.set_ydata([])
                 s.noise_floor_plt_hndl.remove()
                 s.noise_floor_plt_hndl = None
 
@@ -261,7 +224,6 @@ class AuxPlotObj(QWidget):
                 s.plot_handles.append(s.threshold_plt_hndl)
                 s.labels_list.append(label)
             else:
-                #s.threshold_plt_hndl.set_ydata([])
                 s.threshold_plt_hndl.remove()
                 s.threshold_plt_hndl = None
                     
@@ -282,7 +244,6 @@ class AuxPlotObj(QWidget):
                 s.plot_handles.append(s.contrast_plt_hndl)
                 s.labels_list.append(label)
             else:
-                #s.contrast_plt_hndl.set_ydata([])
                 s.contrast_plt_hndl.remove()
                 s.contrast_plt_hndl = None
                 
@@ -362,9 +323,6 @@ class AuxPlotObj(QWidget):
                 s.labels_list.append(label)
 
             else:
-                #s.weight_sum_plt_hndl_0.set_xdata([])
-                #s.weight_sum_plt_hndl_1.set_xdata([])
-                    
                 s.weight_sum_plt_hndl_0.remove()
                 s.weight_sum_plt_hndl_1.remove()
 

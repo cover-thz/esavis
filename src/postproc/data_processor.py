@@ -91,10 +91,10 @@ def main_proc_loop(cfg_obj_pipe, error_pipe, data_out_pipe, query_in_pipe,
                         y_m = power_cube["y_coords_m"]
                         meta_dict = OrderedDict()
                         meta_dict["EXTERNAL_H5_META"] = {
-                            "min_az": float(x_m[0])  * 100.0,
-                            "max_az": float(x_m[-1]) * 100.0,
-                            "min_el": float(y_m[0])  * 100.0,
-                            "max_el": float(y_m[-1]) * 100.0,
+                            "min_x": float(x_m[0])  * 100.0,
+                            "max_x": float(x_m[-1]) * 100.0,
+                            "min_y": float(y_m[0])  * 100.0,
+                            "max_y": float(y_m[-1]) * 100.0,
                         }
                         query_out_pipe.send(meta_dict)
 
