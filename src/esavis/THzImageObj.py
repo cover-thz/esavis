@@ -423,7 +423,7 @@ class THzSurfaceObj(gl.GLViewWidget):
 
 
     def __init__(s, thz_image_tab):
-        super().__init__(rotationMethod="quaternion")
+        super().__init__()
 
         s.thz_image_tab = thz_image_tab
 
@@ -472,7 +472,7 @@ class THzSurfaceObj(gl.GLViewWidget):
 
         color_map = s.color_map
 
-        s.surface_plot.setData(x_grid_cm, y_grid_cm, image_adj)
+        s.surface_plot.setData(x=x_grid_cm, y=y_grid_cm, z=image_adj)
         s.surface_plot.setShader("heightColor")
         s.surface_plot.shader()["colorMap"] = color_map
 
