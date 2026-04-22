@@ -85,6 +85,9 @@ venv/
 lite_venv/
 testvenv/
 
+# generated packaging metadata
+*.egg-info/
+
 # ignore all config files
 src/config/*.json
 
